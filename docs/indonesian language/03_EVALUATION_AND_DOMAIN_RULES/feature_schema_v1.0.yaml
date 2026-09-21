@@ -1,0 +1,104 @@
+meta:
+  version: "1.0"
+  project: Competition Decision Support System
+features:
+  - id: F-001
+    name: "Personal Commitments"
+    release: mvp
+    execution_boundary: local
+  - id: F-002
+    name: "Availability Model"
+    release: mvp
+    execution_boundary: local
+  - id: F-003
+    name: "Competition URL Ingestion"
+    release: mvp
+    execution_boundary: cloud
+  - id: F-004
+    name: "PDF Ingestion"
+    release: mvp
+    execution_boundary: cloud
+  - id: F-005
+    name: "Native Text Extraction"
+    release: mvp
+    execution_boundary: cloud
+  - id: F-006
+    name: "Visual/OCR Extraction"
+    release: mvp
+    execution_boundary: cloud
+  - id: F-007
+    name: "Candidate Report Normalization"
+    release: mvp
+    execution_boundary: cloud
+  - id: F-008
+    name: "Field-Level Reconciliation"
+    release: mvp
+    execution_boundary: cloud
+  - id: F-009
+    name: "Human Source Review"
+    release: mvp
+    execution_boundary: mobile
+  - id: F-010
+    name: "Competition Readiness Triage"
+    release: mvp
+    execution_boundary: backend
+  - id: F-011
+    name: "Task Decomposition"
+    release: mvp
+    execution_boundary: cloud
+  - id: F-012
+    name: "Workload Estimation"
+    release: mvp
+    execution_boundary: cloud
+  - id: F-013
+    name: "Constraint Model"
+    release: mvp
+    execution_boundary: backend
+  - id: F-014
+    name: "CP-SAT Candidate Allocation"
+    release: mvp
+    execution_boundary: backend
+  - id: F-015
+    name: "Recommendation Layer"
+    release: mvp
+    execution_boundary: backend
+  - id: F-016
+    name: "Decision Support Report"
+    release: mvp
+    execution_boundary: mobile
+  - id: F-017
+    name: "Human Decision"
+    release: mvp
+    execution_boundary: mobile
+  - id: F-018
+    name: "Accepted Commitment"
+    release: mvp
+    execution_boundary: local
+  - id: F-019
+    name: "Progress Tracking"
+    release: mvp
+    execution_boundary: local
+  - id: F-020
+    name: "Re-evaluation"
+    release: mvp
+    execution_boundary: backend
+  - id: F-021
+    name: "Saved Plans"
+    release: mvp
+    execution_boundary: local
+  - id: F-022
+    name: "RevenueCat Entitlement"
+    release: mvp
+    execution_boundary: mobile
+  - id: F-023
+    name: "Export"
+    release: post_mvp
+    execution_boundary: mobile
+  - id: F-024
+    name: "Direct Calendar Integration"
+    release: post_mvp
+    execution_boundary: mobile
+  - id: F-025
+    name: "Historical Effort Learning"
+    release: future
+    execution_boundary: local_or_cloud

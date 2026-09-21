@@ -1,0 +1,117 @@
+meta:
+  project: Competition Decision Support System
+  version: "1.0"
+  status: preproduction
+rules:
+  - id: DR-001
+    name: "Human decision authority"
+    severity: critical
+    rule: "The system must not make the final participation decision for the user."
+  - id: DR-002
+    name: "Explicit commitment"
+    severity: critical
+    rule: "A suggested work window becomes a commitment only after explicit user acceptance."
+  - id: DR-003
+    name: "Missing information"
+    severity: critical
+    rule: "Missing required competition information must remain missing; it must not be invented."
+  - id: DR-004
+    name: "Independent extraction"
+    severity: major
+    rule: "Native-text and visual/OCR paths produce independent candidate reports."
+  - id: DR-005
+    name: "Candidate is not canonical"
+    severity: major
+    rule: "No extraction-path output is canonical before reconciliation."
+  - id: DR-006
+    name: "Critical conflict preservation"
+    severity: critical
+    rule: "Unresolved disagreement on a critical field must remain visible as CONFLICT."
+  - id: DR-007
+    name: "No confidence-only override"
+    severity: critical
+    rule: "Extractor confidence alone cannot resolve a critical conflict."
+  - id: DR-008
+    name: "Source scope and authority"
+    severity: major
+    rule: "Reconciliation must consider source authority, freshness, and scope."
+  - id: DR-009
+    name: "Critical provenance"
+    severity: critical
+    rule: "Every critical canonical field must retain source/evidence provenance."
+  - id: DR-010
+    name: "Deadline validity"
+    severity: critical
+    rule: "A passed authoritative deadline blocks readiness unless an applicable authoritative extension exists."
+  - id: DR-011
+    name: "Known ineligibility"
+    severity: critical
+    rule: "A confirmed unmet hard eligibility predicate returns ELIGIBILITY_BLOCKED."
+  - id: DR-012
+    name: "Unknown is not false"
+    severity: major
+    rule: "Unknown user attributes must not be treated as confirmed ineligibility."
+  - id: DR-013
+    name: "Readiness gate"
+    severity: major
+    rule: "Planning may continue only when required critical information is sufficient and no hard readiness blocker applies."
+  - id: DR-014
+    name: "Effort uncertainty"
+    severity: major
+    rule: "Task effort must be represented as a range rather than an unjustified precise point."
+  - id: DR-015
+    name: "Calendar-aware capacity"
+    severity: major
+    rule: "Feasibility must use actual time blocks, not only aggregate free hours."
+  - id: DR-016
+    name: "Hard constraints"
+    severity: critical
+    rule: "Solver candidates must satisfy fixed commitments, dependency order, capacity, and deadline hard constraints."
+  - id: DR-017
+    name: "Post-solver verification"
+    severity: critical
+    rule: "Every recommendable candidate must pass deterministic invariant checks."
+  - id: DR-018
+    name: "Recommendation traceability"
+    severity: major
+    rule: "Every recommendation must reference a valid candidate allocation."
+  - id: DR-019
+    name: "Alternatives"
+    severity: major
+    rule: "Materially different feasible alternatives should be surfaced when available."
+  - id: DR-020
+    name: "Explainability"
+    severity: major
+    rule: "Recommendations must expose rationale, assumptions, and trade-offs."
+  - id: DR-021
+    name: "Feasibility semantics"
+    severity: major
+    rule: "Feasibility states describe current modeled constraints, not user ability or worth."
+  - id: DR-022
+    name: "Staleness"
+    severity: major
+    rule: "Material changes to calendar, scope, deadline, workload, or capacity invalidate affected recommendations."
+  - id: DR-023
+    name: "Recurrence correctness"
+    severity: major
+    rule: "Availability modeling must preserve recurrence and exception semantics."
+  - id: DR-024
+    name: "Monetization isolation"
+    severity: critical
+    rule: "Entitlement must never change deadline, eligibility, conflict, or other correctness-critical facts."
+  - id: DR-025
+    name: "Actual effort integrity"
+    severity: major
+    rule: "Unknown actual effort is missing, not zero, and must not be inferred from scheduled duration alone."
+  - id: DR-026
+    name: "Privacy minimization"
+    severity: major
+    rule: "Backend planning should prefer availability intervals over unnecessary semantic calendar titles."
+  - id: DR-027
+    name: "No silent external action"
+    severity: critical
+    rule: "No calendar write, submission, payment, or other external action occurs without explicit user action."
+  - id: DR-028
+    name: "Auditability"
+    severity: major
+    rule: "Critical decisions must be reproducible from source, rule, solver, and recommendation versions."

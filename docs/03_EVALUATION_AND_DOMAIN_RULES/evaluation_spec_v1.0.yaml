@@ -1,0 +1,29 @@
+meta:
+  version: "1.0"
+  project: Competition Decision Support System
+evaluation_layers:
+  source_understanding:
+    metrics: [critical_field_accuracy, provenance_coverage, conflict_recall]
+    critical_requirements:
+      provenance_coverage: 1.0
+      false_conflict_resolution: 0
+  triage:
+    metrics: [false_ready_count, blocker_recall]
+    critical_requirements:
+      false_ready_count: 0
+  solver:
+    metrics: [hard_constraint_violations, feasible_fixture_pass_rate]
+    critical_requirements:
+      hard_constraint_violations: 0
+  recommendation:
+    metrics: [candidate_traceability, rationale_coverage, alternative_coverage]
+    critical_requirements:
+      candidate_traceability: 1.0
+  governance:
+    metrics: [silent_external_actions, entitlement_correctness_violations]
+    critical_requirements:
+      silent_external_actions: 0
+      entitlement_correctness_violations: 0
+reporting:
+  synthetic_and_real_results_must_be_separate: true
+  acceptance_rate_is_not_quality_proxy: true
