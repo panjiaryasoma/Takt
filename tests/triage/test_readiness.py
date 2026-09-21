@@ -16,7 +16,7 @@ PAST = NOW - timedelta(days=1)
 
 
 @pytest.mark.parametrize(
-    ("request", "expected"),
+    ("case_input", "expected"),
     [
         (
             ReadinessRequest(
@@ -95,7 +95,7 @@ PAST = NOW - timedelta(days=1)
     ],
 )
 def test_triage_acceptance_cases(
-    request: ReadinessRequest,
+    case_input: ReadinessRequest,
     expected: ReadinessStatus,
 ) -> None:
-    assert evaluate_readiness(request).status == expected
+    assert evaluate_readiness(case_input).status == expected
