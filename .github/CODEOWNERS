@@ -1,0 +1,10 @@
+# Temporary single-account ownership.
+# Add the second team member's GitHub handle when the collaborator account is confirmed.
+
+* @panjiaryasoma
+/apps/mobile/ @panjiaryasoma
+/apps/api/ @panjiaryasoma
+/engine/ @panjiaryasoma
+/packages/contracts/ @panjiaryasoma
+/tests/ @panjiaryasoma
+/docs/ @panjiaryasoma
