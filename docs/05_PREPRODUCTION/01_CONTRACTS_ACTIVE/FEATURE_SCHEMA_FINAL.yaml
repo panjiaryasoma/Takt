@@ -1,0 +1,38 @@
+meta:
+  project: Competition Decision Support System
+  schema_version: "1.0.0"
+  status: ACTIVE
+enums:
+  readiness_status: [READY_TO_EVALUATE, NEEDS_REVIEW, ELIGIBILITY_BLOCKED, DEADLINE_PASSED, INSUFFICIENT_INFORMATION]
+  feasibility_status: [FEASIBLE, FEASIBLE_WITH_TRADEOFFS, TIGHT_CAPACITY, NOT_FEASIBLE_UNDER_CURRENT_CONSTRAINTS]
+  canonical_field_state: [VERIFIED, SINGLE_SOURCE, CONFLICT, MISSING, UNVERIFIED]
+  commitment_type: [FIXED, FLEXIBLE]
+  recommendation_action: [ACCEPT, CHOOSE_ALTERNATIVE, EDIT_CONSTRAINTS, IGNORE]
+contracts:
+  CompetitionBrief:
+    required: [competition_id, name, organizer, submission_deadline, eligibility, deliverables, source_ids, unresolved_critical_fields]
+    critical_fields_require_provenance: true
+  ReadinessTriage:
+    required: [status, blocking_reasons, review_items, passed_checks, rule_version]
+    decision_authority: deterministic
+  Task:
+    required: [task_id, name, mandatory, dependencies, effort_min_hours, effort_likely_hours, effort_max_hours]
+    point_estimate_only_forbidden: true
+  AvailabilityBlock:
+    required: [start, end, timezone, source, availability_type]
+    allowed_types: [AVAILABLE, FIXED_BUSY, FLEXIBLE_BUSY, ACCEPTED_PROJECT_COMMITMENT]
+  CandidateAllocation:
+    required: [candidate_id, work_blocks, buffer_hours, hard_constraint_violations, assumptions]
+    recommendable_requires_zero_hard_violations: true
+  Recommendation:
+    required: [recommended_candidate_id, recommended_next_work, suggested_windows, alternatives, rationale, tradeoffs, assumptions]
+    may_be_null: true
+    human_commit_required: true
+  DecisionSupportReport:
+    required: [competition_brief, readiness, workload, capacity, feasibility, recommendation, risks, assumptions]
+invariants:
+  - No silent calendar commitment.
+  - No confidence-only resolution of critical source conflicts.
+  - No READY state for a passed authoritative deadline unless an applicable authoritative exception exists.
+  - No recommendable candidate with hard-constraint violations.
+  - No custom-ML decision authority based solely on synthetic evaluation.

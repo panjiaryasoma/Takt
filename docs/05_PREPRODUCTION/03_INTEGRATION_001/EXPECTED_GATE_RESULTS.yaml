@@ -1,0 +1,14 @@
+fixture_id: INTEGRATION-001
+gates:
+  - id: GATE-SOURCE
+    expected: PASS
+    condition: critical provenance complete
+  - id: GATE-TRIAGE
+    expected: PASS
+    condition: READY_TO_EVALUATE with no blocking reason
+  - id: GATE-AUTHORITY
+    expected: PASS
+    condition: no join/do-not-join directive
+  - id: GATE-PLANNING
+    expected: OPEN
+    condition: task decomposition may begin

@@ -1,0 +1,14 @@
+fixture_id: INTEGRATION-001
+expected:
+  status: READY_TO_EVALUATE
+  blocking_reasons: []
+  review_items: []
+  passed_checks:
+    - deadline_future
+    - age_eligible
+    - student_status_eligible
+    - region_eligible
+    - mandatory_deliverables_known
+    - required_technology_known
+  rule_version: "1.0"
+forbidden_outputs: [JOIN, DO_NOT_JOIN]
