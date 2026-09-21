@@ -1,27 +1,27 @@
-# Addendum Penyelarasan Schema PRD
+# PRD Schema Alignment Addendum
 
-**Versi:** 1.0  
-**Tanggal:** 2026-09-21
+**Version:** 1.0  
+**Date:** 2026-09-21
 
-File ini menyelaraskan `simple_prd.md` dengan machine-readable schema dan evaluation asset. PRD prose sering terlihat jelas sampai dua engineer mengimplementasikan dua interpretasi berbeda, sebuah ritual industri yang rupanya belum punah.
+This file aligns `simple_prd.md` with the machine-readable schemas and evaluation assets. It exists because prose PRDs have a charming habit of being "clear" until two engineers implement different interpretations.
 
-## 1. Hierarki source of truth
-1. `domain_rules_v1.0.yaml` — behavioral invariant.
-2. `SOURCE_SCHEMA.md` — kontrak source, evidence, candidate report, canonical report.
-3. `feature_schema_v1.0.yaml` — historical feature inventory/release boundary.
-4. `simple_prd.md` — product intent dan user-facing requirement.
+## 1. Source-of-truth hierarchy
+1. `domain_rules_v1.0.yaml` — behavioral invariants.
+2. `SOURCE_SCHEMA.md` — source, evidence, candidate-report and canonical-report contracts.
+3. `feature_schema_v1.0.yaml` — feature inventory and release boundaries.
+4. `simple_prd.md` — product intent and user-facing requirements.
 5. `evaluation_spec_v1.0.yaml` — acceptance methodology.
 6. `evaluation_matrix_v1.0.csv` — executable pre-production case inventory.
 
-Jika prose bertentangan dengan critical domain invariant, domain rule berlaku sampai ada versioned change yang eksplisit.
+When prose conflicts with a critical domain invariant, the domain rule wins until an explicit versioned change is made.
 
 ## 2. PRD → feature alignment
 
-| Area PRD | Canonical feature IDs |
+| PRD area | Canonical feature IDs |
 |---|---|
-| Kalender personal | F-001, F-002 |
+| Personal calendar | F-001, F-002 |
 | URL/PDF intake | F-003, F-004 |
-| Dual-path extraction | F-005, F-006, F-007 |
+| Dual-path document extraction | F-005, F-006, F-007 |
 | Reconciliation/canonical report | F-008, F-009 |
 | Competition readiness | F-010 |
 | Task/workload modeling | F-011, F-012 |
@@ -33,37 +33,100 @@ Jika prose bertentangan dengan critical domain invariant, domain rule berlaku sa
 | Future learned effort adjustment | F-025 |
 
 ## 3. Core data contracts
-- Source ingestion: `SourceRecord[] + EvidenceSpan[]`
-- Extraction: `CandidateExtractionReport`, FW1/FW2 setara dan belum canonical.
-- Reconciliation: `CanonicalCompetitionReport`
-- Readiness: `READY_TO_EVALUATE | NEEDS_REVIEW | ELIGIBILITY_BLOCKED | DEADLINE_PASSED | INSUFFICIENT_INFORMATION`
-- Workload: task dengan dependency dan min/likely/max.
-- Candidate allocation: candidate, work blocks, buffer, hard violations, assumption.
-- Recommendation: candidate reference, suggested windows, alternatives, rationale, trade-offs, assumption.
 
-Recommendation `null` valid jika evidence atau feasibility tidak cukup.
+### Source ingestion output
+`SourceRecord[] + EvidenceSpan[]`
 
-## 4. Pemisahan state
-Source extraction confidence, canonical verification, readiness, feasibility, recommendation ranking, dan human acceptance tidak boleh dilebur.
+### Extraction output
+`CandidateExtractionReport` — FW1 and FW2 are peers; neither is canonical.
 
-High-confidence OCR bukan `VERIFIED`; `READY_TO_EVALUATE` bukan `FEASIBLE`; `FEASIBLE` bukan "pengguna sebaiknya ikut".
+### Reconciliation output
+`CanonicalCompetitionReport`
 
-## 5. Bahasa decision support
-Diperbolehkan: "Feasible di bawah asumsi saat ini", "Kapasitas ketat", recommended work window, alternative, dan explicit buffer/trade-off.
+### Readiness output
+```yaml
+status: READY_TO_EVALUATE | NEEDS_REVIEW | ELIGIBILITY_BLOCKED | DEADLINE_PASSED | INSUFFICIENT_INFORMATION
+blocking_reasons: []
+review_items: []
+passed_checks: []
+```
 
-Dilarang sebagai conclusion sistem: "Kamu pasti harus ikut", "Kamu tidak bisa melakukan ini" ketika hanya current constraints yang infeasible, "Ini kompetisi terbaik untukmu", atau "Kamu harus bekerja jam 19:00".
+### Workload output
+```yaml
+tasks:
+  - id
+  - name
+  - dependencies
+  - min_hours
+  - likely_hours
+  - max_hours
+  - mandatory
+  - evidence_or_basis
+```
+
+### Candidate allocation output
+```yaml
+candidate_id: string
+feasible: boolean
+work_blocks: []
+buffer_hours: number
+hard_constraint_violations: []
+assumptions: []
+```
+
+### Recommendation output
+```yaml
+recommended_candidate_id: string | null
+recommended_next_work: []
+suggested_windows: []
+alternatives: []
+rationale: []
+tradeoffs: []
+assumptions: []
+```
+
+A null recommendation is allowed when evidence or feasibility is insufficient.
+
+## 4. State separation
+These states must not be collapsed:
+- source extraction confidence;
+- canonical field verification state;
+- readiness triage;
+- solver feasibility;
+- recommendation ranking;
+- human acceptance.
+
+High-confidence OCR does not equal `VERIFIED`; `READY_TO_EVALUATE` does not equal `FEASIBLE`; `FEASIBLE` does not equal "user should join."
+
+## 5. Decision-support language
+Approved: "Feasible under current assumptions", "Tight capacity", "Recommended work window", "Alternative", and explicit buffer/trade-off language.
+
+Disallowed as system conclusions: "You should definitely join", "You cannot do this" when only current constraints are infeasible, "This is the best competition for you", or "You must work at 19:00".
 
 ## 6. PDF late-fusion alignment
-`FR-005` mewajibkan independent candidate report dan reconciliation setelah kedua report. Page/region optimization boleh dilakukan tanpa mengubah contract.
+`FR-005` requires independent candidate reports. The reconciliation boundary exists after both reports, not inside OCR routing.
+
+Efficiency optimization is allowed at page/region level, but must not change the logical contract: each path reports what it observed; skipped paths record why; critical mixed-content fixtures run both paths in evaluation.
 
 ## 7. Calendar alignment
-Bedakan FIXED, FLEXIBLE, FREE, accepted competition commitment, dan suggested work window. Hanya accepted commitment yang masuk committed plan.
+The domain model distinguishes FIXED commitment, FLEXIBLE commitment, FREE block, accepted competition commitment, and suggested work window.
+
+Only accepted commitments affect the user's committed plan as competition work.
 
 ## 8. Evaluation alignment
-Semua FR-001..FR-022 harus traceable. Critical invariant: zero false READY known blocker; zero CP-SAT hard violation; 100% provenance critical fields; 100% recommendation-to-candidate traceability; zero silent external/calendar action.
+Every MVP requirement FR-001..FR-022 appears in `feature_traceability_v1.0.csv`.
+
+Critical invariants:
+- zero false READY on known expired/ineligible fixtures;
+- zero CP-SAT hard-constraint violations;
+- 100% provenance coverage for critical canonical fields;
+- 100% recommendation-to-candidate traceability;
+- zero silent calendar/external actions.
 
 ## 9. Deferred decisions
-LLM vendor/model, OCR engine, mobile framework, cloud vendor, dan paid-tier limit tidak dikunci kecuali mengubah product behavior/evaluation contract.
+The schemas intentionally do not lock LLM vendor/model, OCR engine, mobile framework, backend cloud vendor, or paid-tier limits. Those are implementation decisions unless they change product behavior or evaluation contracts.
 
 ## 10. Data-strategy alignment
-Synthetic data valid untuk engineering dan deterministic/adversarial evaluation. Synthetic-only predictive performance bukan product evidence. MVP tetap valid tanpa custom-trained ML.
+The PRD does not authorize a custom learned model merely because a synthetic dataset can be generated.
+
+Data/model decisions are governed by `4_DATA_STRATEGY/`. Synthetic data is valid for engineering and deterministic/adversarial evaluation, but synthetic-only predictive performance is not product evidence. The MVP remains valid without a custom-trained ML model.
