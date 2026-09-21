@@ -1,0 +1,23 @@
+# README — Implementation Handoff
+
+Read order:
+1. `HANDOFF_DECISION_SUMMARY.md`
+2. `PRODUCTION_START_GATE_v1.0_READY.md`
+3. `STAKEHOLDER_MONOREPO_OWNERSHIP_v1.0.md`
+4. `REPO_EXECUTION_PLAN_v1.0_DRAFT.md`
+5. `PRODUCTION_TASK_ORDER_v1.0_DRAFT.md`
+6. `IMPLEMENTATION_HANDOFF_PLAN_v1.0_DRAFT.md`
+7. `TESTING_AND_EVALUATION_PLAN_v1.0_DRAFT.md`
+8. `DEADLINE_AND_CUT_SCOPE_PLAN_v1.0_DRAFT.md`
+9. `SALVAGE_AUDIT_v1.0_FINAL.md`
+10. `IMPLEMENTATION_HANDOFF_REVIEW_v1.0.md`
+11. `MANIFEST.json`
+
+Behavioral authority still comes from:
+```text
+05_PREPRODUCTION/01_CONTRACTS_ACTIVE/
++ 03_EVALUATION_AND_DOMAIN_RULES/domain_rules_v1.0.yaml
++ 03_EVALUATION_AND_DOMAIN_RULES/SOURCE_SCHEMA.md
+```
+
+This folder defines execution order and ownership; it does not casually override behavioral contracts.

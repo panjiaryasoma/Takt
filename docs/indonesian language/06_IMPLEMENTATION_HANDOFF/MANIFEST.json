@@ -1,0 +1,21 @@
+{
+  "project": "Competition Decision Support System",
+  "manifest_version": "repo-docs-1.0-ID",
+  "stage": "implementation_handoff",
+  "language": "id",
+  "files": [
+    "DEADLINE_AND_CUT_SCOPE_PLAN_v1.0_DRAFT.md",
+    "HANDOFF_DECISION_SUMMARY.md",
+    "IMPLEMENTATION_HANDOFF_PLAN_v1.0_DRAFT.md",
+    "IMPLEMENTATION_HANDOFF_REVIEW_v1.0.md",
+    "MANIFEST.json",
+    "PRODUCTION_START_GATE_v1.0_READY.md",
+    "PRODUCTION_TASK_ORDER_v1.0_DRAFT.md",
+    "README_IMPLEMENTATION_HANDOFF.md",
+    "REPO_EXECUTION_PLAN_v1.0_DRAFT.md",
+    "SALVAGE_AUDIT_v1.0_FINAL.md",
+    "STAKEHOLDER_MONOREPO_OWNERSHIP_v1.0.md",
+    "TESTING_AND_EVALUATION_PLAN_v1.0_DRAFT.md"
+  ],
+  "note": "Dokumentasi human-readable Bahasa Indonesia; identifier teknis tetap canonical."
+}
