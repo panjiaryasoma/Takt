@@ -1,0 +1,1 @@
+"""Deterministic competition readiness triage."""
