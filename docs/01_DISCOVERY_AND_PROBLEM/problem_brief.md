@@ -1,119 +1,127 @@
-# Ringkasan Masalah — Competition Decision Support System
+# Problem Brief — Competition Decision Support System
 
-**Versi:** 1.0  
-**Tanggal:** 2026-09-21  
-**Judul kerja:** sengaja belum dikunci  
-**Kelas produk:** decision support kompetisi yang sadar kalender  
-**Target utama:** mahasiswa dan builder tahap awal karier yang mengikuti hackathon, challenge, kompetisi, atau program pembangunan produk dengan batas waktu.
+**Version:** 1.0  
+**Date:** 2026-09-21  
+**Working title:** intentionally not locked  
+**Product class:** Calendar-aware competition decision support  
+**Primary target:** Students and early-career builders who participate in hackathons, challenges, competitions, or time-bounded build programs.
 
-## 1. Pernyataan masalah
+## 1. Problem statement
 
-Informasi kompetisi dan jadwal kehidupan nyata peserta berada di sistem yang terpisah.
+Competition information and a participant's real-life schedule live in separate systems.
 
-Halaman kompetisi menjelaskan deadline, eligibility, deliverable, batasan tim, kriteria penilaian, teknologi wajib, dan aturan submission. Kalender menjelaskan kuliah, pekerjaan, rutinitas, ujian, komitmen yang sudah ada, serta waktu kosong. Peserta harus menggabungkan keduanya secara mental untuk menjawab pertanyaan yang lebih sulit:
+A competition page describes deadlines, eligibility, deliverables, team constraints, judging criteria, mandatory technologies, and submission rules. A calendar describes classes, work, routines, exams, existing commitments, and free time. The participant must mentally combine both and answer a harder question:
 
-> Dengan requirement opportunity ini dan waktu yang benar-benar saya punya, apa yang feasible, apa yang sebaiknya saya kerjakan berikutnya, dan trade-off apa yang saya terima?
+> Given the opportunity requirements and the time I actually have, what is feasible, what should I work on next, and what trade-offs am I accepting?
 
-Kalender dapat menunjukkan free/busy time tetapi tidak memahami rules kompetisi. Platform kompetisi menyediakan rules tetapi tidak menalar terhadap kalender nyata peserta. Tool project-management generik biasanya menganggap proyek sudah ada dan meminta pengguna membuat task/timeline secara manual.
+Existing calendars can expose free/busy time but do not understand competition rules. Competition platforms expose rules but do not reason over the participant's real calendar. Generic project-management tools assume the project already exists and usually require the user to create tasks and timelines manually.
 
-Produk yang diusulkan menghubungkan kedua domain tersebut tanpa mengambil otoritas keputusan dari pengguna.
+The proposed product joins those domains without taking decision authority away from the user.
 
-## 2. Tesis produk
+## 2. Product thesis
 
-Produk **tidak** boleh otomatis menjadwalkan hidup pengguna atau memutuskan apakah pengguna harus mengikuti sebuah kompetisi.
+The product should **not** automatically schedule a user's life or decide whether they should join a competition.
 
-Produk harus:
-1. menerima sumber kompetisi berupa URL dan/atau PDF;
-2. menghasilkan canonical competition report yang mempertahankan provenance;
-3. melakukan triage deterministik untuk menentukan apakah opportunity siap dievaluasi;
-4. memecah requirement menjadi candidate work;
-5. mengestimasi workload sebagai range, bukan angka tunggal dengan presisi palsu;
-6. memodelkan waktu tersedia dari kalender pengguna;
-7. menghasilkan candidate allocation yang feasible di bawah hard constraints;
-8. mengubah candidate tersebut menjadi recommendation, alternative, assumption, dan trade-off;
-9. menyerahkan acceptance, rejection, dan calendar commitment kepada manusia.
+It should:
+1. ingest a competition source (URL and/or PDF);
+2. produce a provenance-preserving canonical competition report;
+3. deterministically triage whether the opportunity is ready to evaluate;
+4. decompose requirements into candidate work;
+5. estimate workload as ranges, not false-precision point estimates;
+6. model the user's available time from their calendar;
+7. generate feasible candidate allocations under hard constraints;
+8. turn those allocations into recommendations, alternatives, assumptions, and trade-offs;
+9. leave acceptance, rejection, and calendar commitment to the human.
 
-**Prinsip inti:** AI menginterpretasikan informasi ambigu; sistem deterministik memverifikasi dan membatasi; manusia memutuskan.
+**Core principle:** AI interprets ambiguous information; deterministic systems verify and constrain; the human decides.
 
-## 3. Status bukti
+## 3. Evidence status
 
-### Diketahui
-- Eligibility dapat memiliki pembatas material yang perlu diketahui peserta sebelum menginvestasikan waktu (`SRC-015`).
-- Requirement kompetisi nyata sangat heterogen pada team size, usia/status mahasiswa, required technology, artifact, store/repository obligation, dan deadline (`SRC-001`–`SRC-014`).
-- Deadline sensitif terhadap timezone dan format (`SRC-001`, `SRC-006`, `SRC-010`, `SRC-014`).
-- Sistem kalender dapat mengekspos free/busy interval tanpa event title (`SRC-018`).
-- Recurring commitment membutuhkan recurrence dan exception semantics (`SRC-019`, `SRC-020`).
-- Constraint programming cocok untuk precedence, non-overlap, capacity, dan preference-aware scheduling (`SRC-021`, `SRC-022`).
-- Mixed PDF dapat berisi native text sekaligus image-only content (`SRC-023`–`SRC-026`).
-- Explainability dan human oversight penting ketika AI memengaruhi keputusan (`SRC-027`, `SRC-028`).
+### Known
+- Competition eligibility can contain material restrictions that participants need to know before investing work. Devpost's organizer guidance explicitly treats eligibility as a first-class rules concern. See `SRC-015`.
+- Real competition requirements are heterogeneous. Shipaton, Swift Student Challenge, Imagine Cup, HackMIT, GitHub Game Off, and GitLab's Devpost challenge vary on team size, age/student status, required technology, artifact types, store/repository obligations, and deadlines. See `SRC-001`–`SRC-014`.
+- Deadlines are timezone-sensitive and can be expressed in multiple formats. See `SRC-001`, `SRC-006`, `SRC-010`, and `SRC-014`.
+- Calendar systems can expose free/busy intervals without requiring the planner to consume event titles. See `SRC-018`.
+- Recurring commitments require explicit recurrence and exception semantics. See `SRC-019` and `SRC-020`.
+- Constraint programming is suitable for precedence, non-overlap, capacity, and preference-aware scheduling problems. See `SRC-021` and `SRC-022`.
+- Mixed PDFs can contain native text and image-only content. PyMuPDF/PyMuPDF4LLM provide separate text, image, and OCR paths. See `SRC-023`–`SRC-026`.
+- Explainability and human oversight are important when AI outputs affect user decisions. See `SRC-027` and `SRC-028`.
 
-### Diduga, tetapi didukung
-- Calendar-aware recommendation kemungkinan lebih berguna daripada hanya membandingkan total jam, karena contiguous block berbeda dari free time yang terfragmentasi (`SRC-029`, `SRC-030`). Bukti ini **tidak** membuktikan efektivitas produk.
-- Pengguna mungkin mendapat manfaat dari alternative dan trade-off daripada satu final schedule, tetapi tetap memerlukan product evaluation.
+### Suspected, but supported
+- Calendar-aware recommendations should be more useful than a simple `hours remaining >= estimated hours` check because timetable structure affects behavior and because contiguous work blocks differ from fragmented free time. `SRC-029` and `SRC-030` support the importance of time-management/timetable structure but do **not** prove this product's effectiveness.
+- Users may benefit from seeing alternatives and trade-offs rather than one final schedule. This follows from the decision-support framing and human-oversight requirement, but requires product evaluation.
 
-### Belum terbukti
-- Pengguna akan membayar untuk advanced recommendation atau multi-competition planning.
-- Custom ML akan mengalahkan deterministic heuristic sebelum real historical data cukup.
-- Produk meningkatkan completion rate, submission quality, atau mengurangi stres.
-- Recommendation engine akan dipercaya hanya karena explainable.
-- Team-capacity recommendation meningkatkan outcome tanpa teammate availability data yang lebih kaya.
+### Not yet demonstrated
+- Users will pay for advanced recommendations or multi-competition planning.
+- Custom ML will outperform deterministic heuristics for effort estimation before sufficient historical user data exists.
+- The product improves competition completion rate, submission quality, or stress.
+- A recommendation engine will be trusted merely because it explains itself.
+- Team-capacity recommendations materially improve outcomes without richer teammate availability data.
 
-Semua poin tersebut adalah hipotesis, bukan klaim marketing.
+These are hypotheses, not marketing claims.
 
 ## 4. Primary user job
 
-> Ketika saya menemukan kompetisi, bantu saya memahami requirement sebenarnya dan bagaimana opportunity itu dapat masuk ke komitmen nyata saya, supaya saya bisa mengambil keputusan dengan informasi cukup tanpa merekonstruksi rules dan jadwal secara manual.
+> When I find a competition, help me understand what it really requires and how it could fit around my actual commitments, so I can make an informed decision and act without manually reconstructing the rules and schedule.
 
 ## 5. Scope
 
-### Masuk scope MVP
-- manual personal schedule/commitment;
+### In scope for MVP
+- manual personal schedule / commitments;
 - URL ingestion;
 - PDF upload;
-- independent native-text dan visual/OCR path;
-- candidate extraction report dengan schema identik;
-- field-level reconciliation menjadi canonical competition report;
-- source provenance untuk critical field;
+- independent native-text and visual/OCR extraction paths;
+- candidate extraction reports with identical schema;
+- field-level reconciliation into a canonical competition report;
+- source provenance for critical fields;
 - competition-readiness triage;
 - task/dependency generation;
-- effort range;
+- effort ranges;
 - calendar-aware availability model;
-- CP-SAT candidate allocation;
-- recommendation + alternative + trade-off;
-- human approval sebelum accepted commitment;
-- saved plans dan progress;
-- re-evaluation saat constraint berubah material;
-- RevenueCat entitlement gating yang sesuai kebutuhan Shipaton.
+- CP-SAT candidate allocations;
+- recommendation + alternatives + trade-offs;
+- human approval before any accepted commitment;
+- saved plans and progress;
+- re-evaluation when constraints materially change;
+- RevenueCat entitlement gating appropriate to Shipaton.
 
-### Secara eksplisit di luar scope MVP
+### Explicitly out of scope for MVP
 - social feed;
 - teammate marketplace;
 - automatic team formation;
 - autonomous registration/submission;
 - autonomous payment;
-- silent calendar write;
-- automatic scope reduction tanpa persetujuan;
-- memperlakukan feasibility sebagai kepastian;
-- custom ML dari invented/insufficient outcome data.
+- silent calendar writes;
+- automatic scope reduction without user approval;
+- pretending feasibility is certainty;
+- custom ML trained on invented or insufficient outcome data.
 
-## 6. Failure mode yang harus dicegah
-1. Deadline salah tetapi confidence tinggi.
-2. Eligibility rule terlewat.
-3. OCR menimpa native text benar tanpa provenance.
-4. Native text mengabaikan informasi penting pada image.
-5. Conflicting official pages diam-diam dilebur menjadi satu nilai.
-6. Timezone conversion mengubah hari lokal secara salah.
-7. Recurring event diperlakukan one-off.
-8. Free hours cukup secara total tetapi terfragmentasi menjadi micro-block tidak berguna.
-9. Solver output ditampilkan sebagai perintah, bukan candidate.
-10. Recommendation tidak dapat menjelaskan alasannya.
-11. Constraint berubah tetapi stale recommendation tetap tampil.
-12. RevenueCat gating mengubah eligibility atau critical facts.
+## 6. Failure modes to design against
+1. Wrong deadline with high confidence.
+2. Eligibility rule missed, causing work on an ineligible competition.
+3. OCR overrides correct native text without provenance.
+4. Native text ignores information embedded in an image.
+5. Conflicting official pages silently collapsed into one value.
+6. Timezone conversion changes the effective local day.
+7. Recurring class/work events treated as one-off.
+8. Free hours counted but fragmented into unusable micro-blocks.
+9. Solver output presented as a command rather than a candidate.
+10. Recommendation cannot explain why it exists.
+11. User edits a constraint but stale recommendations remain visible.
+12. RevenueCat gating changes the correctness of eligibility or critical facts.
 
-## 7. Definisi keberhasilan pre-production
+## 7. Success definition for pre-production
 
-Pre-production siap dilanjutkan ketika domain rules machine-readable; source schema mempertahankan provenance/conflict; fitur MVP traceable ke requirement/rule/evaluation; critical extraction/reconciliation punya acceptance criteria; triage zero-tolerance untuk expired/ineligible; CP-SAT tidak menghasilkan hard-constraint violation pada fixture; recommendation advisory dan traceable; serta hipotesis diberi label sebagai hipotesis.
+Pre-production is ready to proceed when:
+- domain rules are explicit and machine-readable;
+- source schema supports provenance and conflict preservation;
+- every MVP feature traces to a requirement, domain rule, and evaluation case;
+- critical-field extraction and reconciliation have measurable acceptance criteria;
+- triage has zero-tolerance safety invariants for expired/ineligible cases in the evaluation suite;
+- CP-SAT candidate generation has zero hard-constraint violations in test fixtures;
+- recommendation output is advisory and traceable to candidate allocations;
+- open product hypotheses are labeled as hypotheses rather than facts.
 
-## 8. Sumber utama
+## 8. Primary sources
 
-Lihat `3_EVALUATION_AND_DOMAIN_RULES/SOURCE_EVALUATION_SUITE_001-030.md` dan `SOURCE_SCHEMA.md`.
+See `3_EVALUATION_AND_DOMAIN_RULES/SOURCE_EVALUATION_SUITE_001-030.md` for the 30-source evaluation suite and `SOURCE_SCHEMA.md` for source/canonical-report contracts.
