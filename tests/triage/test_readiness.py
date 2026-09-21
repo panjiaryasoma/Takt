@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -10,7 +10,7 @@ from packages.contracts.triage import (
     UserContext,
 )
 
-NOW = datetime(2026, 9, 21, 8, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 9, 21, 8, 0, tzinfo=UTC)
 FUTURE = NOW + timedelta(days=10)
 PAST = NOW - timedelta(days=1)
 
