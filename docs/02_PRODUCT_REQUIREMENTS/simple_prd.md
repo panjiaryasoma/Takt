@@ -1,73 +1,73 @@
-# PRD Sederhana — Competition Decision Support System
+# Simple PRD — Competition Decision Support System
 
-**Versi:** 1.0  
-**Tanggal:** 2026-09-21  
-**Status:** baseline pre-production  
-**Nama brand:** belum dikunci
+**Version:** 1.0  
+**Date:** 2026-09-21  
+**Status:** Pre-production baseline  
+**Brand name:** not locked
 
-## 1. Ringkasan produk
+## 1. Product summary
 
-Aplikasi mobile-first decision support untuk orang yang mempertimbangkan atau mengerjakan kompetisi berbatas waktu.
+A mobile-first decision-support application for people considering or working on time-bounded competitions.
 
-Aplikasi membaca URL/PDF kompetisi, membangun canonical competition report dengan source provenance, memeriksa readiness/eligibility, mengestimasi pekerjaan, membandingkannya dengan kalender nyata pengguna, menghasilkan candidate work allocation yang feasible, lalu menyajikan recommendation, alternative, risk, assumption, dan trade-off.
+The application reads competition URLs/PDFs, constructs a canonical competition report with source provenance, checks readiness/eligibility, estimates work, compares it with the user's real calendar, generates feasible candidate work allocations, and presents recommendations, alternatives, risks, assumptions, and trade-offs.
 
-Aplikasi tidak diam-diam menjadwalkan hidup pengguna.
+It does not silently schedule the user's life.
 
-## 2. Tujuan
-1. Mengurangi rekonstruksi manual rules kompetisi.
-2. Memunculkan eligibility/deadline blocker sebelum planning.
-3. Membuat source conflict terlihat.
-4. Mengubah requirement menjadi task dan workload range yang dapat diperiksa.
-5. Menggunakan calendar constraint untuk menguji feasibility.
-6. Merekomendasikan work window tanpa otomatis mengubahnya menjadi commitment.
-7. Menjaga human authority pada consequential boundary.
-8. Tetap berguna tanpa custom-trained ML.
+## 2. Goals
+1. Reduce manual reconstruction of competition rules.
+2. Surface eligibility/deadline blockers before planning.
+3. Make source conflicts visible instead of hiding them.
+4. Convert requirements into inspectable tasks and workload ranges.
+5. Use calendar constraints to test feasibility.
+6. Recommend next work windows without converting suggestions into commitments automatically.
+7. Preserve human authority at every consequential boundary.
+8. Be useful without custom-trained ML.
 
 ## 3. Non-goals
 - social network;
 - teammate marketplace;
-- autonomous registration/submission;
-- automatic payment;
+- autonomous registration or submission;
+- automatic payments;
 - automatic calendar modification;
 - guaranteed completion prediction;
 - generic life planner;
 - generic Jira/Notion replacement;
-- custom ML synthetic hanya untuk mengklaim "AI".
+- custom ML trained on synthetic labels merely to claim "AI".
 
-## 4. Persona utama
+## 4. Primary personas
 
 ### P1 — Student builder
-Punya kuliah, tugas, dan waktu kosong tidak teratur. Sulit menilai apakah kompetisi tambahan masih realistis.
+Has classes, assignments and irregular free time. Finds hackathons from social media or Devpost and struggles to determine whether another competition is realistic.
 
 ### P2 — Working builder
-Punya fixed work block dan capacity malam/weekend terbatas. Membutuhkan trade-off dan buffer visibility.
+Has fixed work blocks and narrower evening/weekend capacity. Needs trade-offs and buffer visibility.
 
 ### P3 — Small team lead
-Perlu mempertimbangkan availability beberapa anggota yang dimasukkan manual tanpa membutuhkan social discovery/chat.
+Needs to consider multiple members' manually entered availability, but does not need social discovery or chat.
 
 ## 5. Core user journey
 
-### Journey A — Memahami opportunity
-1. Pengguna paste URL atau upload PDF.
-2. Backend melakukan ingestion web/PDF.
-3. Native text dan visual/OCR pipeline menghasilkan candidate report independen.
-4. Reconciliation menghasilkan canonical competition report.
-5. Critical conflict/missing field ditampilkan untuk review.
-6. Readiness triage mengembalikan status faktual.
+### Journey A — Understand an opportunity
+1. User pastes URL or uploads PDF.
+2. Backend ingests web/PDF content.
+3. Native text and visual/OCR pipelines independently produce candidate reports.
+4. Reconciliation creates a canonical competition report.
+5. Critical conflicts/missing fields are shown for review.
+6. Competition readiness triage returns a factual status.
 
-### Journey B — Mengevaluasi feasibility
-1. Sistem memecah confirmed requirements menjadi task/milestone.
-2. Workload direpresentasikan min/likely/max.
-3. Local calendar diubah menjadi busy/free block.
-4. CP-SAT menghasilkan candidate allocation yang mematuhi hard constraint.
-5. Recommendation layer melakukan ranking dan explanation.
-6. Pengguna melihat feasibility state, suggested next work, alternative, risk, assumption, dan trade-off.
+### Journey B — Evaluate feasibility
+1. System decomposes confirmed requirements into tasks/milestones.
+2. Workload is represented as min/likely/max.
+3. Local calendar is transformed into busy/free blocks.
+4. CP-SAT generates candidate allocations that obey hard constraints.
+5. Recommendation layer ranks/explains options.
+6. User sees feasibility state, suggested next work, alternatives, risks, assumptions and trade-offs.
 
-### Journey C — Menerima dan mengeksekusi
-1. Pengguna menerima suggestion atau memilih alternative.
-2. Accepted commitment dapat disimpan ke local plan.
-3. Pengguna update progress.
-4. Material change memicu re-evaluation, bukan silent mutation.
+### Journey C — Accept and execute
+1. User accepts a suggestion or chooses an alternative.
+2. Accepted commitment can be saved to the local plan.
+3. User updates progress.
+4. Material changes trigger re-evaluation, not silent mutation.
 
 ## 6. Information architecture
 
@@ -76,162 +76,243 @@ HOME
 ├── My Schedule
 │   ├── Calendar
 │   └── Add Commitment
+│
 ├── Analyze Competition
 │   ├── Paste URL / Upload PDF
 │   ├── Analysis Progress
 │   ├── Competition Brief Review
 │   └── Decision Support Report
+│
 └── Saved Plans
     ├── Competition Detail
     ├── Suggested Plan / Projection
     └── Progress / Re-evaluate
 ```
 
-Identifier UI dapat diterjemahkan pada presentation layer tanpa mengubah kontrak internal.
-
 ## 7. Functional requirements
 
 ### FR-001 Personal commitments
-Pengguna dapat membuat FIXED/FLEXIBLE commitment dengan date/time, recurrence, dan category.
+User can create fixed and flexible commitments with date/time, recurrence, and category.
 
 ### FR-002 Availability model
-Sistem mengubah commitment menjadi available work block sambil mempertahankan timezone dan recurrence semantics.
+System converts commitments into available work blocks while preserving timezone and recurrence semantics.
 
 ### FR-003 Competition URL ingestion
-Sistem menerima URL HTTP(S) dan mencatat retrieval metadata.
+System accepts HTTP(S) competition URLs and records retrieval metadata.
 
 ### FR-004 PDF ingestion
-Sistem menerima PDF dan mencatat document/page provenance.
+System accepts PDF sources and records document/page provenance.
 
 ### FR-005 Dual-path extraction
-FW1 native extraction dan FW2 visual/OCR dapat berjalan independen dan menghasilkan candidate-report schema yang sama.
+For PDFs, FW1 native extraction and FW2 visual/OCR extraction can run independently and produce the same candidate-report schema.
 
 ### FR-006 Field-level reconciliation
-Sistem merekonsiliasi normalized value, source authority, context, dan evidence. Confidence saja tidak boleh menyelesaikan critical conflict.
+System reconciles candidate fields using normalized values, source authority, context and evidence. Confidence alone cannot silently resolve critical conflicts.
 
 ### FR-007 Canonical Competition Report
-Menyimpan deadline, registration deadline, eligibility, team size, format/location, track, deliverable, judging criteria, required technology, prize/benefit, dan provenance.
+System stores a canonical report containing deadline, registration deadline, eligibility, team size, format/location, tracks, deliverables, judging criteria, required technology, prizes/benefits, and provenance.
 
 ### FR-008 Human source review
-Critical field yang conflict, missing, atau evidence-nya lemah memerlukan review sebelum readiness.
+Critical fields in conflict, missing, or below evidence threshold require review before the system may claim readiness.
 
 ### FR-009 Competition readiness triage
-`READY_TO_EVALUATE`, `NEEDS_REVIEW`, `ELIGIBILITY_BLOCKED`, `DEADLINE_PASSED`, `INSUFFICIENT_INFORMATION`.
+Deterministic triage statuses:
+- `READY_TO_EVALUATE`
+- `NEEDS_REVIEW`
+- `ELIGIBILITY_BLOCKED`
+- `DEADLINE_PASSED`
+- `INSUFFICIENT_INFORMATION`
 
 ### FR-010 Task decomposition
-Mengubah competition requirement menjadi candidate task, milestone, dependency, skill, dan submission work.
+System converts competition requirements into candidate tasks, milestones, dependencies, skills, and submission work.
 
 ### FR-011 Workload estimation
-Setiap task estimate berupa `min`, `likely`, `max` dengan basis yang dinyatakan.
+Every task estimate is a range (`min`, `likely`, `max`) with a stated basis. Point estimates may be displayed only as a derived convenience.
 
 ### FR-012 Calendar-aware feasibility
-Mengevaluasi workload terhadap real available block, bukan hanya total free hours.
+System evaluates workload against real available blocks, not only total free hours.
 
 ### FR-013 CP-SAT candidate allocations
-Solver menghasilkan candidate allocation yang feasible di bawah hard constraint. Output solver bukan automatic calendar commitment.
+Solver produces one or more feasible candidate allocations under hard constraints. Solver output is not automatically committed to the user's calendar.
 
 ### FR-014 Recommendation layer
-Melakukan ranking candidate dan menjelaskan next work, suggested window, alternative, buffer impact, dependency impact, dan assumption.
+System ranks candidate allocations and explains recommended next work, suggested work windows, alternatives, buffer impact, dependency impact, and relevant assumptions.
 
 ### FR-015 Feasibility states
-`FEASIBLE`, `FEASIBLE_WITH_TRADEOFFS`, `TIGHT_CAPACITY`, `NOT_FEASIBLE_UNDER_CURRENT_CONSTRAINTS`.
+- `FEASIBLE`
+- `FEASIBLE_WITH_TRADEOFFS`
+- `TIGHT_CAPACITY`
+- `NOT_FEASIBLE_UNDER_CURRENT_CONSTRAINTS`
 
-State ini menjelaskan modeled plan, bukan kemampuan personal pengguna.
+These describe the modeled plan, not the user's ability or personal fitness.
 
 ### FR-016 Human decision
-Pengguna dapat accept, choose alternative, edit constraint, atau ignore.
+User can accept, choose an alternative, edit constraints, or ignore a recommendation.
 
 ### FR-017 Accepted commitment
-Hanya suggestion yang diterima eksplisit menjadi bagian local plan.
+Only an explicitly accepted suggestion becomes part of the user's local plan.
 
 ### FR-018 Progress
-Pengguna dapat menandai work complete dan opsional mencatat actual effort.
+User can mark work complete and optionally record actual effort.
 
 ### FR-019 Re-evaluation
-Material change pada calendar, scope, deadline, task duration, atau team capacity menginvalidasi recommendation terdampak.
+Material changes to calendar, scope, deadline, task duration, or team capacity invalidate affected recommendations and trigger a new evaluation.
 
 ### FR-020 Saved plans
-Pengguna dapat melihat saved competition, state terbaru, progress, risk, dan next recommendation.
+User can view saved competitions, latest decision-support state, progress, risks, and next recommendation.
 
 ### FR-021 Entitlement
-RevenueCat boleh membatasi premium feature/capacity tetapi tidak boleh mengubah critical facts, eligibility, deadline, atau conflict warning.
+RevenueCat gates premium capacity/features but must never change the correctness of critical facts, eligibility checks, deadline handling, or conflict warnings.
 
 ### FR-022 Export
-Pengguna dapat mengekspor explainable plan summary. Calendar write/export membutuhkan explicit action.
+User can export an explainable plan summary. Calendar write/export must require explicit action.
 
 ## 8. Canonical outputs
-- `CompetitionBrief`: fakta grounded pada source.
-- `ReadinessTriage`: factual deterministic gate.
-- `WorkloadModel`: task + dependency + effort range.
-- `CandidateAllocation[]`: feasible solver output.
-- `Recommendation`: ranking/explanation atas candidate.
-- `DecisionSupportReport`: brief + readiness + capacity + workload + feasibility + recommendation + alternative + risk + assumption + trade-off.
+- `CompetitionBrief`: source-grounded facts only.
+- `ReadinessTriage`: deterministic factual gate.
+- `WorkloadModel`: tasks + dependencies + effort ranges.
+- `CandidateAllocation[]`: feasible solver outputs.
+- `Recommendation`: human-readable ranking/explanation over candidates.
+- `DecisionSupportReport`: brief + readiness + capacity + workload + feasibility + recommendation + alternatives + risks + assumptions + trade-offs.
 
-## 9. Data dan privacy
+## 9. Data and privacy
 
 ### Local-first
-Utamakan local storage untuk event title/detail, routine label, accepted commitment, progress, dan saved plan cache.
+Prefer local storage for event titles/details, routine labels, accepted commitments, progress, and saved plan cache.
 
 ### Cloud-minimized planning payload
-Jika memungkinkan, backend menerima busy/free interval, timezone, daily capacity/preference, dan task model, bukan event name sensitif.
+Where possible, backend receives busy/free intervals, timezone, daily capacity/preferences, and task model rather than sensitive event names.
 
-Local-first tidak otomatis berarti "private". Telemetry, backend request, crash reporting, dan third-party provider tetap harus didokumentasikan.
+No claim is made that the product is "private" merely because storage is local-first; telemetry, backend requests, crash reporting and third-party providers must be documented before launch.
 
-## 10. Penggunaan AI
-AI/LLM cocok untuk structured extraction, contextual normalization, task decomposition, dan explanation drafting.
+## 10. AI use
+AI/LLM is appropriate for structured extraction from prose, contextual normalization, requirement/task decomposition, and explanation drafting.
 
-AI bukan authority untuk current time, arithmetic, deadline comparison, timezone conversion, hard eligibility setelah predicate diketahui, calendar collision, atau CP-SAT constraint satisfaction.
+AI is not authoritative for current time, arithmetic, deadline comparison, timezone conversion, hard eligibility checks once predicates are known, calendar collision, or CP-SAT constraint satisfaction.
 
 ## 11. Deterministic engines
-Schema validation, source-state machine, readiness triage, date/time normalization, recurrence expansion, availability calculation, CP-SAT candidate generation, hard-constraint validation, dan post-solver invariant checks.
+- schema validation;
+- source-state machine;
+- readiness triage;
+- date/time normalization;
+- recurrence expansion;
+- availability calculation;
+- CP-SAT candidate generation;
+- hard-constraint validation;
+- post-solver invariant checks.
 
-## 12. Strategi mixed PDF
+## 12. Mixed PDF strategy
+
 ```text
 PDF
 ├── FW1 native/structured extraction → CandidateReport A
 └── FW2 visual/OCR extraction       → CandidateReport B
-A + B → field-level reconciliation → Canonical Competition Report
+
+A + B
+  ↓
+field-level reconciliation
+  ↓
+Canonical Competition Report
 ```
 
-Pertahankan page/source evidence dan conflict. OCR-only evidence boleh mengisi native-text gap. Critical disagreement tidak boleh diselesaikan hanya dengan confidence score.
+Rules:
+- do not call both candidate reports canonical;
+- preserve page/source evidence;
+- preserve conflicts;
+- OCR-only evidence can fill native-text gaps;
+- agreement across independent paths may increase verification status;
+- disagreement on critical fields cannot be resolved by confidence score alone.
 
 ## 13. Recommendation policy
-Recommendation valid hanya jika memetakan ke solver candidate, seluruh hard constraint lolos, rationale menyebut faktor scheduling, assumption terlihat, dan alternative muncul ketika ada candidate materially berbeda.
+A recommendation is valid only if:
+1. it maps to a solver candidate;
+2. candidate passes all hard constraints;
+3. rationale names at least one scheduling factor;
+4. relevant assumptions are visible;
+5. alternatives are shown when materially different feasible candidates exist.
 
-## 14. Layar MVP
-Home; My Schedule; Add Commitment; Analyze Competition; Analysis Progress; Competition Brief Review; Decision Support Report; Suggested Plan / Projection; Saved Plans; Competition Detail / Progress; Re-evaluation.
+## 14. MVP screens
+1. Home
+2. My Schedule
+3. Add Commitment
+4. Analyze Competition
+5. Analysis Progress
+6. Competition Brief Review
+7. Decision Support Report
+8. Suggested Plan / Projection
+9. Saved Plans
+10. Competition Detail / Progress
+11. Re-evaluation
 
-## 15. Hipotesis monetisasi
-Potential Free: active competition terbatas, basic source analysis, satu current recommendation set, local schedule.
+## 15. Monetization hypothesis
 
-Potential Pro: lebih banyak active competition, advanced what-if analysis, alternatives, extended history, team-capacity modeling, export/history tools.
+Potential Free: limited active competitions, basic source analysis, one current recommendation set, local schedule.
 
-Ini **hipotesis**, bukan validated willingness-to-pay evidence.
+Potential Pro: more active competitions, advanced what-if analysis, more alternatives, extended history, team-capacity modeling, export/history tools.
+
+This is a **hypothesis**, not validated willingness-to-pay evidence.
 
 ## 16. Non-functional requirements
 
 ### Reliability
-Nol hard-constraint violation pada valid recommendation; critical canonical field punya provenance.
+- No hard-constraint violation may appear as a valid recommendation.
+- Critical canonical fields must carry provenance.
 
 ### Explainability
-Recommendation rationale/assumption dan conflict/missing state terlihat.
+- Recommendation rationale and assumptions visible.
+- Conflict/missing-state visible.
 
-### Performance target MVP
-Cached app terasa lokal; URL analysis target p50 <=15 detik untuk halaman biasa; PDF progress ditampilkan; re-evaluation tanpa source ingestion baru target p50 <=5 detik untuk task count normal.
+### Performance targets for MVP
+- cached app screens feel local;
+- URL analysis target p50 <= 15 s for ordinary pages;
+- PDF analysis target reported progressively; no fixed SLA until benchmarked;
+- re-evaluation without new source ingestion target p50 <= 5 s for normal task counts.
+
+Targets are engineering goals, not externally promised SLAs.
 
 ### Accessibility
-Primary action dapat ditap/klik; status tidak color-only; conflict/confidence readable; date/time ditampilkan sebagai text.
+- all primary actions tap/click accessible;
+- no color-only status encoding;
+- readable confidence/conflict states;
+- time and date text always shown, not icon-only.
 
 ### Auditability
-Persist source retrieval timestamp, extraction pipeline/version, canonical field provenance, rule version, solver configuration/version, dan recommendation basis.
+Persist source retrieval timestamp, extraction pipeline/version, canonical field provenance, rule version, solver configuration/version, and recommendation basis.
 
 ## 17. Metrics
-Gunakan metric di `evaluation_spec_v1.0.yaml`. Product metric setelah instrumentation mencakup analyze→brief-confirm, brief-confirm→decision-report, recommendation acceptance, alternative selection, re-evaluation, source-review, conflict frequency, user edit, dan estimate-vs-actual error.
 
-Acceptance rate saja bukan proxy kualitas recommendation.
+Pre-launch evaluation metrics are defined in `evaluation_spec_v1.0.yaml`.
+
+Product metrics after instrumentation:
+- analyze → brief-confirm conversion;
+- brief-confirm → decision-report conversion;
+- recommendation acceptance rate;
+- alternative selection rate;
+- re-evaluation rate;
+- source-review rate;
+- extraction conflict frequency;
+- user edit rate for extracted fields;
+- estimate-vs-actual error where users record actual effort.
+
+Do not use recommendation acceptance alone as a proxy for recommendation quality.
 
 ## 18. Launch gates
-MVP hanya ready jika source suite lolos critical threshold, nol false-ready blocker, nol solver hard-constraint violation, critical field punya provenance, recommendation traceability lengkap, local/cloud privacy boundary terdokumentasi, dan entitlement tidak menyembunyikan critical warning.
+
+MVP cannot be called ready unless:
+- source suite passes critical extraction thresholds;
+- zero false-ready cases for known hard blockers;
+- zero solver hard-constraint violations in evaluation;
+- every critical field is provenance-backed;
+- recommendation traceability is complete;
+- local/cloud privacy boundary is documented;
+- RevenueCat entitlement cannot suppress critical warnings.
 
 ## 19. Open decisions
-Nama produk, mobile framework, backend hosting, LLM provider/model, OCR engine/ensemble, direct calendar integration, RevenueCat Free/Pro boundary, dan kedalaman team capacity V1.
+- final product name;
+- mobile framework;
+- exact backend hosting;
+- LLM provider/model;
+- whether FW2 uses Tesseract, RapidOCR, a vision model, or an ensemble in MVP;
+- whether direct calendar integration is Shipaton MVP or post-MVP;
+- exact RevenueCat free/pro boundary;
+- team-capacity depth for V1.
