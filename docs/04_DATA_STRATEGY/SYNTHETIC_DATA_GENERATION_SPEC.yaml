@@ -1,0 +1,68 @@
+meta:
+  project: Competition Decision Support System
+  version: "1.0"
+  status: preproduction_specification
+purposes:
+  - pipeline_development
+  - schema_validation
+  - feature_engineering_tests
+  - split_strategy_tests
+  - solver_fixture_generation
+  - reconciliation_fixture_generation
+forbidden_claims:
+  - real_world_predictive_accuracy
+  - real_user_behavior
+  - competition_success_probability
+  - product_market_fit
+dataset_families:
+  calendar_constraint_fixture:
+    unit: planning_case_day
+    must_generate_cases:
+      - fully_blocked_day
+      - fragmented_capacity
+      - single_long_focus_block
+      - recurring_commitment
+      - recurrence_exception
+      - overlapping_commitments
+      - cross_midnight_commitment
+  task_effort_fixture:
+    unit: task
+    target: synthetic_actual_hours
+    status: prototype_only
+  feasibility_fixture:
+    unit: planning_case
+    target: expected_feasibility_state
+    allowed_states:
+      - FEASIBLE
+      - FEASIBLE_WITH_TRADEOFFS
+      - TIGHT_CAPACITY
+      - NOT_FEASIBLE_UNDER_CURRENT_CONSTRAINTS
+    ground_truth_policy: domain_rule_or_solver_derived
+  reconciliation_fixture:
+    unit: canonical_field_case
+    allowed_states: [VERIFIED, SINGLE_SOURCE, CONFLICT, MISSING, UNVERIFIED]
+generation_rules:
+  - id: SG-001
+    rule: Every run has an immutable random seed.
+  - id: SG-002
+    rule: Generator version and parameter configuration are stored with the dataset.
+  - id: SG-003
+    rule: Target generation must not create hidden target leakage.
+  - id: SG-004
+    rule: Synthetic recommendation acceptance is UI/pipeline test data only.
+  - id: SG-005
+    rule: Balanced class views must be explicitly labeled artificial.
+  - id: SG-006
+    rule: Retain a natural-simulation distribution when a balanced view exists.
+  - id: SG-007
+    rule: Leakage-sensitive derived columns are tagged.
+  - id: SG-008
+    rule: Expected fixture outcomes are reproducible from documented rules/equations.
+reproducibility:
+  required: true
+  record: [random_seed, generator_version, generation_timestamp, parameter_config, row_counts, schema_hash, generator_source_hash]
+release_policy:
+  prototype: May change without backward compatibility.
+  candidate: Requires acceptance checks and schema freeze.
+  benchmark: Requires immutable snapshot and documented generator.
+  production_training: Synthetic-only training cannot qualify.
