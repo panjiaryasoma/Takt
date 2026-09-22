@@ -28,15 +28,11 @@ Takt turns competition rules into a provenance-backed brief, evaluates them agai
 
 ## Backend quick start
 
-```bash
-python -m venv .venv
-# Windows
-.venv\Scripts\activate
-# macOS/Linux
-source .venv/bin/activate
+Requires Python 3.12 and `uv`.
 
-pip install -e ".[dev]"
-uvicorn apps.api.main:app --reload
+```bash
+uv sync --locked --dev
+uv run uvicorn apps.api.main:app --reload
 ```
 
 Health check:
@@ -45,10 +41,17 @@ Health check:
 GET http://127.0.0.1:8000/health
 ```
 
-Run tests:
+Run backend quality checks:
 
 ```bash
-pytest
+uv run ruff check apps engine packages tests scripts
+uv run pytest -q
+```
+
+On Windows, run the same quality gate with:
+
+```powershell
+.\scripts\verify_backend.ps1
 ```
 
 ## Mobile bootstrap
