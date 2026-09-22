@@ -1,7 +1,12 @@
 from datetime import UTC, datetime, timedelta
 
 from engine.triage.service import evaluate_readiness
-from packages.contracts.triage import EligibilityRule, ReadinessRequest, ReadinessStatus, UserContext
+from packages.contracts.triage import (
+    EligibilityRule,
+    ReadinessRequest,
+    ReadinessStatus,
+    UserContext,
+)
 
 NOW = datetime(2026, 9, 21, 8, 0, tzinfo=UTC)
 FUTURE = NOW + timedelta(days=10)
