@@ -6,7 +6,10 @@ REQUIRED = [
     Path("docs/03_EVALUATION_AND_DOMAIN_RULES/domain_rules_v1.0.yaml"),
     Path("docs/03_EVALUATION_AND_DOMAIN_RULES/SOURCE_SCHEMA.md"),
     Path("apps/api/main.py"),
+    Path("apps/mobile/lib/data/local/app_database.dart"),
+    Path("apps/mobile/lib/domain/contracts.dart"),
     Path("engine/triage/service.py"),
+    Path("packages/contracts/enums.py"),
     Path("packages/contracts/triage.py"),
 ]
 

@@ -1,17 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime
-from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
-
-class ReadinessStatus(StrEnum):
-    READY_TO_EVALUATE = "READY_TO_EVALUATE"
-    NEEDS_REVIEW = "NEEDS_REVIEW"
-    ELIGIBILITY_BLOCKED = "ELIGIBILITY_BLOCKED"
-    DEADLINE_PASSED = "DEADLINE_PASSED"
-    INSUFFICIENT_INFORMATION = "INSUFFICIENT_INFORMATION"
+from packages.contracts.enums import ReadinessStatus
 
 
 class UserContext(BaseModel):
