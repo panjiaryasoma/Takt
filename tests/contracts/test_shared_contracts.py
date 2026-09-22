@@ -201,3 +201,17 @@ def test_recommendation_required_fields_are_enforced() -> None:
             tradeoffs=[],
             # assumptions sengaja hilang
         )
+
+
+def test_competition_brief_rejects_naive_submission_deadline() -> None:
+    with pytest.raises(ValidationError):
+        CompetitionBrief(
+            competition_id="cmp_001",
+            name="Example",
+            organizer="Org",
+            submission_deadline=datetime(2026, 9, 22, 10, 0),
+            eligibility={},
+            deliverables=[],
+            source_ids=["src_1"],
+            unresolved_critical_fields=[],
+        )

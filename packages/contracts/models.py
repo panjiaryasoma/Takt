@@ -10,7 +10,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import AwareDatetime, BaseModel, Field
 
 from packages.contracts.enums import (
     AvailabilityType,
@@ -25,7 +25,7 @@ class CompetitionBrief(BaseModel):
     competition_id: str
     name: str
     organizer: str
-    submission_deadline: datetime
+    submission_deadline: AwareDatetime
     eligibility: Any
     deliverables: Any
     source_ids: list[str]

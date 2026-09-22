@@ -1,6 +1,7 @@
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 
 import pytest
+from pydantic import ValidationError
 
 from engine.triage.scope import ResolvedEligibilityScope
 from engine.triage.service import evaluate_readiness
@@ -10,6 +11,7 @@ from packages.contracts.triage import EligibilityRule, ReadinessRequest, UserCon
 NOW = datetime(2026, 9, 21, 8, 0, tzinfo=UTC)
 FUTURE = NOW + timedelta(days=10)
 PAST = NOW - timedelta(days=1)
+JAKARTA = timezone(timedelta(hours=7))
 
 
 @pytest.mark.parametrize(
@@ -298,3 +300,43 @@ def test_triage_output_contains_no_recommendation_or_participation_directive() -
     assert "join" not in serialized
     assert "do_not_join" not in serialized
     assert "recommendation" not in serialized
+
+
+def test_readiness_rejects_naive_evaluated_at() -> None:
+    with pytest.raises(ValidationError):
+        ReadinessRequest(
+            evaluated_at=datetime(2026, 9, 23, 8, 0),
+            submission_deadline=FUTURE,
+        )
+
+
+def test_readiness_rejects_naive_submission_deadline() -> None:
+    with pytest.raises(ValidationError):
+        ReadinessRequest(
+            evaluated_at=NOW,
+            submission_deadline=datetime(2026, 9, 23, 8, 0),
+        )
+
+
+def test_equivalent_instants_across_offsets_are_compared_correctly() -> None:
+    case_input = ReadinessRequest(
+        evaluated_at=datetime(2026, 9, 23, 8, 0, tzinfo=JAKARTA),
+        submission_deadline=datetime(2026, 9, 23, 1, 0, tzinfo=UTC),
+    )
+
+    result = evaluate_readiness(case_input)
+
+    assert result.status is ReadinessStatus.DEADLINE_PASSED
+    assert result.blocking_reasons == ["authoritative_submission_deadline_passed"]
+
+
+def test_deadline_comparison_respects_cross_timezone_order() -> None:
+    case_input = ReadinessRequest(
+        evaluated_at=datetime(2026, 9, 23, 8, 0, tzinfo=JAKARTA),
+        submission_deadline=datetime(2026, 9, 23, 1, 30, tzinfo=UTC),
+    )
+
+    result = evaluate_readiness(case_input)
+
+    assert result.status is ReadinessStatus.READY_TO_EVALUATE
+    assert "deadline_valid" in result.passed_checks

@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-from datetime import datetime
-
-from pydantic import BaseModel, Field
+from pydantic import AwareDatetime, BaseModel, Field
 
 from packages.contracts.models import ReadinessTriage
 
@@ -20,8 +18,8 @@ class EligibilityRule(BaseModel):
 
 
 class ReadinessRequest(BaseModel):
-    evaluated_at: datetime
-    submission_deadline: datetime | None = None
+    evaluated_at: AwareDatetime
+    submission_deadline: AwareDatetime | None = None
     has_applicable_deadline_extension: bool = False
     eligibility: EligibilityRule = Field(default_factory=EligibilityRule)
     user: UserContext = Field(default_factory=UserContext)
