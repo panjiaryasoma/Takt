@@ -305,7 +305,7 @@ def test_triage_output_contains_no_recommendation_or_participation_directive() -
 def test_readiness_rejects_naive_evaluated_at() -> None:
     with pytest.raises(ValidationError):
         ReadinessRequest(
-            evaluated_at=datetime(2026, 9, 23, 8, 0),
+            evaluated_at="2026-09-23T08:00:00",
             submission_deadline=FUTURE,
         )
 
@@ -314,7 +314,7 @@ def test_readiness_rejects_naive_submission_deadline() -> None:
     with pytest.raises(ValidationError):
         ReadinessRequest(
             evaluated_at=NOW,
-            submission_deadline=datetime(2026, 9, 23, 8, 0),
+            submission_deadline="2026-09-23T08:00:00",
         )
 
 
