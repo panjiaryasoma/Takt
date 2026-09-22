@@ -1,17 +1,10 @@
 from __future__ import annotations
 
 from datetime import datetime
-from enum import StrEnum
 
 from pydantic import BaseModel, Field
 
-
-class ReadinessStatus(StrEnum):
-    READY_TO_EVALUATE = "READY_TO_EVALUATE"
-    NEEDS_REVIEW = "NEEDS_REVIEW"
-    ELIGIBILITY_BLOCKED = "ELIGIBILITY_BLOCKED"
-    DEADLINE_PASSED = "DEADLINE_PASSED"
-    INSUFFICIENT_INFORMATION = "INSUFFICIENT_INFORMATION"
+from packages.contracts.models import ReadinessTriage
 
 
 class UserContext(BaseModel):
@@ -36,9 +29,9 @@ class ReadinessRequest(BaseModel):
     mandatory_information_complete: bool = True
 
 
-class ReadinessResponse(BaseModel):
-    status: ReadinessStatus
-    blocking_reasons: list[str] = Field(default_factory=list)
-    review_items: list[str] = Field(default_factory=list)
-    passed_checks: list[str] = Field(default_factory=list)
-    rule_version: str = "1.0"
+__all__ = [
+    "EligibilityRule",
+    "ReadinessRequest",
+    "ReadinessTriage",
+    "UserContext",
+]
