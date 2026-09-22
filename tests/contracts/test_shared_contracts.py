@@ -19,7 +19,6 @@ from packages.contracts import (
     Task,
 )
 
-
 NOW = datetime(2026, 9, 22, 8, 0, tzinfo=UTC)
 LATER = datetime(2026, 9, 22, 10, 0, tzinfo=UTC)
 

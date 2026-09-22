@@ -11,8 +11,8 @@ from packages.contracts.models import (
     CandidateAllocation,
     CompetitionBrief,
     DecisionSupportReport,
-    Recommendation,
     ReadinessTriage,
+    Recommendation,
     Task,
 )
 from packages.contracts.triage import (

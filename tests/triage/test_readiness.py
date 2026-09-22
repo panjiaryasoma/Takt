@@ -7,7 +7,6 @@ from engine.triage.service import evaluate_readiness
 from packages.contracts import ReadinessStatus, ReadinessTriage
 from packages.contracts.triage import EligibilityRule, ReadinessRequest, UserContext
 
-
 NOW = datetime(2026, 9, 21, 8, 0, tzinfo=UTC)
 FUTURE = NOW + timedelta(days=10)
 PAST = NOW - timedelta(days=1)

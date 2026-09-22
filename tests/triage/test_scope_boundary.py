@@ -1,7 +1,6 @@
 import ast
 from pathlib import Path
 
-
 FORBIDDEN_IMPORT_PREFIXES = (
     "engine.solver",
     "engine.recommendation",
