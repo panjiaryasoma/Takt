@@ -62,3 +62,23 @@ class AvailabilityType(StrEnum):
     FIXED_BUSY = "FIXED_BUSY"
     FLEXIBLE_BUSY = "FLEXIBLE_BUSY"
     ACCEPTED_PROJECT_COMMITMENT = "ACCEPTED_PROJECT_COMMITMENT"
+
+
+class SourceType(StrEnum):
+    """Peran source sesuai wire contract SOURCE_SCHEMA v1.0."""
+
+    OFFICIAL_RULES = "official_rules"
+    OFFICIAL_ORGANIZER = "official_organizer"
+    OFFICIAL_FAQ = "official_faq"
+    PLATFORM = "platform"
+    SECONDARY = "secondary"
+    DERIVED_FIXTURE = "derived_fixture"
+
+
+class ExtractionPath(StrEnum):
+    """Jalur extraction sesuai wire contract SOURCE_SCHEMA v1.0."""
+
+    NATIVE = "native"
+    OCR = "ocr"
+    VISION = "vision"
+    MANUAL = "manual"
