@@ -6,8 +6,6 @@ from packages.contracts.enums import (
     FeasibilityStatus,
     ReadinessStatus,
     RecommendationAction,
-    SourceAuthority,
-    SourceRelation,
     SourceType,
 )
 from packages.contracts.models import (
@@ -54,9 +52,7 @@ __all__ = [
     "ReadinessTriage",
     "Recommendation",
     "RecommendationAction",
-    "SourceAuthority",
     "SourceRecord",
-    "SourceRelation",
     "SourceType",
     "Task",
     "UserContext",
