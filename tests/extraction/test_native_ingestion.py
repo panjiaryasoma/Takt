@@ -939,7 +939,10 @@ def test_html_native_text_cap_stops_extracted_text_amplification() -> None:
 
     from engine.extraction import SourceLimitExceededError
 
-    with _client(handler) as client, pytest.raises(SourceLimitExceededError, match="extracted text limit"):
+    with (
+        _client(handler) as client,
+        pytest.raises(SourceLimitExceededError, match="extracted text limit"),
+    ):
         ingest_url_native(
             "https://fixture.example/text-cap",
             context=_context(),
@@ -1030,7 +1033,10 @@ def test_xhtml_is_not_claimed_as_supported_native_media_type() -> None:
             request=request,
         )
 
-    with _client(handler) as client, pytest.raises(UnsupportedMediaTypeError, match="application/xhtml\\+xml"):
+    with (
+        _client(handler) as client,
+        pytest.raises(UnsupportedMediaTypeError, match="application/xhtml\\+xml"),
+    ):
         ingest_url_native(
             "https://fixture.example/rules.xhtml",
             context=_context(),
@@ -1245,7 +1251,10 @@ def test_redirect_dns_target_is_revalidated_before_second_request(
         redirect_getaddrinfo,
     )
 
-    with _client(handler) as client, pytest.raises(InvalidSourceError, match="resolved to a non-public IP"):
+    with (
+        _client(handler) as client,
+        pytest.raises(InvalidSourceError, match="resolved to a non-public IP"),
+    ):
         ingest_url_native(
             "https://start.example/rules",
             context=_context(),
