@@ -9,7 +9,7 @@ from the CandidateExtractionReport for later reconciliation/review.
 from __future__ import annotations
 
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from hashlib import sha256
 from typing import Any
 
@@ -67,7 +67,7 @@ def _evidence_id(
     field_name: str,
     locator: str,
 ) -> str:
-    raw = "|".join((source_id, extraction_path.value, field_name, locator))
+    raw = f"{source_id}|{extraction_path.value}|{field_name}|{locator}"
     digest = sha256(raw.encode("utf-8")).hexdigest()[:16]
     return f"ev-{field_name}-{digest}"
 
@@ -99,7 +99,7 @@ def _normalize_deadline(value: str) -> str | None:
         parsed_date = datetime.strptime(
             f"{match.group('month')} {match.group('day')} {match.group('year')}",
             "%B %d %Y",
-        )
+        ).replace(tzinfo=UTC)
     except ValueError:
         return None
 
