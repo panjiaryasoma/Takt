@@ -204,9 +204,10 @@ def _as_eligibility_rule(value: Any) -> EligibilityRule | None:
         return None
 
     minimum_age = value["minimum_age"]
-    if minimum_age is not None:
-        if type(minimum_age) is not int or minimum_age < 0:
-            return None
+    if minimum_age is not None and (
+        type(minimum_age) is not int or minimum_age < 0
+    ):
+        return None
 
     requires_student = value["requires_student"]
     if type(requires_student) is not bool:
@@ -371,7 +372,7 @@ def _canonical_deadline(field: CanonicalField) -> datetime | None:
         if "T" not in cleaned:
             return None
         try:
-            parsed = datetime.fromisoformat(cleaned.replace("Z", "+00:00"))
+            parsed = datetime.fromisoformat(cleaned)
         except ValueError:
             return None
     else:

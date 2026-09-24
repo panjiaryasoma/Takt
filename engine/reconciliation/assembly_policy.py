@@ -42,7 +42,7 @@ def _freeze_string_tuple(
     field_name: str,
 ) -> tuple[str, ...]:
     if isinstance(value, (str, bytes)):
-        raise ValueError(f"{field_name} must be an iterable of field names")
+        raise TypeError(f"{field_name} must be an iterable of field names")
     try:
         frozen = tuple(value)
     except TypeError as exc:

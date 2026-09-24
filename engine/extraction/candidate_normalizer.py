@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import json
 import re
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta, timezone
 from hashlib import sha256
 from typing import Any
 
@@ -151,7 +151,7 @@ def _normalize_deadline(value: str) -> str | None:
         parsed_date = datetime.strptime(
             f"{match.group('month')} {match.group('day')} {match.group('year')}",
             "%B %d %Y",
-        )
+        ).replace(tzinfo=UTC)
     except ValueError:
         return None
 

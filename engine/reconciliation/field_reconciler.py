@@ -176,137 +176,329 @@ def collect_candidate_observations(
                 linked_evidence.append(evidence)
 
             candidate_scope = parse_scope(field.scope)
-            effective_scope = intersect_scopes(source_scope, candidate_scope,
-            )
+            effective_scope = intersect_scopes(source_scope, candidate_scope)
             if effective_scope is None:
                 raise ReconciliationInputError(
-                    "candidate scope is disZ›Ú[œ›ÛH]ÈÛÝ\˜ÙT™XÛÜ™ØÛÜH‚ˆ
-B‚ˆØœÙ\˜][ÛœË˜\[™
-ˆØ[™Y]SØœÙ\˜][ÛŠˆÛÝ\˜ÙWÚY\™\ÜœÛÝ\˜ÙWÚYˆ™\ÜÚÙ^O\™\ÜÚÙ^KˆÛÝ\˜ÙWÜ™XÛÜ™\ÛÝ\˜ÙKˆšY[YšY[ˆ]šY[˜ÙO]\JÛÜY
-[šÙYÙ]šY[˜ÙKÙ^O[[X™H][Nˆ][K™]šY[˜ÙWÚY
-JKˆÛÝ\˜ÙWÜØÛÜO\ÛÝ\˜ÙWÜØÛÜKˆØ[™Y]WÜØÛÜOXØ[™Y]WÜØÛÜKˆY™™XÝ]™WÜØÛÜOYY™™XÝ]™WÜØÛÜKˆ]]Üš]OX]]Üš]Kˆœ™\Ú™\ÜÏYœ™\Ú™\ÜËˆ
-Bˆ
-B‚ˆ™]\›ˆ\JÛÜY
-ØœÙ\˜][ÛœËÙ^OWÛØœÙ\˜][Û—ÜÛÜÚÙ^JJB‚‚™YˆÝ[™\šYšYY
-ˆšY[Û˜[YNˆÝ‹ˆØœÙ\˜][ÛœÎˆ\VÐØ[™Y]SØœÙ\˜][Û‹‹‹—Kˆ
-‹ˆ˜\Ú\Îˆ\VÜÝ‹‹‹—KŠHOˆšY[™XÛÛ˜Ú[X][Û”™\Ý[‚ˆ™]\›ˆšY[™XÛÛ˜Ú[X][Û”™\Ý[
-ˆØ[›ÛšXØ[ÙšY[PØ[›ÛšXØ[šY[
-ˆšY[Û˜[YOYšY[Û˜[YKˆÝ]OPØ[›ÛšXØ[šY[Ý]K•S•‘T’Q’QQˆØ[™Y]\ÏWØØ[™Y]\ÊØœÙ\˜][ÛœÊKˆ]šY[˜ÙWÚYÏWÙ]šY[˜ÙWÚYÊØœÙ\˜][ÛœÊKˆ
-Kˆ™\ÛÛ][Û—Ø˜\Ú\ÏX˜\Ú\ËˆÝ\Ü[™×ÜÛÝ\˜ÙWÚYÏJ
-Kˆ
-B‚‚™YˆØÛÛ™›XÝ
-ˆšY[Û˜[YNˆÝ‹ˆØœÙ\˜][ÛœÎˆ\VÐØ[™Y]SØœÙ\˜][Û‹‹‹—Kˆ
-‹ˆÝ\\œÙYYÜÛÝ\˜ÙWÚYÎˆ\VÜÝ‹‹‹—HH
+                    "candidate scope is disjoint from its SourceRecord scope"
+                )
 
-KŠHOˆšY[™XÛÛ˜Ú[X][Û”™\Ý[‚ˆ™]\›ˆšY[™XÛÛ˜Ú[X][Û”™\Ý[
-ˆØ[›ÛšXØ[ÙšY[PØ[›ÛšXØ[šY[
-ˆšY[Û˜[YOYšY[Û˜[YKˆÝ]OPØ[›ÛšXØ[šY[Ý]KÓÓ‘“PÕˆØ[™Y]\ÏWØØ[™Y]\ÊØœÙ\˜][ÛœÊKˆ]šY[˜ÙWÚYÏWÙ]šY[˜ÙWÚYÊØœÙ\˜][ÛœÊKˆ
-Kˆ™\ÛÛ][Û—Ø˜\Ú\ÏJ[œ™\ÛÛ™YX\XØX›KY\ØYÜ™Y[Y[‹
-KˆÝ\Ü[™×ÜÛÝ\˜ÙWÚYÏJ
-KˆÝ\\œÙYYÜÛÝ\˜ÙWÚYÏ\Ý\\œÙYYÜÛÝ\˜ÙWÚYËˆ
-B‚‚™YˆÜÚ[\WÝ\ØX›WÜ™\Ý[
-ˆšY[Û˜[YNˆÝ‹ˆ
-‹ˆXÝ]™Nˆ\VÐØ[™Y]SØœÙ\˜][Û‹‹‹—Kˆ[ÛØœÙ\˜][ÛœÎˆ\VÐØ[™Y]SØœÙ\˜][Û‹‹‹—KˆÝ\\œÙYYÜÛÝ\˜ÙWÚYÎˆ\VÜÝ‹‹‹—KŠHOˆšY[™XÛÛ˜Ú[X][Û”™\Ý[‚ˆ™\™\Ù[]]™HHZ[ŠXÝ]™KÙ^OWÛØœÙ\˜][Û—ÜÛÜÚÙ^JBˆÛÛ\\™YHÛÛ\\š\ÛÛ—Ý˜[YJšY[Û˜[YK™\™\Ù[]]™K™šY[››Ü›X[^™YÝ˜[YJBˆÝ\Ü[™×ÜÛÝ\˜ÙWÚYÈH\JÛÜY
-Ú][KœÛÝ\˜ÙWÚY›Üˆ][H[ˆXÝ]™_JJBˆÝ]HH
-ˆØ[›ÛšXØ[šY[Ý]K•‘T’Q’QQˆYˆ[ŠÝ\Ü[™×ÜÛÝ\˜ÙWÚYÊHH‚ˆ[ÙHØ[›ÛšXØ[šY[Ý]K”ÒS‘ÓWÔÓÕTÑBˆ
-Bˆ˜\Ú\ÈH
-ˆ˜YÜ™Y[Y[žÛ[ŠÝ\Ü[™×ÜÛÝ\˜ÙWÚYÊ_KZ[™\[™[\ÛÝ\˜ÙH‹
-BˆYˆÝ\\œÙYYÜÛÝ\˜ÙWÚYÎ‚ˆ˜\Ú\È
-ÏH
-™]\›Z[š\ÝXË\Ý\\œÙ\ÜÚ[Ûˆ‹
-B‚ˆ™]\›ˆšY[™XÛÛ˜Ú[X][Û”™\Ý[
-ˆØ[›ÛšXØ[ÙšY[PØ[›ÛšXØ[šY[
-ˆšY[Û˜[YOYšY[Û˜[YKˆÝ]O\Ý]Kˆ˜[YO\™\™\Ù[]]™K™šY[œ˜]×Ý˜[YKˆ›Ü›X[^™YÝ˜[YOXÛÛ\\™Y˜Ø[›ÛšXØ[ˆØ[™Y]\ÏWØØ[™Y]\Ê[ÛØœÙ\˜][ÛœÊKˆ]šY[˜ÙWÚYÏWÙ]šY[˜ÙWÚYÊ[ÛØœÙ\˜][ÛœÊKˆ
-Kˆ™\ÛÛ][Û—Ø˜\Ú\ÏX˜\Ú\ËˆÝ\Ü[™×ÜÛÝ\˜ÙWÚYÏ\Ý\Ü[™×ÜÛÝ\˜ÙWÚYËˆÝ\\œÙYYÜÛÝ\˜ÙWÚYÏ\Ý\\œÙYYÜÛÝ\˜ÙWÚYËˆ
-B‚‚™YˆÜØÛÜYÜ™\Ý[
-ˆšY[Û˜[YNˆÝ‹ˆ
-‹ˆXÝ]™Nˆ\VÐØ[™Y]SØœÙ\˜][Û‹‹‹—Kˆ[ÛØœÙ\˜][ÛœÎˆ\VÐØ[™Y]SØœÙ\˜][Û‹‹‹—KˆÝ\\œÙYYÜÛÝ\˜ÙWÚYÎˆ\VÜÝ‹‹‹—KŠHOˆšY[™XÛÛ˜Ú[X][Û”™\Ý[‚ˆÜ›Ý\ÎˆXÝÂˆ\VÝ\VÜÝˆ›Û™KÝˆ›Û™KÝˆ›Û™WKÝ—Kˆ\ÝÐØ[™Y]SØœÙ\˜][Û—KˆHHßBˆØÛÜ\ÎˆXÝÂˆ\VÝ\VÜÝˆ›Û™KÝˆ›Û™KÝˆ›Û™WKÝ—KØÛÜQ\ØÜš\Ü‚ˆHHßB‚ˆ›ÜˆØœÙ\˜][Ûˆ[ˆXÝ]™N‚ˆØÛÜHHØœÙ\˜][Û‹™Y™™XÝ]™WÜØÛÜBˆÛÛ\\™YHÛÛ\\š\ÛÛ—Ý˜[YJšY[Û˜[YKØœÙ\˜][Û‹™šY[››Ü›X[^™YÝ˜[YJBˆÙ^HH
-ØÛÜKšÙ^KÛÛ\\™YšÙ^JBˆÜ›Ý\ËœÙ]Y˜][
-Ù^K×JK˜\[™
-ØœÙ\˜][ÛŠBˆØÛÜ\ÖÚÙ^WHHØÛÜB‚ˆ˜]×Ý˜\šX[Îˆ\ÝÙXÝÜÝ‹Øš™XÝWHH×Bˆ›Ü›X[^™YÝ˜\šX[Îˆ\ÝÙXÝÜÝ‹Øš™XÝWHH×BˆÝ\ÜØÛÝ[Îˆ\ÝÚ[HH×BˆÝ\Ü[™×ÜÛÝ\˜Ù\ÎˆÙ]ÜÝ—HHÙ]
+            observations.append(
+                CandidateObservation(
+                    source_id=report.source_id,
+                    report_key=report_key,
+                    source_record=source,
+                    field=field,
+                    evidence=tuple(sorted(linked_evidence, key=lambda item: item.evidence_id)),
+                    source_scope=source_scope,
+                    candidate_scope=candidate_scope,
+                    effective_scope=effective_scope,
+                    authority=authority,
+                    freshness=freshness,
+                )
+            )
 
-B‚ˆ›ÜˆÙ^H[ˆÛÜY
-Ü›Ý\ËÙ^O[[X™H][Nˆ
-ÜÝX›WÚœÛÛŠ][VÌJK][VÌWJJN‚ˆÜ›Ý\H\JÛÜY
-Ü›Ý\ÖÚÙ^WKÙ^OWÛØœÙ\˜][Û—ÜÛÜÚÙ^JJBˆ™\™\Ù[]]™HHÜ›Ý\ÌBˆÛÛ\\™YHÛÛ\\š\ÛÛ—Ý˜[YJšY[Û˜[YK™\™\Ù[]]™K™šY[››Ü›X[^™YÝ˜[YJBˆØÛÜWÛX\[™ÈHØÛÜ\ÖÚÙ^WK˜\×ÛX\[™Ê
-BˆÜ›Ý\ÜÛÝ\˜Ù\ÈHÛÜY
-Ú][KœÛÝ\˜ÙWÚY›Üˆ][H[ˆÜ›Ý\JBˆÝ\ÜØÛÝ[Ë˜\[™
-[ŠÜ›Ý\ÜÛÝ\˜Ù\ÊJBˆÝ\Ü[™×ÜÛÝ\˜Ù\Ë\]JÜ›Ý\ÜÛÝ\˜Ù\ÊBˆ˜]×Ý˜\šX[Ë˜\[™
-ˆÂˆœØÛÜHŽˆØÛÜWÛX\[™Ëˆ˜[YHŽˆ™\™\Ù[]]™K™šY[œ˜]×Ý˜[YKˆBˆ
-Bˆ›Ü›X[^™YÝ˜\šX[Ë˜\[™
-ˆÂˆœØÛÜHŽˆØÛÜWÛX\[™Ëˆ˜[YHŽˆÛÛ\\™Y˜Ø[›ÛšXØ[ˆBˆ
-B‚ˆÝ]HH
-ˆØ[›ÛšXØ[šY[Ý]K•‘T’Q’QQˆYˆÝ\ÜØÛÝ[È[™[
-ÛÝ[Hˆ›ÜˆÛÝ[[ˆÝ\ÜØÛÝ[ÊBˆ[ÙHØ[›ÛšXØ[šY[Ý]K”ÒS‘ÓWÔÓÕTÑBˆ
-Bˆ˜\Ú\ÈH
-œØÛÜY]˜\šX[È‹
-BˆYˆÝ\\œÙYYÜÛÝ\˜ÙWÚYÎ‚ˆ˜\Ú\È
-ÏH
-™]\›Z[š\ÝXË\Ý\\œÙ\ÜÚ[Ûˆ‹
-B‚ˆ™]\›ˆšY[™XÛÛ˜Ú[X][Û”™\Ý[
-ˆØ[›ÛšXØ[ÙšY[PØ[›ÛšXØ[šY[
-ˆšY[Û˜[YOYšY[Û˜[YKˆÝ]O\Ý]Kˆ˜[YO^È˜\šX[ÈŽˆ˜]×Ý˜\šX[ßKˆ›Ü›X[^™YÝ˜[YO^È˜\šX[ÈŽˆ›Ü›X[^™YÝ˜\šX[ßKˆØ[™Y]\ÏWØØ[™Y]\Ê[ÛØœÙ\˜][ÛœÊKˆ]šY[˜ÙWÚYÏWÙ]šY[˜ÙWÚYÊ[ÛØœÙ\˜][ÛœÊKˆ
-Kˆ™\ÛÛ][Û—Ø˜\Ú\ÏX˜\Ú\ËˆÝ\Ü[™×ÜÛÝ\˜ÙWÚYÏ]\JÛÜY
-Ý\Ü[™×ÜÛÝ\˜Ù\ÊJKˆÝ\\œÙYYÜÛÝ\˜ÙWÚYÏ\Ý\\œÙYYÜÛÝ\˜ÙWÚYËˆ
-B‚‚™YˆÚ\×Ù\Ú›Ú[ÜZ\ŠØœÙ\˜][ÛœÎˆ\VÐØ[™Y]SØœÙ\˜][Û‹‹‹—JHOˆ›ÛÛ‚ˆ›ÜˆYÚ[™^Y[ˆ[[Y\˜]JØœÙ\˜][ÛœÊN‚ˆ›ÜˆšYÚ[ˆØœÙ\˜][ÛœÖÛYÚ[™^
-ÈH—N‚ˆYˆ
-ˆØÛÜWÜ™[][ÛŠY™Y™™XÝ]™WÜØÛÜKšYÚ™Y™™XÝ]™WÜØÛÜJBˆ\ÈØÛÜT™[][Û‹‘TÒ“ÒS•ˆ
-N‚ˆ™]\›ˆYBˆ™]\›ˆ˜[ÙB‚‚™Yˆ™XÛÛ˜Ú[WÙšY[
-ˆšY[Û˜[YNˆÝ‹ˆ™\ÜÎˆ]\˜X›VÐØ[™Y]Q^˜XÝ[Û”™\ÜKˆÛÝ\˜Ù\Îˆ]\˜X›VÔÛÝ\˜ÙT™XÛÜ™KŠHOˆšY[™XÛÛ˜Ú[X][Û”™\Ý[‚ˆˆˆ”™XÛÛ˜Ú[HÛ™HšY[Ú[H™]Z[š[™È]™\žHØ[™Y]KÙ]šY[˜ÙH™Y™\™[˜ÙKˆˆˆ‚‚ˆ[ÛØœÙ\˜][ÛœÈHÛÛXÝØØ[™Y]WÛØœÙ\˜][ÛœÊ™\ÜËÛÝ\˜Ù\ÊBˆØœÙ\˜][ÛœÈH\Jˆ][H›Üˆ][H[ˆ[ÛØœÙ\˜][ÛœÈYˆ][K™šY[™šY[Û˜[YHOHšY[Û˜[YBˆ
-BˆYˆ›ÝØœÙ\˜][ÛœÎ‚ˆ™]\›ˆšY[™XÛÛ˜Ú[X][Û”™\Ý[
-ˆØ[›ÛšXØ[ÙšY[PØ[›ÛšXØ[šY[
-ˆšY[Û˜[YOYšY[Û˜[YKˆÝ]OPØ[›ÛšXØ[šY[Ý]K“RTÔÒS‘Ëˆ
-Kˆ™\ÛÛ][Û—Ø˜\Ú\ÏJ››ËXØ[™Y]H‹
-KˆÝ\Ü[™×ÜÛÝ\˜ÙWÚYÏJ
-Kˆ
-B‚ˆÛÛ\\š\ÛÛœÎˆ\ÝÜÝ—HH×Bˆ›ÜˆØœÙ\˜][Ûˆ[ˆØœÙ\˜][ÛœÎ‚ˆYˆ›ÝØœÙ\˜][Û‹˜]]Üš]KšÛ›ÝÛŽ‚ˆ™]\›ˆÝ[™\šYšYY
-ˆšY[Û˜[YKˆØœÙ\˜][ÛœËˆ˜\Ú\ÏJ˜]]Üš]K][šÛ›ÝÛˆ‹
-Kˆ
-BˆYˆ›ÝØœÙ\˜][Û‹™œ™\Ú™\ÜËšÛ›ÝÛŽ‚ˆ™]\›ˆÝ[™\šYšYY
-ˆšY[Û˜[YKˆØœÙ\˜][ÛœËˆ˜\Ú\ÏJ™œ™\Ú™\ÜË][šÛ›ÝÛˆ‹
-Kˆ
-BˆYˆ›ÝØœÙ\˜][Û‹™Y™™XÝ]™WÜØÛÜKšÛ›ÝÛŽ‚ˆ™]\›ˆÝ[™\šYšYY
-ˆšY[Û˜[YKˆØœÙ\˜][ÛœËˆ˜\Ú\ÏJœØÛÜK][šÛ›ÝÛˆ‹
-Kˆ
-BˆYˆØœÙ\˜][Û‹™šY[œ˜]×Ý˜[YH\È›Û™N‚ˆ™]\›ˆÝ[™\šYšYY
-ˆšY[Û˜[YKˆØœÙ\˜][ÛœËˆ˜\Ú\ÏJœ˜]Ë]˜[YK][\ØX›H‹
-Kˆ
-BˆžN‚ˆÛÛ\\š\ÛÛœË˜\[™
-ˆÛÛ\\š\ÛÛ—Ý˜[YJšY[Û˜[YKØœÙ\˜][Û‹™šY[››Ü›X[^™YÝ˜[YJKšÙ^Bˆ
-Bˆ^Ù\[\ØX›S›Ü›X[^™Y˜[YN‚ˆ™]\›ˆÝ[™\šYšYY
-ˆšY[Û˜[YKˆØœÙ\˜][ÛœËˆ˜\Ú\ÏJ››Ü›X[^™Y]˜[YK][\ØX›H‹
-Kˆ
-B‚ˆÝ\\œÙYYÚ[™^\ÎˆÙ]Ú[HHÙ]
+    return tuple(sorted(observations, key=_observation_sort_key))
 
-BˆÝ\\œÙ\ÜÚ[Û—Ø˜\Ú\Îˆ\ÝÜÝ—HH×Bˆ›ÜˆYÚ[™^Y[ˆ[[Y\˜]JØœÙ\˜][ÛœÊN‚ˆ›ÜˆšYÚÚ[™^[ˆ˜[™ÙJYÚ[™^
-ÈK[ŠØœÙ\˜][ÛœÊJN‚ˆšYÚHØœÙ\˜][ÛœÖÜšYÚÚ[™^BˆYˆÛÛ\\š\ÛÛœÖÛYÚ[™^HOHÛÛ\\š\ÛÛœÖÜšYÚÚ[™^N‚ˆÛÛ[YBˆ™[][ÛˆHØÛÜWÜ™[][ÛŠY™Y™™XÝ]™WÜØÛÜKšYÚ™Y™™XÝ]™WÜØÛÜJBˆYˆ™[][Ûˆ›Ý[ˆÔØÛÜT™[][Û‹”ÐSQKØÛÜT™[][Û‹“Õ‘T“TßN‚ˆÛÛ[YB‚ˆYÛÝ™\—ÜšYÚHÛÝ\˜ÙWÜÝ\\œÙY\ÊYšYÚšY[Û˜[YOYšY[Û˜[YJBˆšYÚÛÝ™\—ÛYHÛÝ\˜ÙWÜÝ\\œÙY\ÊšYÚYšY[Û˜[YOYšY[Û˜[YJBˆYˆYÛÝ™\—ÜšYÚOHšYÚÛÝ™\—ÛY‚ˆÛÛ[YBˆYˆYÛÝ™\—ÜšYÚ‚ˆÝ\\œÙYYÚ[™^\Ë˜Y
-šYÚÚ[™^
-BˆÝ\\œÙ\ÜÚ[Û—Ø˜\Ú\Ë˜\[™
-ˆžÛYœÛÝ\˜ÙWÚYOžÜšYÚœÛÝ\˜ÙWÚYHŠBˆ[ÙN‚ˆÝ\\œÙYYÚ[™^\Ë˜Y
-YÚ[™^
-BˆÝ\\œÙ\ÜÚ[Û—Ø˜\Ú\Ë˜\[™
-ˆžÜšYÚœÛÝ\˜ÙWÚYOžÛYœÛÝ\˜ÙWÚYHŠB‚ˆXÝ]™WÚ[™^\ÈH\Jˆ[™^›Üˆ[™^[ˆ˜[™ÙJ[ŠØœÙ\˜][ÛœÊJHYˆ[™^›Ý[ˆÝ\\œÙYYÚ[™^\Âˆ
-BˆXÝ]™HH\JØœÙ\˜][ÛœÖÚ[™^H›Üˆ[™^[ˆXÝ]™WÚ[™^\ÊBˆYˆ›ÝXÝ]™N‚ˆ™]\›ˆÝ[™\šYšYY
-ˆšY[Û˜[YKˆØœÙ\˜][ÛœËˆ˜\Ú\ÏJœÝ\\œÙ\ÜÚ[Û‹Y[[Z[˜]YX[XØ[™Y]\È‹
-Kˆ
-B‚ˆXÝ]™WÚÙ^\ÈHØÛÛ\\š\ÛÛœÖÚ[™^H›Üˆ[™^[ˆXÝ]™WÚ[™^\ßBˆÝ\\œÙYYÜÛÝ\˜ÙWÚYÈH\JˆÛÜY
-ÛØœÙ\˜][ÛœÖÚ[™^KœÛÝ\˜ÙWÚY›Üˆ[™^[ˆÝ\\œÙYYÚ[™^\ßJBˆ
-B‚ˆYˆ[ŠXÝ]™WÚÙ^\ÊHOHN‚ˆYˆÚ\×Ù\Ú›Ú[ÜZ\ŠXÝ]™JN‚ˆ™]\›ˆÜØÛÜYÜ™\Ý[
-ˆšY[Û˜[YKˆXÝ]™OXXÝ]™Kˆ[ÛØœÙ\˜][ÛœÏ[ØœÙ\˜][ÛœËˆÝ\\œÙYYÜÛÝ\˜ÙWÚYÏ\Ý\\œÙYYÜÛÝ\˜ÙWÚYËˆ
-B‚ˆ™\Ý[HÜÚ[\WÝ\ØX›WÜ™\Ý[
-ˆšY[Û˜[YKˆXÝ]™OXXÝ]™Kˆ[ÛØœÙ\˜][ÛœÏ[ØœÙ\˜][ÛœËˆÝ\\œÙYYÜÛÝ\˜ÙWÚYÏ\Ý\\œÙYYÜÛÝ\˜ÙWÚYËˆ
-BˆYˆÝ\\œÙ\ÜÚ[Û—Ø˜\Ú\Î‚ˆ™]\›ˆšY[™XÛÛ˜Ú[X][Û”™\Ý[
-ˆØ[›ÛšXØ[ÙšY[\™\Ý[˜Ø[›ÛšXØ[ÙšY[ˆ™\ÛÛ][Û—Ø˜\Ú\Ï\™\Ý[œ™\ÛÛ][Û—Ø˜\Ú\Âˆ
-È\JˆœÝ\\œÙY\ÎžÚ][_Hˆ›Üˆ][H[ˆÛÜY
-Ù]
-Ý\\œÙ\ÜÚ[Û—Ø˜\Ú\ÊJJKˆÝ\Ü[™×ÜÛÝ\˜ÙWÚYÏ\™\Ý[œÝ\Ü[™×ÜÛÝ\˜ÙWÚYËˆÝ\\œÙYYÜÛÝ\˜ÙWÚYÏ\™\Ý[œÝ\\œÙYYÜÛÝ\˜ÙWÚYËˆ
-Bˆ™]\›ˆ™\Ý[‚ˆ›ÜˆXÝ]™WÜÜÚ][Û‹YÚ[™^[ˆ[[Y\˜]JXÝ]™WÚ[™^\ÊN‚ˆ›ÜˆšYÚÚ[™^[ˆXÝ]™WÚ[™^\ÖØXÝ]™WÜÜÚ][Ûˆ
-ÈH—N‚ˆYˆÛÛ\\š\ÛÛœÖÛYÚ[™^HOHÛÛ\\š\ÛÛœÖÜšYÚÚ[™^N‚ˆÛÛ[YBˆ™[][ÛˆHØÛÜWÜ™[][ÛŠˆØœÙ\˜][ÛœÖÛYÚ[™^K™Y™™XÝ]™WÜØÛÜKˆØœÙ\˜][ÛœÖÜšYÚÚ[™^K™Y™™XÝ]™WÜØÛÜKˆ
-BˆYˆ™[][Ûˆ[ˆÔØÛÜT™[][Û‹”ÐSQKØÛÜT™[][Û‹“Õ‘T“TßN‚ˆ™]\›ˆØÛÛ™›XÝ
-ˆšY[Û˜[YKˆØœÙ\˜][ÛœËˆÝ\\œÙYYÜÛÝ\˜ÙWÚYÏ\Ý\\œÙYYÜÛÝ\˜ÙWÚYËˆ
-BˆYˆ™[][Ûˆ\ÈØÛÜT™[][Û‹•S’Ó“ÕÓŽ‚ˆ™]\›ˆÝ[™\šYšYY
-ˆšY[Û˜[YKˆØœÙ\˜][ÛœËˆ˜\Ú\ÏJœØÛÜK\™[][Û‹][šÛ›ÝÛˆ‹
-Kˆ
-B‚ˆ™]\›ˆÜØÛÜYÜ™\Ý[
-ˆšY[Û˜[YKˆXÝ]™OXXÝ]™Kˆ[ÛØœÙ\˜][ÛœÏ[ØœÙ\˜][ÛœËˆÝ\\œÙYYÜÛÝ\˜ÙWÚYÏ\Ý\\œÙYYÜÛÝ\˜ÙWÚYËˆ
-B
+
+def _unverified(
+    field_name: str,
+    observations: tuple[CandidateObservation, ...],
+    *,
+    basis: tuple[str, ...],
+) -> FieldReconciliationResult:
+    return FieldReconciliationResult(
+        canonical_field=CanonicalField(
+            field_name=field_name,
+            state=CanonicalFieldState.UNVERIFIED,
+            candidates=_candidates(observations),
+            evidence_ids=_evidence_ids(observations),
+        ),
+        resolution_basis=basis,
+        supporting_source_ids=(),
+    )
+
+
+def _conflict(
+    field_name: str,
+    observations: tuple[CandidateObservation, ...],
+    *,
+    superseded_source_ids: tuple[str, ...] = (),
+) -> FieldReconciliationResult:
+    return FieldReconciliationResult(
+        canonical_field=CanonicalField(
+            field_name=field_name,
+            state=CanonicalFieldState.CONFLICT,
+            candidates=_candidates(observations),
+            evidence_ids=_evidence_ids(observations),
+        ),
+        resolution_basis=("unresolved-applicable-disagreement",),
+        supporting_source_ids=(),
+        superseded_source_ids=superseded_source_ids,
+    )
+
+
+def _simple_usable_result(
+    field_name: str,
+    *,
+    active: tuple[CandidateObservation, ...],
+    all_observations: tuple[CandidateObservation, ...],
+    superseded_source_ids: tuple[str, ...],
+) -> FieldReconciliationResult:
+    representative = min(active, key=_observation_sort_key)
+    compared = comparison_value(field_name, representative.field.normalized_value)
+    supporting_source_ids = tuple(sorted({item.source_id for item in active}))
+    state = (
+        CanonicalFieldState.VERIFIED
+        if len(supporting_source_ids) >= 2
+        else CanonicalFieldState.SINGLE_SOURCE
+    )
+    basis = (f"agreement:{len(supporting_source_ids)}-independent-source",)
+    if superseded_source_ids:
+        basis += ("deterministic-supersession",)
+
+    return FieldReconciliationResult(
+        canonical_field=CanonicalField(
+            field_name=field_name,
+            state=state,
+            value=representative.field.raw_value,
+            normalized_value=compared.canonical,
+            candidates=_candidates(all_observations),
+            evidence_ids=_evidence_ids(all_observations),
+        ),
+        resolution_basis=basis,
+        supporting_source_ids=supporting_source_ids,
+        superseded_source_ids=superseded_source_ids,
+    )
+
+
+def _scoped_result(
+    field_name: str,
+    *,
+    active: tuple[CandidateObservation, ...],
+    all_observations: tuple[CandidateObservation, ...],
+    superseded_source_ids: tuple[str, ...],
+) -> FieldReconciliationResult:
+    groups: dict[
+        tuple[tuple[str | None, str | None, str | None], str],
+        list[CandidateObservation],
+    ] = {}
+    scopes: dict[
+        tuple[tuple[str | None, str | None, str | None], str], ScopeDescriptor
+    ] = {}
+
+    for observation in active:
+        scope = observation.effective_scope
+        compared = comparison_value(field_name, observation.field.normalized_value)
+        key = (scope.key, compared.key)
+        groups.setdefault(key, []).append(observation)
+        scopes[key] = scope
+
+    raw_variants: list[dict[str, object]] = []
+    normalized_variants: list[dict[str, object]] = []
+    support_counts: list[int] = []
+    supporting_sources: set[str] = set()
+
+    for key in sorted(groups, key=lambda item: (_stable_json(item[0]), item[1])):
+        group = tuple(sorted(groups[key], key=_observation_sort_key))
+        representative = group[0]
+        compared = comparison_value(field_name, representative.field.normalized_value)
+        scope_mapping = scopes[key].as_mapping()
+        group_sources = sorted({item.source_id for item in group})
+        support_counts.append(len(group_sources))
+        supporting_sources.update(group_sources)
+        raw_variants.append(
+            {
+                "scope": scope_mapping,
+                "value": representative.field.raw_value,
+            }
+        )
+        normalized_variants.append(
+            {
+                "scope": scope_mapping,
+                "value": compared.canonical,
+            }
+        )
+
+    state = (
+        CanonicalFieldState.VERIFIED
+        if support_counts and all(count >= 2 for count in support_counts)
+        else CanonicalFieldState.SINGLE_SOURCE
+    )
+    basis = ("scoped-variants",)
+    if superseded_source_ids:
+        basis += ("deterministic-supersession",)
+
+    return FieldReconciliationResult(
+        canonical_field=CanonicalField(
+            field_name=field_name,
+            state=state,
+            value={"variants": raw_variants},
+            normalized_value={"variants": normalized_variants},
+            candidates=_candidates(all_observations),
+            evidence_ids=_evidence_ids(all_observations),
+        ),
+        resolution_basis=basis,
+        supporting_source_ids=tuple(sorted(supporting_sources)),
+        superseded_source_ids=superseded_source_ids,
+    )
+
+
+def _has_disjoint_pair(observations: tuple[CandidateObservation, ...]) -> bool:
+    for left_index, left in enumerate(observations):
+        for right in observations[left_index + 1 :]:
+            if (
+                scope_relation(left.effective_scope, right.effective_scope)
+                is ScopeRelation.DISJOINT
+            ):
+                return True
+    return False
+
+
+def reconcile_field(
+    field_name: str,
+    reports: Iterable[CandidateExtractionReport],
+    sources: Iterable[SourceRecord],
+) -> FieldReconciliationResult:
+    """Reconcile one field while retaining every candidate/evidence reference."""
+
+    all_observations = collect_candidate_observations(reports, sources)
+    observations = tuple(
+        item for item in all_observations if item.field.field_name == field_name
+    )
+    if not observations:
+        return FieldReconciliationResult(
+            canonical_field=CanonicalField(
+                field_name=field_name,
+                state=CanonicalFieldState.MISSING,
+            ),
+            resolution_basis=("no-candidate",),
+            supporting_source_ids=(),
+        )
+
+    comparisons: list[str] = []
+    for observation in observations:
+        if not observation.authority.known:
+            return _unverified(
+                field_name,
+                observations,
+                basis=("authority-unknown",),
+            )
+        if not observation.freshness.known:
+            return _unverified(
+                field_name,
+                observations,
+                basis=("freshness-unknown",),
+            )
+        if not observation.effective_scope.known:
+            return _unverified(
+                field_name,
+                observations,
+                basis=("scope-unknown",),
+            )
+        if observation.field.raw_value is None:
+            return _unverified(
+                field_name,
+                observations,
+                basis=("raw-value-unusable",),
+            )
+        try:
+            comparisons.append(
+                comparison_value(field_name, observation.field.normalized_value).key
+            )
+        except UnusableNormalizedValue:
+            return _unverified(
+                field_name,
+                observations,
+                basis=("normalized-value-unusable",),
+            )
+
+    superseded_indexes: set[int] = set()
+    supersession_basis: list[str] = []
+    for left_index, left in enumerate(observations):
+        for right_index in range(left_index + 1, len(observations)):
+            right = observations[right_index]
+            if comparisons[left_index] == comparisons[right_index]:
+                continue
+            relation = scope_relation(left.effective_scope, right.effective_scope)
+            if relation not in {ScopeRelation.SAME, ScopeRelation.OVERLAPS}:
+                continue
+
+            left_over_right = source_supersedes(left, right, field_name=field_name)
+            right_over_left = source_supersedes(right, left, field_name=field_name)
+            if left_over_right == right_over_left:
+                continue
+            if left_over_right:
+                superseded_indexes.add(right_index)
+                supersession_basis.append(f"{left.source_id}>{right.source_id}")
+            else:
+                superseded_indexes.add(left_index)
+                supersession_basis.append(f"{right.source_id}>{left.source_id}")
+
+    active_indexes = tuple(
+        index for index in range(len(observations)) if index not in superseded_indexes
+    )
+    active = tuple(observations[index] for index in active_indexes)
+    if not active:
+        return _unverified(
+            field_name,
+            observations,
+            basis=("supersession-eliminated-all-candidates",),
+        )
+
+    active_keys = {comparisons[index] for index in active_indexes}
+    superseded_source_ids = tuple(
+        sorted({observations[index].source_id for index in superseded_indexes})
+    )
+
+    if len(active_keys) == 1:
+        if _has_disjoint_pair(active):
+            return _scoped_result(
+                field_name,
+                active=active,
+                all_observations=observations,
+                superseded_source_ids=superseded_source_ids,
+            )
+
+        result = _simple_usable_result(
+            field_name,
+            active=active,
+            all_observations=observations,
+            superseded_source_ids=superseded_source_ids,
+        )
+        if supersession_basis:
+            return FieldReconciliationResult(
+                canonical_field=result.canonical_field,
+                resolution_basis=result.resolution_basis
+                + tuple(f"supersedes:{item}" for item in sorted(set(supersession_basis))),
+                supporting_source_ids=result.supporting_source_ids,
+                superseded_source_ids=result.superseded_source_ids,
+            )
+        return result
+
+    for active_position, left_index in enumerate(active_indexes):
+        for right_index in active_indexes[active_position + 1 :]:
+            if comparisons[left_index] == comparisons[right_index]:
+                continue
+            relation = scope_relation(
+                observations[left_index].effective_scope,
+                observations[right_index].effective_scope,
+            )
+            if relation in {ScopeRelation.SAME, ScopeRelation.OVERLAPS}:
+                return _conflict(
+                    field_name,
+                    observations,
+                    superseded_source_ids=superseded_source_ids,
+                )
+            if relation is ScopeRelation.UNKNOWN:
+                return _unverified(
+                    field_name,
+                    observations,
+                    basis=("scope-relation-unknown",),
+                )
+
+    return _scoped_result(
+        field_name,
+        active=active,
+        all_observations=observations,
+        superseded_source_ids=superseded_source_ids,
+    )

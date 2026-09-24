@@ -387,7 +387,7 @@ def _declared_meta_charset(content: bytes) -> str | None:
 def _decode_html(content: bytes, encoding: str | None) -> str:
     if content.startswith(codecs.BOM_UTF8):
         return content.decode("utf-8-sig")
-    if content.startswith(codecs.BOM_UTF16_LE) or content.startswith(codecs.BOM_UTF16_BE):
+    if content.startswith((codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE)):
         return content.decode("utf-16")
 
     candidates: list[str] = []

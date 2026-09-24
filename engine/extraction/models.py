@@ -80,28 +80,32 @@ class HttpRetrievalMetadata:
         if not isinstance(resolved_url, str) or not resolved_url.strip():
             raise ValueError("resolved_url must be a non-empty string")
         if isinstance(status_code, bool) or not isinstance(status_code, int):
-            raise ValueError("status_code must be an integer")
+            raise TypeError("status_code must be an integer")
 
-        if content_type is not None and declared_content_type is not None:
-            if content_type.strip().lower() != declared_content_type.strip().lower():
-                raise ValueError(
-                    "content_type and declared_content_type must not disagree"
-                )
+        if (
+            content_type is not None
+            and declared_content_type is not None
+            and content_type.strip().lower()
+            != declared_content_type.strip().lower()
+        ):
+            raise ValueError(
+                "content_type and declared_content_type must not disagree"
+            )
         selected_content_type = (
             declared_content_type if declared_content_type is not None else content_type
         )
         if selected_content_type is not None:
             if not isinstance(selected_content_type, str):
-                raise ValueError("content_type must be a string or null")
+                raise TypeError("content_type must be a string or null")
             selected_content_type = selected_content_type.strip().lower() or None
 
         if declared_charset is not None:
             if not isinstance(declared_charset, str):
-                raise ValueError("declared_charset must be a string or null")
+                raise TypeError("declared_charset must be a string or null")
             declared_charset = declared_charset.strip() or None
 
         if isinstance(redirect_chain, (str, bytes)):
-            raise ValueError("redirect_chain must be an iterable of URLs")
+            raise TypeError("redirect_chain must be an iterable of URLs")
         try:
             owned_chain = tuple(redirect_chain)
         except TypeError as exc:
@@ -141,7 +145,7 @@ class UploadedDocumentMetadata:
         if not isinstance(self.document_id, str) or not self.document_id.strip():
             raise ValueError("document_id must be a non-empty string")
         if not isinstance(self.uploaded_at, datetime):
-            raise ValueError("uploaded_at must be a datetime")
+            raise TypeError("uploaded_at must be a datetime")
         if self.uploaded_at.tzinfo is None or self.uploaded_at.utcoffset() is None:
             raise ValueError("uploaded_at must include timezone information")
         if (

@@ -195,12 +195,14 @@ def validate_snapshot_extraction_result(
                 "native HTTP retrieval metadata must match owning snapshot",
                 source_ref=snapshot.source_record.source_id,
             )
-    elif isinstance(snapshot.origin_metadata, UploadedDocumentMetadata):
-        if native_document.retrieval is not None:
-            raise SnapshotBatchError(
-                "uploaded native document must not invent HTTP retrieval metadata",
-                source_ref=snapshot.source_record.source_id,
-            )
+    elif (
+        isinstance(snapshot.origin_metadata, UploadedDocumentMetadata)
+        and native_document.retrieval is not None
+    ):
+        raise SnapshotBatchError(
+            "uploaded native document must not invent HTTP retrieval metadata",
+            source_ref=snapshot.source_record.source_id,
+        )
 
     if not isinstance(result.bound_candidate_reports, tuple):
         raise SnapshotBatchError("bound_candidate_reports must be an immutable tuple")

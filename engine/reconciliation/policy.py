@@ -7,8 +7,6 @@ import math
 from datetime import UTC, date, datetime
 from typing import Any
 
-from packages.contracts import SourceRecord, SourceType
-
 from engine.reconciliation.models import (
     AuthorityDescriptor,
     CandidateObservation,
@@ -18,6 +16,7 @@ from engine.reconciliation.models import (
     ScopeDescriptor,
     ScopeRelation,
 )
+from packages.contracts import SourceRecord, SourceType
 
 _SCOPE_KEYS = frozenset({"audience", "category", "region"})
 _WILDCARDS = frozenset({"*", "all", "any"})
@@ -184,9 +183,12 @@ def parse_authority(source: SourceRecord) -> AuthorityDescriptor:
             )
 
     tier = metadata.get("tier")
-    if tier is not None:
-        if isinstance(tier, bool) or not isinstance(tier, int) or tier < 0:
-            raise ReconciliationInputError("authority tier must be a non-negative integer")
+    if tier is not None and (
+        isinstance(tier, bool) or not isinstance(tier, int) or tier < 0
+    ):
+        raise ReconciliationInputError(
+            "authority tier must be a non-negative integer"
+        )
 
     return AuthorityDescriptor(
         source_type=source.source_type,
@@ -202,7 +204,7 @@ def _parse_effective_at(value: Any) -> datetime | None:
         parsed = value
     elif isinstance(value, str):
         try:
-            parsed = datetime.fromisoformat(value.strip().replace("Z", "+00:00"))
+            parsed = datetime.fromisoformat(value.strip())
         except ValueError as exc:
             raise ReconciliationInputError("freshness effective_at must be ISO datetime") from exc
     else:
@@ -303,7 +305,7 @@ def _deadline_comparison(value: Any) -> ComparisonValue:
                 parsed_date = date.fromisoformat(cleaned)
                 canonical = parsed_date.isoformat()
                 return ComparisonValue(key=f"date:{canonical}", canonical=canonical)
-            parsed = datetime.fromisoformat(cleaned.replace("Z", "+00:00"))
+            parsed = datetime.fromisoformat(cleaned)
         except ValueError as exc:
             raise UnusableNormalizedValue(
                 "deadline normalized value is not ISO date/datetime"
