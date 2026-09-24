@@ -60,6 +60,7 @@ def make_report(
     scope=None,
     confidence: float | None = 0.9,
     evidence_id: str | None = None,
+    extractor_version: str = "test-v1",
 ) -> CandidateExtractionReport:
     evidence_id = evidence_id or f"ev-{source_id}-{path.value}-{field_name}"
     scope = scope or {"category": "general"}
@@ -70,7 +71,7 @@ def make_report(
         raw_text_or_visual_reference=str(value),
         field_name=field_name,
         extraction_path=path,
-        extractor_version="test-v1",
+        extractor_version=extractor_version,
     )
     field = CandidateField(
         field_name=field_name,
@@ -359,19 +360,64 @@ def test_set_like_list_order_does_not_create_false_conflict() -> None:
     assert result.canonical_field.normalized_value == ["demo_video", "repository"]
 
 
-def test_duplicate_reports_for_same_source_and_path_are_rejected() -> None:
+def test_exact_duplicate_report_snapshot_is_rejected() -> None:
+    source = make_source("src-a")
+    report = make_report(
+        "src-a",
+        value="Sep 30",
+        normalized="2026-09-30T16:59:00Z",
+    )
+    with pytest.raises(ReconciliationInputError):
+        reconcile_field("submission_deadline", [report, report], [source])
+
+
+def test_same_source_same_ocr_path_engine_disagreement_surfaces_conflict() -> None:
     source = make_source("src-a")
     reports = [
-        make_report("src-a", value="Sep 30", normalized="2026-09-30T16:59:00Z"),
         make_report(
             "src-a",
             value="Sep 30",
             normalized="2026-09-30T16:59:00Z",
-            evidence_id="ev-second",
+            path=ExtractionPath.OCR,
+            evidence_id="ev-ocr-engine-a",
+            extractor_version="ocr-engine-a:v1",
+        ),
+        make_report(
+            "src-a",
+            value="Oct 1",
+            normalized="2026-10-01T16:59:00Z",
+            path=ExtractionPath.OCR,
+            evidence_id="ev-ocr-engine-b",
+            extractor_version="ocr-engine-b:v1",
         ),
     ]
-    with pytest.raises(ReconciliationInputError):
-        reconcile_field("submission_deadline", reports, [source])
+    result = reconcile_field("submission_deadline", reports, [source])
+    assert result.canonical_field.state is CanonicalFieldState.CONFLICT
+
+
+def test_same_source_same_ocr_path_agreement_still_counts_as_one_source() -> None:
+    source = make_source("src-a")
+    reports = [
+        make_report(
+            "src-a",
+            value="Sep 30",
+            normalized="2026-09-30T16:59:00Z",
+            path=ExtractionPath.OCR,
+            evidence_id="ev-ocr-engine-a",
+            extractor_version="ocr-engine-a:v1",
+        ),
+        make_report(
+            "src-a",
+            value="September 30",
+            normalized="2026-09-30T16:59:00Z",
+            path=ExtractionPath.OCR,
+            evidence_id="ev-ocr-engine-b",
+            extractor_version="ocr-engine-b:v1",
+        ),
+    ]
+    result = reconcile_field("submission_deadline", reports, [source])
+    assert result.canonical_field.state is CanonicalFieldState.SINGLE_SOURCE
+    assert result.supporting_source_ids == ("src-a",)
 
 
 def test_cross_source_evidence_is_rejected_at_reconciliation_boundary() -> None:

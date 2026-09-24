@@ -62,7 +62,7 @@ class CandidateObservation:
     """A candidate bound back to its source, report identity, and evidence."""
 
     source_id: str
-    report_key: tuple[str, ExtractionPath]
+    report_key: tuple[str, ExtractionPath, str]
     source_record: SourceRecord
     field: CandidateField
     evidence: tuple[EvidenceSpan, ...]

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Iterable
+from hashlib import sha256
 
 from packages.contracts import (
     CandidateExtractionReport,
@@ -38,6 +39,18 @@ def _stable_json(value: object) -> str:
         default=str,
     )
 
+
+
+def _report_fingerprint(report: CandidateExtractionReport) -> str:
+    payload = report.model_dump(mode="json")
+    encoded = json.dumps(
+        payload,
+        sort_keys=True,
+        separators=(",", ":"),
+        ensure_ascii=False,
+        default=str,
+    ).encode("utf-8")
+    return sha256(encoded).hexdigest()[:16]
 
 def _observation_sort_key(observation: CandidateObservation) -> tuple[object, ...]:
     return (
@@ -85,7 +98,7 @@ def collect_candidate_observations(
             )
         source_by_id[source.source_id] = source
 
-    seen_report_keys: set[tuple[str, object]] = set()
+    seen_report_keys: set[tuple[str, object, str]] = set()
     seen_evidence_ids: set[str] = set()
     observations: list[CandidateObservation] = []
 
@@ -96,10 +109,14 @@ def collect_candidate_observations(
                 f"candidate report references unknown source_id: {report.source_id!r}"
             )
 
-        report_key = (report.source_id, report.extraction_path)
+        report_key = (
+            report.source_id,
+            report.extraction_path,
+            _report_fingerprint(report),
+        )
         if report_key in seen_report_keys:
             raise ReconciliationInputError(
-                "duplicate candidate report for (source_id, extraction_path): "
+                "duplicate candidate report snapshot for source/path: "
                 f"{report.source_id!r}, {report.extraction_path.value!r}"
             )
         seen_report_keys.add(report_key)
