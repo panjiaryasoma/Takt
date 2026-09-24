@@ -1,14 +1,14 @@
-"""Explicit failure types for source ingestion.
+"""Explicit failure types for native and OCR source extraction.
 
-Block 2 must fail clearly on invalid/broken sources instead of leaking raw
-library exceptions through the engine boundary.
+Engine boundaries normalize raw library/process failures into stable error
+types instead of leaking implementation-specific exceptions.
 """
 
 from __future__ import annotations
 
 
 class IngestionError(RuntimeError):
-    """Base error for native source ingestion."""
+    """Base error for source ingestion and extraction."""
 
     code = "INGESTION_ERROR"
 
@@ -45,3 +45,33 @@ class NativeExtractionError(IngestionError):
     """Raised when supported content cannot be parsed natively."""
 
     code = "NATIVE_EXTRACTION_FAILED"
+
+
+class OCRProviderError(IngestionError):
+    """Base error for OCR provider failures."""
+
+    code = "OCR_PROVIDER_ERROR"
+
+
+class OCRProviderUnavailableError(OCRProviderError):
+    """Raised when the configured OCR provider cannot be executed."""
+
+    code = "OCR_PROVIDER_UNAVAILABLE"
+
+
+class OCRTimeoutError(IngestionError):
+    """Raised when OCR exceeds a configured page or document time budget."""
+
+    code = "OCR_TIMEOUT"
+
+
+class OCRExtractionError(IngestionError):
+    """Raised when OCR input/rendering/output cannot be processed safely."""
+
+    code = "OCR_EXTRACTION_FAILED"
+
+
+class CandidateNormalizationError(IngestionError):
+    """Raised when an extraction observation violates candidate-report boundaries."""
+
+    code = "CANDIDATE_NORMALIZATION_FAILED"
