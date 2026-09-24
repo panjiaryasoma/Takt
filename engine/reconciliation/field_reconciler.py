@@ -6,14 +6,6 @@ import json
 from collections.abc import Iterable
 from hashlib import sha256
 
-from packages.contracts import (
-    CandidateExtractionReport,
-    CanonicalField,
-    CanonicalFieldState,
-    EvidenceSpan,
-    SourceRecord,
-)
-
 from engine.reconciliation.models import (
     CandidateObservation,
     FieldReconciliationResult,
@@ -30,6 +22,13 @@ from engine.reconciliation.policy import (
     parse_scope,
     scope_relation,
     source_supersedes,
+)
+from packages.contracts import (
+    CandidateExtractionReport,
+    CanonicalField,
+    CanonicalFieldState,
+    EvidenceSpan,
+    SourceRecord,
 )
 
 
