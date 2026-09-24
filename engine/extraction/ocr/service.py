@@ -7,8 +7,8 @@ normalization or reconciliation.
 
 from __future__ import annotations
 
-from contextlib import suppress
 import json
+from contextlib import suppress
 from hashlib import sha256
 from hmac import compare_digest
 from math import ceil
