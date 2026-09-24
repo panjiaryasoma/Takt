@@ -2,11 +2,10 @@
 
 from __future__ import annotations
 
+from collections.abc import Iterable
 from dataclasses import dataclass
-from typing import Iterable
 
 from packages.contracts.source import CORE_CANONICAL_FIELDS
-
 
 _CANONICAL_V1_CORE_FIELDS = (
     "competition_name",

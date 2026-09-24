@@ -2,17 +2,16 @@
 
 from __future__ import annotations
 
+import codecs
+import re
 from collections import defaultdict
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
-import codecs
-import re
 from urllib.parse import quote
-
-from packages.contracts import SourceRecord
 
 from engine.extraction.errors import SourceLimitExceededError
 from engine.extraction.models import NativeDocument, NativeTextBlock, RetrievalMetadata
+from packages.contracts import SourceRecord
 
 _BLOCK_TAGS = {
     "address",

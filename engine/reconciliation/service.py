@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import json
 import math
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import date, datetime
 from enum import Enum
 from hashlib import sha256
-from typing import Any, Iterable
+from typing import Any
 
 from pydantic import BaseModel, ValidationError
 

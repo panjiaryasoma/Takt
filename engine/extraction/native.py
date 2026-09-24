@@ -9,12 +9,10 @@ from urllib.parse import urljoin, urlsplit
 import httpx
 from pydantic import ValidationError
 
-from packages.contracts import SourceRecord, SourceType
-
 from engine.extraction.errors import (
     InvalidSourceError,
-    SourceFetchError,
     SnapshotIntegrityError,
+    SourceFetchError,
     SourceLimitExceededError,
     UnsupportedMediaTypeError,
 )
@@ -31,6 +29,7 @@ from engine.extraction.url_security import (
     validate_http_url_reference,
     validate_public_http_target,
 )
+from packages.contracts import SourceRecord, SourceType
 
 _REDIRECT_STATUS = {301, 302, 303, 307, 308}
 _MAX_REDIRECTS = 5

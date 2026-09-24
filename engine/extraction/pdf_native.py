@@ -9,10 +9,9 @@ from __future__ import annotations
 
 import pymupdf
 
-from packages.contracts import SourceRecord
-
 from engine.extraction.errors import NativeExtractionError, SourceLimitExceededError
 from engine.extraction.models import NativeDocument, NativeTextBlock, RetrievalMetadata
+from packages.contracts import SourceRecord
 
 NATIVE_PDF_PARSER_VERSION = "native-pdf-v1"
 

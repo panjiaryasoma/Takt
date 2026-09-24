@@ -8,10 +8,11 @@ exactly the same source bytes without sharing mutable SourceRecord instances.
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from hashlib import sha256
-from typing import TYPE_CHECKING, Any, Iterable
+from typing import TYPE_CHECKING, Any
 
 from engine.extraction.errors import (
     InvalidSourceError,

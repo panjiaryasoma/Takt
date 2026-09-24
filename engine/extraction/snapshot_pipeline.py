@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from typing import Any, Iterable
+from collections.abc import Iterable
+from typing import Any
 
 from pydantic import ValidationError
 
@@ -18,9 +19,9 @@ from engine.extraction.errors import (
 from engine.extraction.models import (
     HttpRetrievalMetadata,
     NativeDocument,
-    SourceSnapshot,
     SnapshotBoundCandidateReport,
     SnapshotExtractionResult,
+    SourceSnapshot,
     UploadedDocumentMetadata,
 )
 from engine.extraction.native import extract_native_snapshot, verify_snapshot_integrity
