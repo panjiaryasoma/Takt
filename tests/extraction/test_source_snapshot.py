@@ -948,14 +948,19 @@ def test_ingest_url_native_invalid_native_limit_does_not_fetch(
         "engine.extraction.native.validate_public_http_target",
         lambda _url: None,
     )
-    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
-        with pytest.raises(InvalidSourceError, match="native extraction limits"):
-            ingest_url_native(
-                "https://example.test/rules",
-                context=_context(),
-                client=client,
-                max_native_blocks=0,
-            )
+    with (
+        httpx.Client(transport=httpx.MockTransport(handler)) as client,
+        pytest.raises(
+            InvalidSourceError,
+            match="native extraction limits",
+        ),
+    ):
+        ingest_url_native(
+            "https://example.test/rules",
+            context=_context(),
+            client=client,
+            max_native_blocks=0,
+        )
     assert request_count == 0
 
 

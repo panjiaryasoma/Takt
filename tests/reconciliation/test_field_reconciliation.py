@@ -760,4 +760,4 @@ def test_input_order_does_not_change_output() -> None:
         list(reversed(reports)),
         list(reversed(sources)),
     )
-    assert forward == reve
+    assert forward == reverse

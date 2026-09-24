@@ -164,7 +164,7 @@ def parse_authority(source: SourceRecord) -> AuthorityDescriptor:
 
     metadata = source.authority_rank
     if not isinstance(metadata, dict):
-        raise ReconciliationInputError(authority_rank must be an object)")
+        raise ReconciliationInputError("authority_rank must be an object")
 
     basis = metadata.get("basis", metadata.get("kind"))
     if basis is None:
