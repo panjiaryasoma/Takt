@@ -1,0 +1,71 @@
+{
+  "fixture_id": "INTEGRATION-001",
+  "fixture_version": "2.0",
+  "change_note": "Expected triage tokens aligned to frozen Issue-1 semantics; canonical fixture intent preserved.",
+  "evaluated_at": "2026-09-21T04:30:00+07:00",
+  "user": {
+    "age": 21,
+    "student_status": true,
+    "country": "Indonesia"
+  },
+  "canonical_report": {
+    "competition_name": {
+      "state": "VERIFIED",
+      "value": "Synthetic Build Challenge"
+    },
+    "submission_deadline": {
+      "state": "VERIFIED",
+      "value": "2026-09-30T23:45:00-07:00",
+      "evidence": ["official_rules:p2", "official_faq:p1"]
+    },
+    "eligibility": {
+      "state": "VERIFIED",
+      "value": {
+        "minimum_age": 18,
+        "requires_student": true,
+        "allowed_regions": ["global"]
+      },
+      "evidence": ["official_rules:p1"]
+    },
+    "team_size": {
+      "state": "SINGLE_SOURCE",
+      "value": {"min": 1, "max": 4},
+      "evidence": ["official_rules:p3"]
+    },
+    "deliverables": {
+      "state": "VERIFIED",
+      "value": ["working mobile demo", "demo video", "public repository"],
+      "evidence": ["official_rules:p4", "official_submission_guide:p1"]
+    },
+    "required_technologies": {
+      "state": "VERIFIED",
+      "value": ["RevenueCat"],
+      "evidence": ["official_rules:p4"]
+    },
+    "unresolved_critical_fields": []
+  },
+  "policy": {
+    "selected_track": "student",
+    "eligibility_selected_scope": "unscoped",
+    "critical_fields_required": [
+      "submission_deadline",
+      "eligibility",
+      "deliverables",
+      "required_technologies"
+    ],
+    "deadline_extension": null,
+    "require_technology_information": true
+  },
+  "expected": {
+    "status": "READY_TO_EVALUATE",
+    "blocking_reasons": [],
+    "review_items": [],
+    "passed_checks": [
+      "deadline_valid",
+      "minimum_age_met",
+      "student_status_met",
+      "mandatory_information_complete"
+    ],
+    "rule_version": "1.0"
+  }
+}
