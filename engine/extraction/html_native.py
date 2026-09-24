@@ -2,16 +2,17 @@
 
 from __future__ import annotations
 
-import codecs
-import re
 from collections import defaultdict
 from dataclasses import dataclass, field
 from html.parser import HTMLParser
+import codecs
+import re
 from urllib.parse import quote
+
+from packages.contracts import SourceRecord
 
 from engine.extraction.errors import SourceLimitExceededError
 from engine.extraction.models import NativeDocument, NativeTextBlock, RetrievalMetadata
-from packages.contracts import SourceRecord
 
 _BLOCK_TAGS = {
     "address",
@@ -115,6 +116,7 @@ _P_IMPLIED_END_START_TAGS = {
     "ul",
 }
 _CSS_COMMENT_RE = re.compile(r"/\*.*?\*/", re.DOTALL)
+NATIVE_HTML_PARSER_VERSION = "native-html-v1"
 
 
 def _normalize_whitespace(value: str) -> str:
@@ -386,7 +388,7 @@ def _declared_meta_charset(content: bytes) -> str | None:
 def _decode_html(content: bytes, encoding: str | None) -> str:
     if content.startswith(codecs.BOM_UTF8):
         return content.decode("utf-8-sig")
-    if content.startswith((codecs.BOM_UTF16_LE, codecs.BOM_UTF16_BE)):
+    if content.startswith(codecs.BOM_UTF16_LE) or content.startswith(codecs.BOM_UTF16_BE):
         return content.decode("utf-16")
 
     candidates: list[str] = []
@@ -431,4 +433,5 @@ def extract_html_native(
         raw_size_bytes=len(content),
         blocks=tuple(parser.blocks),
         retrieval=retrieval,
+        parser_version=NATIVE_HTML_PARSER_VERSION,
     )

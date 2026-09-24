@@ -9,20 +9,28 @@ from urllib.parse import urljoin, urlsplit
 import httpx
 from pydantic import ValidationError
 
+from packages.contracts import SourceRecord, SourceType
+
 from engine.extraction.errors import (
     InvalidSourceError,
     SourceFetchError,
+    SnapshotIntegrityError,
     SourceLimitExceededError,
     UnsupportedMediaTypeError,
 )
 from engine.extraction.html_native import extract_html_native
-from engine.extraction.models import NativeDocument, RetrievalMetadata, SourceContext
+from engine.extraction.models import (
+    HttpRetrievalMetadata,
+    NativeDocument,
+    SourceContext,
+    SourceSnapshot,
+    UploadedDocumentMetadata,
+)
 from engine.extraction.pdf_native import extract_pdf_native
 from engine.extraction.url_security import (
     validate_http_url_reference,
     validate_public_http_target,
 )
-from packages.contracts import SourceRecord, SourceType
 
 _REDIRECT_STATUS = {301, 302, 303, 307, 308}
 _MAX_REDIRECTS = 5
@@ -31,6 +39,15 @@ MAX_SOURCE_BYTES = 20 * 1024 * 1024
 MAX_PDF_PAGES = 250
 MAX_NATIVE_BLOCKS = 20_000
 MAX_EXTRACTED_TEXT_CHARS = 5_000_000
+
+
+def _validate_native_extraction_limits(
+    *,
+    max_native_blocks: int,
+    max_extracted_text_chars: int,
+) -> None:
+    if max_native_blocks <= 0 or max_extracted_text_chars <= 0:
+        raise InvalidSourceError("native extraction limits must be greater than zero")
 
 
 def _content_hash(content: bytes) -> str:
@@ -239,23 +256,51 @@ def _source_record(
         ) from exc
 
 
-def ingest_url_native(
+def verify_snapshot_integrity(snapshot: SourceSnapshot) -> None:
+    source_record = snapshot.source_record
+    expected = source_record.content_hash.strip().lower()
+    prefix = "sha256:"
+    if not expected.startswith(prefix):
+        raise SnapshotIntegrityError(
+            "snapshot content_hash cannot be verified; expected sha256:<hex>",
+            source_ref=source_record.url_or_document_id,
+        )
+    digest = expected[len(prefix) :]
+    if len(digest) != 64:
+        raise SnapshotIntegrityError(
+            "snapshot content_hash is not a valid SHA-256 digest",
+            source_ref=source_record.url_or_document_id,
+        )
+    try:
+        int(digest, 16)
+    except ValueError as exc:
+        raise SnapshotIntegrityError(
+            "snapshot content_hash is not a valid SHA-256 digest",
+            source_ref=source_record.url_or_document_id,
+        ) from exc
+    if sha256(snapshot.content).hexdigest() != digest:
+        raise SnapshotIntegrityError(
+            "snapshot bytes do not match SourceRecord content_hash",
+            source_ref=source_record.url_or_document_id,
+        )
+
+
+def fetch_url_snapshot(
     url: str,
     *,
     context: SourceContext,
     client: httpx.Client | None = None,
     retrieved_at: datetime | None = None,
     max_source_bytes: int = MAX_SOURCE_BYTES,
-    max_pdf_pages: int = MAX_PDF_PAGES,
-    max_native_blocks: int = MAX_NATIVE_BLOCKS,
-    max_extracted_text_chars: int = MAX_EXTRACTED_TEXT_CHARS,
-) -> NativeDocument:
-    """Retrieve an HTTP(S) source and parse supported HTML/PDF natively."""
+) -> SourceSnapshot:
+    """Perform one HTTP retrieval transaction and freeze the final response body.
+
+    Redirect hops remain part of this single transaction. Callers must fan out
+    native/OCR work from the returned snapshot rather than retrieving again.
+    """
 
     source_type = _validate_source_context(context)
     validate_http_url_reference(url)
-    if max_native_blocks <= 0 or max_extracted_text_chars <= 0:
-        raise InvalidSourceError("native extraction limits must be greater than zero")
     owned_client = client is None
     active_client = client or httpx.Client(timeout=15.0)
 
@@ -275,50 +320,38 @@ def ingest_url_native(
             content=content,
             retrieved_at=timestamp,
         )
-        retrieval = RetrievalMetadata(
+        retrieval = HttpRetrievalMetadata(
             requested_url=url,
             resolved_url=resolved_url,
             status_code=response.status_code,
-            content_type=_media_type(response),
+            declared_content_type=_media_type(response),
+            declared_charset=_http_declared_charset(response),
             etag=response.headers.get("etag"),
             last_modified=response.headers.get("last-modified"),
             redirect_chain=redirect_chain,
         )
-
-        if media_type == "text/html":
-            return extract_html_native(
-                content,
-                source_record=source_record,
-                encoding=_http_declared_charset(response),
-                retrieval=retrieval,
-                max_blocks=max_native_blocks,
-                max_text_chars=max_extracted_text_chars,
-            )
-        return extract_pdf_native(
-            content,
+        snapshot = SourceSnapshot(
             source_record=source_record,
-            retrieval=retrieval,
-            max_pages=max_pdf_pages,
-            max_blocks=max_native_blocks,
-            max_text_chars=max_extracted_text_chars,
+            media_type=media_type,
+            content=content,
+            origin_metadata=retrieval,
         )
+        verify_snapshot_integrity(snapshot)
+        return snapshot
     finally:
         if owned_client:
             active_client.close()
 
 
-def ingest_pdf_native(
+def create_pdf_snapshot(
     document_id: str,
     content: bytes,
     *,
     context: SourceContext,
     retrieved_at: datetime | None = None,
     max_source_bytes: int = MAX_SOURCE_BYTES,
-    max_pdf_pages: int = MAX_PDF_PAGES,
-    max_native_blocks: int = MAX_NATIVE_BLOCKS,
-    max_extracted_text_chars: int = MAX_EXTRACTED_TEXT_CHARS,
-) -> NativeDocument:
-    """Parse an uploaded/in-memory PDF without pretending it came from a URL."""
+) -> SourceSnapshot:
+    """Freeze caller-supplied PDF bytes without inventing HTTP metadata."""
 
     source_type = _validate_source_context(context)
     if not isinstance(document_id, str) or not document_id.strip():
@@ -327,8 +360,6 @@ def ingest_pdf_native(
         raise InvalidSourceError("PDF content must be bytes", source_ref=document_id)
     if max_source_bytes <= 0:
         raise InvalidSourceError("max_source_bytes must be greater than zero")
-    if max_native_blocks <= 0 or max_extracted_text_chars <= 0:
-        raise InvalidSourceError("native extraction limits must be greater than zero")
     if len(content) > max_source_bytes:
         raise SourceLimitExceededError(
             f"source exceeded byte limit of {max_source_bytes}",
@@ -343,10 +374,147 @@ def ingest_pdf_native(
         content=content,
         retrieved_at=timestamp,
     )
-    return extract_pdf_native(
-        content,
+    metadata = UploadedDocumentMetadata(
+        document_id=document_id,
+        uploaded_at=timestamp,
+        declared_media_type="application/pdf",
+    )
+    snapshot = SourceSnapshot(
         source_record=source_record,
-        max_pages=max_pdf_pages,
-        max_blocks=max_native_blocks,
-        max_text_chars=max_extracted_text_chars,
+        media_type="application/pdf",
+        content=content,
+        origin_metadata=metadata,
+    )
+    verify_snapshot_integrity(snapshot)
+    return snapshot
+
+
+def extract_native_snapshot(
+    snapshot: SourceSnapshot,
+    *,
+    max_pdf_pages: int = MAX_PDF_PAGES,
+    max_native_blocks: int = MAX_NATIVE_BLOCKS,
+    max_extracted_text_chars: int = MAX_EXTRACTED_TEXT_CHARS,
+) -> NativeDocument:
+    """Run native parsing against the exact bytes owned by one snapshot."""
+
+    if not isinstance(snapshot, SourceSnapshot):
+        raise InvalidSourceError("snapshot must be a SourceSnapshot")
+    _validate_native_extraction_limits(
+        max_native_blocks=max_native_blocks,
+        max_extracted_text_chars=max_extracted_text_chars,
+    )
+
+    verify_snapshot_integrity(snapshot)
+    source_record = snapshot.source_record
+    retrieval = (
+        snapshot.origin_metadata
+        if isinstance(snapshot.origin_metadata, HttpRetrievalMetadata)
+        else None
+    )
+
+    if snapshot.media_type == "text/html":
+        encoding = retrieval.declared_charset if retrieval is not None else None
+        return extract_html_native(
+            snapshot.content,
+            source_record=source_record,
+            encoding=encoding,
+            retrieval=retrieval,
+            max_blocks=max_native_blocks,
+            max_text_chars=max_extracted_text_chars,
+        )
+    if snapshot.media_type == "application/pdf":
+        return extract_pdf_native(
+            snapshot.content,
+            source_record=source_record,
+            retrieval=retrieval,
+            max_pages=max_pdf_pages,
+            max_blocks=max_native_blocks,
+            max_text_chars=max_extracted_text_chars,
+        )
+    raise UnsupportedMediaTypeError(
+        f"unsupported snapshot media type: {snapshot.media_type}",
+        source_ref=source_record.url_or_document_id,
+    )
+
+
+def ingest_url_native(
+    url: str,
+    *,
+    context: SourceContext,
+    client: httpx.Client | None = None,
+    retrieved_at: datetime | None = None,
+    max_source_bytes: int = MAX_SOURCE_BYTES,
+    max_pdf_pages: int = MAX_PDF_PAGES,
+    max_native_blocks: int = MAX_NATIVE_BLOCKS,
+    max_extracted_text_chars: int = MAX_EXTRACTED_TEXT_CHARS,
+) -> NativeDocument:
+    """Backward-compatible URL native API backed by SourceSnapshot."""
+
+    # Preserve the Block 2 pre-fetch validation order for this public wrapper.
+    _validate_source_context(context)
+    validate_http_url_reference(url)
+    _validate_native_extraction_limits(
+        max_native_blocks=max_native_blocks,
+        max_extracted_text_chars=max_extracted_text_chars,
+    )
+
+    snapshot = fetch_url_snapshot(
+        url,
+        context=context,
+        client=client,
+        retrieved_at=retrieved_at,
+        max_source_bytes=max_source_bytes,
+    )
+    return extract_native_snapshot(
+        snapshot,
+        max_pdf_pages=max_pdf_pages,
+        max_native_blocks=max_native_blocks,
+        max_extracted_text_chars=max_extracted_text_chars,
+    )
+
+
+def ingest_pdf_native(
+    document_id: str,
+    content: bytes,
+    *,
+    context: SourceContext,
+    retrieved_at: datetime | None = None,
+    max_source_bytes: int = MAX_SOURCE_BYTES,
+    max_pdf_pages: int = MAX_PDF_PAGES,
+    max_native_blocks: int = MAX_NATIVE_BLOCKS,
+    max_extracted_text_chars: int = MAX_EXTRACTED_TEXT_CHARS,
+) -> NativeDocument:
+    """Backward-compatible uploaded-PDF native API backed by SourceSnapshot."""
+
+    # Preserve the Block 2 validation order before constructing a snapshot.
+    _validate_source_context(context)
+    if not isinstance(document_id, str) or not document_id.strip():
+        raise InvalidSourceError("document_id must be a non-empty string")
+    if not isinstance(content, bytes):
+        raise InvalidSourceError("PDF content must be bytes", source_ref=document_id)
+    if max_source_bytes <= 0:
+        raise InvalidSourceError("max_source_bytes must be greater than zero")
+    _validate_native_extraction_limits(
+        max_native_blocks=max_native_blocks,
+        max_extracted_text_chars=max_extracted_text_chars,
+    )
+    if len(content) > max_source_bytes:
+        raise SourceLimitExceededError(
+            f"source exceeded byte limit of {max_source_bytes}",
+            source_ref=document_id,
+        )
+
+    snapshot = create_pdf_snapshot(
+        document_id,
+        content,
+        context=context,
+        retrieved_at=retrieved_at,
+        max_source_bytes=max_source_bytes,
+    )
+    return extract_native_snapshot(
+        snapshot,
+        max_pdf_pages=max_pdf_pages,
+        max_native_blocks=max_native_blocks,
+        max_extracted_text_chars=max_extracted_text_chars,
     )

@@ -29,6 +29,7 @@ class OCRDocument:
     page_count: int
     pages_without_ocr_text: tuple[int, ...] = ()
     render_dpi: int = 150
+    extractor_fingerprint: str = ""
 
     @property
     def text(self) -> str:

@@ -7,7 +7,7 @@ normalization or reconciliation.
 
 from __future__ import annotations
 
-from contextlib import suppress
+import json
 from hashlib import sha256
 from hmac import compare_digest
 from math import ceil
@@ -34,6 +34,29 @@ OCR_TIMEOUT_SECONDS = 20.0
 OCR_TOTAL_TIMEOUT_SECONDS = 120.0
 MAX_OCR_BLOCKS = 20_000
 MAX_OCR_TEXT_CHARS = 5_000_000
+
+
+def _provider_extractor_fingerprint(
+    provider: OCRProvider,
+    *,
+    provider_id: str,
+    provider_version: str,
+    render_dpi: int,
+) -> str:
+    material = {
+        "provider_id": provider_id,
+        "provider_version": provider_version,
+        "language": getattr(provider, "language", None),
+        "page_segmentation_mode": getattr(provider, "page_segmentation_mode", None),
+        "render_dpi": render_dpi,
+    }
+    encoded = json.dumps(
+        material,
+        sort_keys=True,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return f"ocr-xfp-{sha256(encoded).hexdigest()}"
 
 
 def _validate_limits(
@@ -156,11 +179,16 @@ def ocr_pdf(
         raise OCRExtractionError("OCR provider_id must be a non-empty string")
     if not isinstance(provider_version, str) or not provider_version.strip():
         raise OCRExtractionError("OCR provider_version must be a non-empty string")
+    extractor_fingerprint = _provider_extractor_fingerprint(
+        active_provider,
+        provider_id=provider_id,
+        provider_version=provider_version,
+        render_dpi=render_dpi,
+    )
 
-    # PyMuPDF exception classes vary by version, so normalize the library boundary here.
     try:
         document = pymupdf.open(stream=content, filetype="pdf")
-    except Exception as exc:
+    except Exception as exc:  # PyMuPDF exception classes vary by version.
         raise OCRExtractionError(
             "PDF could not be opened for OCR",
             source_ref=source_record.url_or_document_id,
@@ -292,6 +320,7 @@ def ocr_pdf(
             page_count=document.page_count,
             pages_without_ocr_text=tuple(pages_without_text),
             render_dpi=render_dpi,
+            extractor_fingerprint=extractor_fingerprint,
         )
     except IngestionError:
         raise
@@ -301,5 +330,7 @@ def ocr_pdf(
             source_ref=source_record.url_or_document_id,
         ) from exc
     finally:
-        with suppress(Exception):
+        try:
             document.close()
+        except Exception:
+            pass

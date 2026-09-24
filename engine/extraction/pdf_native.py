@@ -9,9 +9,12 @@ from __future__ import annotations
 
 import pymupdf
 
+from packages.contracts import SourceRecord
+
 from engine.extraction.errors import NativeExtractionError, SourceLimitExceededError
 from engine.extraction.models import NativeDocument, NativeTextBlock, RetrievalMetadata
-from packages.contracts import SourceRecord
+
+NATIVE_PDF_PARSER_VERSION = "native-pdf-v1"
 
 
 def _clean_pdf_text(value: str) -> str:
@@ -99,6 +102,7 @@ def extract_pdf_native(
             page_count=document.page_count,
             pages_without_native_text=tuple(pages_without_text),
             retrieval=retrieval,
+            parser_version=NATIVE_PDF_PARSER_VERSION,
         )
     except SourceLimitExceededError:
         raise

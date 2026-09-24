@@ -98,6 +98,14 @@ class TesseractOCRProvider:
     def provider_version(self) -> str:
         return self._provider_version
 
+    @property
+    def language(self) -> str:
+        return self._language
+
+    @property
+    def page_segmentation_mode(self) -> int:
+        return self._psm
+
     def _probe_version(self, timeout_seconds: float) -> str:
         try:
             result = subprocess.run(
@@ -156,7 +164,8 @@ class TesseractOCRProvider:
             result = subprocess.run(
                 command,
                 input=image_bytes,
-                capture_output=True,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
                 timeout=timeout_seconds,
                 check=False,
             )

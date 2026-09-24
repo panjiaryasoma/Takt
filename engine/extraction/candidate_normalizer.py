@@ -2,14 +2,15 @@
 
 The normalizer deliberately handles only explicit, label-led facts that can be
 traced to one observed text block. It does not infer missing facts, resolve
-conflicts, or produce canonical values. Unsupported fields simply remain absent
-from the CandidateExtractionReport for later reconciliation/review.
+conflicts, or produce canonical values. Evidence identity is bound to exact
+source bytes, extraction configuration, locator, and raw observed evidence.
 """
 
 from __future__ import annotations
 
+import json
 import re
-from datetime import UTC, datetime, timedelta, timezone
+from datetime import datetime, timedelta, timezone
 from hashlib import sha256
 from typing import Any
 
@@ -60,28 +61,79 @@ _TIMEZONE_OFFSETS = {
 ExtractionDocument = NativeDocument | OCRDocument
 
 
-def _evidence_id(
+def _canonical_sha256(material: Any) -> str:
+    encoded = json.dumps(
+        material,
+        sort_keys=True,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    ).encode("utf-8")
+    return sha256(encoded).hexdigest()
+
+
+def _raw_evidence_hash(raw_evidence: str) -> str:
+    return sha256(raw_evidence.encode("utf-8")).hexdigest()
+
+
+def extractor_fingerprint_for_document(document: ExtractionDocument) -> str:
+    if isinstance(document, OCRDocument):
+        observation_fingerprint = document.extractor_fingerprint or _canonical_sha256(
+            {
+                "provider_id": document.provider_id,
+                "provider_version": document.provider_version,
+                "render_dpi": document.render_dpi,
+            }
+        )
+        material = {
+            "path": "ocr",
+            "observation_fingerprint": observation_fingerprint,
+            "candidate_normalizer_version": CANDIDATE_NORMALIZER_VERSION,
+        }
+        digest = _canonical_sha256(material)
+        return (
+            f"{document.provider_id}:{document.provider_version}"
+            f"|ocr-observation:{observation_fingerprint}"
+            f"|candidate-normalizer:{CANDIDATE_NORMALIZER_VERSION}"
+            f"|xfp:{digest}"
+        )
+
+    material = {
+        "path": "native",
+        "parser_version": document.parser_version,
+        "media_type": document.media_type,
+        "candidate_normalizer_version": CANDIDATE_NORMALIZER_VERSION,
+    }
+    digest = _canonical_sha256(material)
+    return (
+        f"{document.parser_version}"
+        f"|candidate-normalizer:{CANDIDATE_NORMALIZER_VERSION}"
+        f"|xfp:{digest}"
+    )
+
+
+def build_evidence_id(
     *,
     source_id: str,
+    content_hash: str,
     extraction_path: ExtractionPath,
     field_name: str,
     locator: str,
+    extractor_fingerprint: str,
+    raw_evidence: str,
 ) -> str:
-    raw = f"{source_id}|{extraction_path.value}|{field_name}|{locator}"
-    digest = sha256(raw.encode("utf-8")).hexdigest()[:16]
-    return f"ev-{field_name}-{digest}"
+    """Build the content/config/raw-observation-bound evidence identity."""
 
-
-def _extractor_version(document: ExtractionDocument) -> str:
-    if isinstance(document, OCRDocument):
-        return (
-            f"{document.provider_id}:{document.provider_version}"
-            f"|candidate-normalizer:{CANDIDATE_NORMALIZER_VERSION}"
-        )
-    return (
-        f"native:{document.media_type}"
-        f"|candidate-normalizer:{CANDIDATE_NORMALIZER_VERSION}"
-    )
+    raw_evidence_hash = _raw_evidence_hash(raw_evidence)
+    material = [
+        source_id,
+        content_hash,
+        extraction_path.value,
+        field_name,
+        locator,
+        extractor_fingerprint,
+        raw_evidence_hash,
+    ]
+    return f"ev-{field_name}-{_canonical_sha256(material)}"
 
 
 def _candidate_confidence(document: ExtractionDocument, block: Any) -> float | None:
@@ -99,7 +151,7 @@ def _normalize_deadline(value: str) -> str | None:
         parsed_date = datetime.strptime(
             f"{match.group('month')} {match.group('day')} {match.group('year')}",
             "%B %d %Y",
-        ).replace(tzinfo=UTC)
+        )
     except ValueError:
         return None
 
@@ -139,12 +191,7 @@ def _normalize_team_size(value: str) -> dict[str, int] | None:
 
 
 class RuleBasedCandidateNormalizer:
-    """Small deterministic F-007 MVP normalizer for explicit labeled fields.
-
-    Current supported fields are intentionally narrow: submission_deadline and
-    team_size. The rules only emit a candidate when the source text explicitly
-    contains the label and a parseable value in the same observed block.
-    """
+    """Small deterministic F-007 MVP normalizer for explicit labeled fields."""
 
     version = CANDIDATE_NORMALIZER_VERSION
 
@@ -173,7 +220,7 @@ class RuleBasedCandidateNormalizer:
         fields: list[CandidateField] = []
         evidence: list[EvidenceSpan] = []
         seen_fields: set[str] = set()
-        extractor_version = _extractor_version(document)
+        extractor_fingerprint = extractor_fingerprint_for_document(document)
 
         for block in document.blocks:
             if not isinstance(block.locator, str) or not block.locator.strip():
@@ -196,7 +243,7 @@ class RuleBasedCandidateNormalizer:
                         field_name="submission_deadline",
                         raw_value=raw_value,
                         normalized_value=normalized_value,
-                        extractor_version=extractor_version,
+                        extractor_fingerprint=extractor_fingerprint,
                         fields=fields,
                         evidence=evidence,
                     )
@@ -214,7 +261,7 @@ class RuleBasedCandidateNormalizer:
                         field_name="team_size",
                         raw_value=raw_value,
                         normalized_value=normalized_value,
-                        extractor_version=extractor_version,
+                        extractor_fingerprint=extractor_fingerprint,
                         fields=fields,
                         evidence=evidence,
                     )
@@ -236,15 +283,18 @@ class RuleBasedCandidateNormalizer:
         field_name: str,
         raw_value: Any,
         normalized_value: Any,
-        extractor_version: str,
+        extractor_fingerprint: str,
         fields: list[CandidateField],
         evidence: list[EvidenceSpan],
     ) -> None:
-        evidence_id = _evidence_id(
+        evidence_id = build_evidence_id(
             source_id=document.source_record.source_id,
+            content_hash=document.source_record.content_hash,
             extraction_path=extraction_path,
             field_name=field_name,
             locator=block.locator,
+            extractor_fingerprint=extractor_fingerprint,
+            raw_evidence=block.text,
         )
         evidence.append(
             EvidenceSpan(
@@ -254,7 +304,7 @@ class RuleBasedCandidateNormalizer:
                 raw_text_or_visual_reference=block.text,
                 field_name=field_name,
                 extraction_path=extraction_path,
-                extractor_version=extractor_version,
+                extractor_version=extractor_fingerprint,
             )
         )
         fields.append(

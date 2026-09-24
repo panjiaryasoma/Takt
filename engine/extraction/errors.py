@@ -1,8 +1,4 @@
-"""Explicit failure types for native and OCR source extraction.
-
-Engine boundaries normalize raw library/process failures into stable error
-types instead of leaking implementation-specific exceptions.
-"""
+"""Explicit failure types for source ingestion, snapshots, and extraction."""
 
 from __future__ import annotations
 
@@ -39,6 +35,18 @@ class UnsupportedMediaTypeError(IngestionError):
     """Raised when a retrieved source is neither supported HTML nor PDF."""
 
     code = "UNSUPPORTED_MEDIA_TYPE"
+
+
+class SnapshotIntegrityError(IngestionError):
+    """Raised when snapshot bytes no longer match SourceRecord content_hash."""
+
+    code = "SNAPSHOT_INTEGRITY_FAILED"
+
+
+class SnapshotBatchError(IngestionError):
+    """Raised when snapshot extraction results cannot form one coherent batch."""
+
+    code = "SNAPSHOT_BATCH_INVALID"
 
 
 class NativeExtractionError(IngestionError):

@@ -1,8 +1,4 @@
-"""Source ingestion and independent native/OCR observation paths.
-
-Extractor output is evidence-oriented only. Semantic candidate normalization
-and reconciliation remain separate downstream boundaries.
-"""
+"""Source ingestion and independent native/OCR observation paths."""
 
 from engine.extraction.candidate_bridge import (
     CandidateReportNormalizer,
@@ -22,23 +18,33 @@ from engine.extraction.errors import (
     OCRProviderError,
     OCRProviderUnavailableError,
     OCRTimeoutError,
+    SnapshotBatchError,
+    SnapshotIntegrityError,
     SourceFetchError,
     SourceLimitExceededError,
     UnsupportedMediaTypeError,
 )
 from engine.extraction.models import (
+    HttpRetrievalMetadata,
     NativeDocument,
     NativeTextBlock,
     RetrievalMetadata,
+    SnapshotExtractionResult,
     SourceContext,
+    SourceSnapshot,
+    UploadedDocumentMetadata,
 )
 from engine.extraction.native import (
     MAX_EXTRACTED_TEXT_CHARS,
     MAX_NATIVE_BLOCKS,
     MAX_PDF_PAGES,
     MAX_SOURCE_BYTES,
+    create_pdf_snapshot,
+    extract_native_snapshot,
+    fetch_url_snapshot,
     ingest_pdf_native,
     ingest_url_native,
+    verify_snapshot_integrity,
 )
 from engine.extraction.ocr import (
     MAX_OCR_BLOCKS,
@@ -46,18 +52,30 @@ from engine.extraction.ocr import (
     MAX_OCR_PAGES,
     MAX_OCR_SOURCE_BYTES,
     MAX_OCR_TEXT_CHARS,
-    OCR_RENDER_DPI,
-    OCR_TIMEOUT_SECONDS,
-    OCR_TOTAL_TIMEOUT_SECONDS,
     OCRDocument,
     OCRProvider,
     OCRTextBlock,
+    OCR_RENDER_DPI,
+    OCR_TIMEOUT_SECONDS,
+    OCR_TOTAL_TIMEOUT_SECONDS,
     TesseractOCRProvider,
     ocr_pdf,
+)
+from engine.extraction.snapshot_pipeline import (
+    derive_snapshot_source_ids,
+    extract_ocr_snapshot,
+    extract_snapshot,
+    validate_snapshot_extraction_result,
 )
 
 __all__ = [
     "CANDIDATE_NORMALIZER_VERSION",
+    "CandidateNormalizationError",
+    "CandidateReportNormalizer",
+    "ExtractionDocument",
+    "HttpRetrievalMetadata",
+    "IngestionError",
+    "InvalidSourceError",
     "MAX_EXTRACTED_TEXT_CHARS",
     "MAX_NATIVE_BLOCKS",
     "MAX_OCR_BLOCKS",
@@ -67,14 +85,6 @@ __all__ = [
     "MAX_OCR_TEXT_CHARS",
     "MAX_PDF_PAGES",
     "MAX_SOURCE_BYTES",
-    "OCR_RENDER_DPI",
-    "OCR_TIMEOUT_SECONDS",
-    "OCR_TOTAL_TIMEOUT_SECONDS",
-    "CandidateNormalizationError",
-    "CandidateReportNormalizer",
-    "ExtractionDocument",
-    "IngestionError",
-    "InvalidSourceError",
     "NativeDocument",
     "NativeExtractionError",
     "NativeTextBlock",
@@ -85,15 +95,31 @@ __all__ = [
     "OCRProviderUnavailableError",
     "OCRTextBlock",
     "OCRTimeoutError",
+    "OCR_RENDER_DPI",
+    "OCR_TIMEOUT_SECONDS",
+    "OCR_TOTAL_TIMEOUT_SECONDS",
     "RetrievalMetadata",
     "RuleBasedCandidateNormalizer",
+    "SnapshotBatchError",
+    "SnapshotExtractionResult",
+    "SnapshotIntegrityError",
     "SourceContext",
     "SourceFetchError",
     "SourceLimitExceededError",
+    "SourceSnapshot",
     "TesseractOCRProvider",
     "UnsupportedMediaTypeError",
+    "UploadedDocumentMetadata",
+    "create_pdf_snapshot",
+    "derive_snapshot_source_ids",
+    "extract_native_snapshot",
+    "extract_ocr_snapshot",
+    "extract_snapshot",
+    "fetch_url_snapshot",
     "ingest_pdf_native",
     "ingest_url_native",
     "normalize_candidate_report",
     "ocr_pdf",
+    "validate_snapshot_extraction_result",
+    "verify_snapshot_integrity",
 ]
