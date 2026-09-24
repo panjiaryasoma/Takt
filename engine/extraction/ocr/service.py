@@ -7,6 +7,7 @@ normalization or reconciliation.
 
 from __future__ import annotations
 
+from contextlib import suppress
 from hashlib import sha256
 from hmac import compare_digest
 from math import ceil
@@ -300,7 +301,5 @@ def ocr_pdf(
             source_ref=source_record.url_or_document_id,
         ) from exc
     finally:
-        try:
+        with suppress(Exception):
             document.close()
-        except Exception:  # noqa: BLE001
-            pass
