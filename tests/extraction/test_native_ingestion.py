@@ -149,14 +149,13 @@ def test_url_adapter_wraps_http_failure_with_explicit_error() -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         return httpx.Response(404, request=request)
 
-    with _client(handler) as client:
-        with pytest.raises(SourceFetchError, match="HTTP 404") as caught:
-            ingest_url_native(
-                "https://fixture.example/missing",
-                context=_context(),
-                client=client,
-                retrieved_at=FIXED_TIME,
-            )
+    with _client(handler) as client, pytest.raises(SourceFetchError, match="HTTP 404") as caught:
+        ingest_url_native(
+            "https://fixture.example/missing",
+            context=_context(),
+            client=client,
+            retrieved_at=FIXED_TIME,
+        )
 
     assert caught.value.code == "SOURCE_FETCH_FAILED"
 
@@ -170,14 +169,13 @@ def test_url_adapter_rejects_unsupported_media_type_cleanly() -> None:
             request=request,
         )
 
-    with _client(handler) as client:
-        with pytest.raises(UnsupportedMediaTypeError, match="image/png"):
-            ingest_url_native(
-                "https://fixture.example/banner.png",
-                context=_context(),
-                client=client,
-                retrieved_at=FIXED_TIME,
-            )
+    with _client(handler) as client, pytest.raises(UnsupportedMediaTypeError, match="image/png"):
+        ingest_url_native(
+            "https://fixture.example/banner.png",
+            context=_context(),
+            client=client,
+            retrieved_at=FIXED_TIME,
+        )
 
 
 def test_url_adapter_can_sniff_pdf_when_server_uses_generic_binary_type() -> None:
@@ -522,15 +520,14 @@ def test_url_response_is_rejected_when_streamed_body_exceeds_size_limit() -> Non
 
     from engine.extraction import SourceLimitExceededError
 
-    with _client(handler) as client:
-        with pytest.raises(SourceLimitExceededError, match="byte limit"):
-            ingest_url_native(
-                "https://fixture.example/large",
-                context=_context(),
-                client=client,
-                retrieved_at=FIXED_TIME,
-                max_source_bytes=64,
-            )
+    with _client(handler) as client, pytest.raises(SourceLimitExceededError, match="byte limit"):
+        ingest_url_native(
+            "https://fixture.example/large",
+            context=_context(),
+            client=client,
+            retrieved_at=FIXED_TIME,
+            max_source_bytes=64,
+        )
 
 
 def test_pdf_upload_is_rejected_before_parse_when_it_exceeds_size_limit() -> None:
@@ -919,15 +916,14 @@ def test_html_native_block_cap_stops_object_amplification() -> None:
 
     from engine.extraction import SourceLimitExceededError
 
-    with _client(handler) as client:
-        with pytest.raises(SourceLimitExceededError, match="block limit"):
-            ingest_url_native(
-                "https://fixture.example/block-cap",
-                context=_context(),
-                client=client,
-                retrieved_at=FIXED_TIME,
-                max_native_blocks=2,
-            )
+    with _client(handler) as client, pytest.raises(SourceLimitExceededError, match="block limit"):
+        ingest_url_native(
+            "https://fixture.example/block-cap",
+            context=_context(),
+            client=client,
+            retrieved_at=FIXED_TIME,
+            max_native_blocks=2,
+        )
 
 
 def test_html_native_text_cap_stops_extracted_text_amplification() -> None:
@@ -943,15 +939,14 @@ def test_html_native_text_cap_stops_extracted_text_amplification() -> None:
 
     from engine.extraction import SourceLimitExceededError
 
-    with _client(handler) as client:
-        with pytest.raises(SourceLimitExceededError, match="extracted text limit"):
-            ingest_url_native(
-                "https://fixture.example/text-cap",
-                context=_context(),
-                client=client,
-                retrieved_at=FIXED_TIME,
-                max_extracted_text_chars=5,
-            )
+    with _client(handler) as client, pytest.raises(SourceLimitExceededError, match="extracted text limit"):
+        ingest_url_native(
+            "https://fixture.example/text-cap",
+            context=_context(),
+            client=client,
+            retrieved_at=FIXED_TIME,
+            max_extracted_text_chars=5,
+        )
 
 
 def test_pdf_native_block_cap_is_enforced() -> None:
@@ -1015,14 +1010,13 @@ def test_unexpected_http_206_is_rejected_as_incomplete_source() -> None:
             request=request,
         )
 
-    with _client(handler) as client:
-        with pytest.raises(SourceFetchError, match="206 Partial Content"):
-            ingest_url_native(
-                "https://fixture.example/partial",
-                context=_context(),
-                client=client,
-                retrieved_at=FIXED_TIME,
-            )
+    with _client(handler) as client, pytest.raises(SourceFetchError, match="206 Partial Content"):
+        ingest_url_native(
+            "https://fixture.example/partial",
+            context=_context(),
+            client=client,
+            retrieved_at=FIXED_TIME,
+        )
 
 
 def test_xhtml_is_not_claimed_as_supported_native_media_type() -> None:
@@ -1036,14 +1030,13 @@ def test_xhtml_is_not_claimed_as_supported_native_media_type() -> None:
             request=request,
         )
 
-    with _client(handler) as client:
-        with pytest.raises(UnsupportedMediaTypeError, match="application/xhtml\\+xml"):
-            ingest_url_native(
-                "https://fixture.example/rules.xhtml",
-                context=_context(),
-                client=client,
-                retrieved_at=FIXED_TIME,
-            )
+    with _client(handler) as client, pytest.raises(UnsupportedMediaTypeError, match="application/xhtml\\+xml"):
+        ingest_url_native(
+            "https://fixture.example/rules.xhtml",
+            context=_context(),
+            client=client,
+            retrieved_at=FIXED_TIME,
+        )
 
 
 def test_svg_text_is_preserved_by_static_native_html_extraction() -> None:
@@ -1252,14 +1245,13 @@ def test_redirect_dns_target_is_revalidated_before_second_request(
         redirect_getaddrinfo,
     )
 
-    with _client(handler) as client:
-        with pytest.raises(InvalidSourceError, match="resolved to a non-public IP"):
-            ingest_url_native(
-                "https://start.example/rules",
-                context=_context(),
-                client=client,
-                retrieved_at=FIXED_TIME,
-            )
+    with _client(handler) as client, pytest.raises(InvalidSourceError, match="resolved to a non-public IP"):
+        ingest_url_native(
+            "https://start.example/rules",
+            context=_context(),
+            client=client,
+            retrieved_at=FIXED_TIME,
+        )
 
     assert calls == ["https://start.example/rules"]
 
