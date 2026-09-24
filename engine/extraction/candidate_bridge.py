@@ -2,14 +2,14 @@
 
 from __future__ import annotations
 
-from typing import Protocol, TypeAlias
+from typing import Protocol
 
 from engine.extraction.errors import CandidateNormalizationError
 from engine.extraction.models import NativeDocument
 from engine.extraction.ocr.models import OCRDocument
 from packages.contracts import CandidateExtractionReport, ExtractionPath
 
-ExtractionDocument: TypeAlias = NativeDocument | OCRDocument
+type ExtractionDocument = NativeDocument | OCRDocument
 
 
 class CandidateReportNormalizer(Protocol):
