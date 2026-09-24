@@ -159,7 +159,7 @@ def ocr_pdf(
     # PyMuPDF exception classes vary by version, so normalize the library boundary here.
     try:
         document = pymupdf.open(stream=content, filetype="pdf")
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         raise OCRExtractionError(
             "PDF could not be opened for OCR",
             source_ref=source_record.url_or_document_id,
@@ -204,7 +204,7 @@ def ocr_pdf(
                     alpha=False,
                 )
                 image_bytes = pixmap.tobytes("png")
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 raise OCRExtractionError(
                     f"PDF page {page_number} could not be rasterized for OCR",
                     source_ref=source_record.url_or_document_id,
@@ -222,7 +222,7 @@ def ocr_pdf(
                 )
             except IngestionError:
                 raise
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 raise OCRExtractionError(
                     f"OCR provider failed on page {page_number}",
                     source_ref=source_record.url_or_document_id,
@@ -294,7 +294,7 @@ def ocr_pdf(
         )
     except IngestionError:
         raise
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         raise OCRExtractionError(
             "PDF could not be processed safely for OCR",
             source_ref=source_record.url_or_document_id,
