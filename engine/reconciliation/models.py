@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from enum import StrEnum
 from typing import Any
 
@@ -12,6 +13,7 @@ from packages.contracts import (
     EvidenceSpan,
     ExtractionPath,
     SourceRecord,
+    SourceType,
 )
 
 
@@ -30,7 +32,7 @@ class ScopeRelation(StrEnum):
 
 @dataclass(frozen=True, slots=True)
 class ScopeDescriptor:
-    """Minimal internal interpretation of candidate scope metadata."""
+    """Minimal internal interpretation of applicability metadata."""
 
     audience: str | None = None
     category: str | None = None
@@ -50,6 +52,33 @@ class ScopeDescriptor:
 
 
 @dataclass(frozen=True, slots=True)
+class AuthorityDescriptor:
+    """Validated contextual authority metadata for one source."""
+
+    source_type: SourceType
+    basis: str | None
+    tier: int | None = None
+
+    @property
+    def known(self) -> bool:
+        return self.basis is not None
+
+
+@dataclass(frozen=True, slots=True)
+class FreshnessDescriptor:
+    """Validated source freshness/update metadata."""
+
+    effective_at: datetime | None
+    supersedes_source_ids: tuple[str, ...] = ()
+    update_kind: str | None = None
+    applies_to_fields: tuple[str, ...] = ()
+
+    @property
+    def known(self) -> bool:
+        return self.effective_at is not None
+
+
+@dataclass(frozen=True, slots=True)
 class ComparisonValue:
     """Stable semantic key plus deterministic canonical representation."""
 
@@ -59,13 +88,18 @@ class ComparisonValue:
 
 @dataclass(frozen=True, slots=True)
 class CandidateObservation:
-    """A candidate bound back to its source, report identity, and evidence."""
+    """A candidate bound back to source metadata and evidence."""
 
     source_id: str
     report_key: tuple[str, ExtractionPath, str]
     source_record: SourceRecord
     field: CandidateField
     evidence: tuple[EvidenceSpan, ...]
+    source_scope: ScopeDescriptor
+    candidate_scope: ScopeDescriptor
+    effective_scope: ScopeDescriptor
+    authority: AuthorityDescriptor
+    freshness: FreshnessDescriptor
 
 
 @dataclass(frozen=True, slots=True)
