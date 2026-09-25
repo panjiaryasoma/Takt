@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import heapq
 from collections.abc import Mapping
 from dataclasses import dataclass
-import heapq
 from types import MappingProxyType
 
 from packages.contracts.models import Task

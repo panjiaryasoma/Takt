@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from engine.workload.graph import build_dependency_graph, required_task_closure
 from packages.contracts.models import Task
 from packages.contracts.workload import (
     EffortRange,
@@ -9,8 +10,6 @@ from packages.contracts.workload import (
     WorkloadAssumption,
     WorkloadInput,
 )
-
-from engine.workload.graph import build_dependency_graph, required_task_closure
 
 
 def analyze_workload(data: WorkloadInput) -> WorkloadAnalysis:

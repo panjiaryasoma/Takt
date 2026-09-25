@@ -52,7 +52,7 @@ class PlanningHorizon(PlanningContract):
     end: AwareDatetime
 
     @model_validator(mode="after")
-    def validate_horizon(self) -> "PlanningHorizon":
+    def validate_horizon(self) -> PlanningHorizon:
         _require_minute_aligned(self.start, "horizon.start")
         _require_minute_aligned(self.end, "horizon.end")
         if not _instant_before(self.start, self.end):
@@ -71,7 +71,7 @@ class PlanningWorkWindow(PlanningContract):
     end: AwareDatetime
 
     @model_validator(mode="after")
-    def validate_window(self) -> "PlanningWorkWindow":
+    def validate_window(self) -> PlanningWorkWindow:
         _require_minute_aligned(self.start, "work_window.start")
         _require_minute_aligned(self.end, "work_window.end")
         if not _instant_before(self.start, self.end):
@@ -88,7 +88,7 @@ class RecurrenceSpec(PlanningContract):
     active_until: AwareDatetime | None = None
 
     @model_validator(mode="after")
-    def validate_spec(self) -> "RecurrenceSpec":
+    def validate_spec(self) -> RecurrenceSpec:
         _validate_timezone(self.timezone)
         _require_minute_aligned(self.active_from, "recurrence.active_from")
         if self.active_until is not None:
@@ -105,7 +105,7 @@ class RecurrenceException(PlanningContract):
     replacement_end_at: AwareDatetime | None = None
 
     @model_validator(mode="after")
-    def validate_exception(self) -> "RecurrenceException":
+    def validate_exception(self) -> RecurrenceException:
         _require_minute_aligned(self.original_start_at, "exception.original_start_at")
         has_replacement = (
             self.replacement_start_at is not None or self.replacement_end_at is not None
@@ -135,7 +135,7 @@ class PlanningCommitment(PlanningContract):
     source: NonEmptyStr
 
     @model_validator(mode="after")
-    def validate_commitment(self) -> "PlanningCommitment":
+    def validate_commitment(self) -> PlanningCommitment:
         _validate_timezone(self.timezone)
         _require_minute_aligned(self.start_at, "commitment.start_at")
         _require_minute_aligned(self.end_at, "commitment.end_at")
@@ -159,7 +159,7 @@ class AcceptedCommitment(PlanningContract):
     source: NonEmptyStr
 
     @model_validator(mode="after")
-    def validate_accepted(self) -> "AcceptedCommitment":
+    def validate_accepted(self) -> AcceptedCommitment:
         _require_minute_aligned(self.start_at, "accepted.start_at")
         _require_minute_aligned(self.end_at, "accepted.end_at")
         if not _instant_before(self.start_at, self.end_at):
@@ -174,7 +174,7 @@ class PlanningPreferences(PlanningContract):
     buffer_target_minutes: StrictInt = Field(ge=0)
 
     @model_validator(mode="after")
-    def validate_preferences(self) -> "PlanningPreferences":
+    def validate_preferences(self) -> PlanningPreferences:
         _validate_timezone(self.timezone)
         return self
 
@@ -187,7 +187,7 @@ class AvailabilityInput(PlanningContract):
     preferences: PlanningPreferences
 
     @model_validator(mode="after")
-    def validate_input(self) -> "AvailabilityInput":
+    def validate_input(self) -> AvailabilityInput:
         commitment_ids = [item.commitment_id for item in self.commitments]
         accepted_ids = [item.accepted_commitment_id for item in self.accepted_commitments]
         all_ids = commitment_ids + accepted_ids

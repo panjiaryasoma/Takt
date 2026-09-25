@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from datetime import datetime, timedelta
 import json
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import pytest
@@ -14,12 +14,12 @@ from engine.availability import (
     build_availability,
 )
 from packages.contracts import (
+    MAX_PLANNING_HORIZON_DAYS,
     AcceptedCommitment,
     AvailabilityBlock,
     AvailabilityInput,
     AvailabilityType,
     CommitmentType,
-    MAX_PLANNING_HORIZON_DAYS,
     PlanningCommitment,
     PlanningHorizon,
     PlanningPreferences,

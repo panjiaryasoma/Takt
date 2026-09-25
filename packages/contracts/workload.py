@@ -28,7 +28,7 @@ class EffortRange(WorkloadContract):
     max_minutes: StrictInt = Field(ge=0)
 
     @model_validator(mode="after")
-    def validate_order(self) -> "EffortRange":
+    def validate_order(self) -> EffortRange:
         if not self.min_minutes <= self.likely_minutes <= self.max_minutes:
             raise ValueError("effort range must satisfy min <= likely <= max")
         return self
