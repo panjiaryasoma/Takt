@@ -34,7 +34,7 @@ def test_allocation_block_rejects_duration_mismatch() -> None:
 
 def test_allocation_block_rejects_naive_datetime() -> None:
     with pytest.raises(ValidationError):
-        _block(start=datetime(2026, 10, 1, 9, 0))
+        _block(start=datetime(2026, 10, 1, 9, 0))  # noqa: DTZ001
 
 
 def test_allocation_block_rejects_non_minute_alignment() -> None:
