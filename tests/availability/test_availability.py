@@ -613,7 +613,11 @@ def test_accepted_precedence_wins_and_preserves_contributing_sources() -> None:
     result = build_availability(
         availability_input(commitments=(generic,), accepted_commitments=(approved,))
     )
-    overlap = [b for b in result.busy_blocks if b.start.hour == 20 and b.end.hour == 21][0]
+    overlap = next(
+        b
+        for b in result.busy_blocks
+        if b.start.hour == 20 and b.end.hour == 21
+    )
     assert overlap.availability_type is AvailabilityType.ACCEPTED_PROJECT_COMMITMENT
     assert "fixture:class" in overlap.source
     assert "accepted:project" in overlap.source
@@ -636,7 +640,7 @@ def test_all_temporal_inputs_must_be_minute_aligned() -> None:
 def test_availability_block_is_timezone_aware_ordered_and_iana_valid() -> None:
     with pytest.raises(ValidationError):
         AvailabilityBlock(
-            start=datetime(2026, 9, 28, 9, 0),
+            start=datetime(2026, 9, 28, 9, 0),  # noqa: DTZ001
             end=dt("2026-09-28T10:00:00+07:00"),
             timezone="Asia/Jakarta",
             source="x",
