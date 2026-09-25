@@ -17,6 +17,18 @@ from packages.contracts.models import (
     Recommendation,
     Task,
 )
+from packages.contracts.planning import (
+    MAX_PLANNING_HORIZON_DAYS,
+    AcceptedCommitment,
+    AvailabilityInput,
+    PlanningCommitment,
+    PlanningHorizon,
+    PlanningPreferences,
+    PlanningWorkWindow,
+    RecurrenceException,
+    RecurrenceExceptionAction,
+    RecurrenceSpec,
+)
 from packages.contracts.source import (
     CandidateExtractionReport,
     CandidateField,
@@ -32,7 +44,9 @@ from packages.contracts.triage import (
 )
 
 __all__ = [
+    "AcceptedCommitment",
     "AvailabilityBlock",
+    "AvailabilityInput",
     "AvailabilityType",
     "CandidateAllocation",
     "CandidateExtractionReport",
@@ -47,11 +61,19 @@ __all__ = [
     "EvidenceSpan",
     "ExtractionPath",
     "FeasibilityStatus",
+    "MAX_PLANNING_HORIZON_DAYS",
+    "PlanningCommitment",
+    "PlanningHorizon",
+    "PlanningPreferences",
+    "PlanningWorkWindow",
     "ReadinessRequest",
     "ReadinessStatus",
     "ReadinessTriage",
     "Recommendation",
     "RecommendationAction",
+    "RecurrenceException",
+    "RecurrenceExceptionAction",
+    "RecurrenceSpec",
     "SourceRecord",
     "SourceType",
     "Task",

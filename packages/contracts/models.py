@@ -7,10 +7,11 @@ dibuat longgar (`Any`) daripada ditebak diam-diam.
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC
 from typing import Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import AwareDatetime, BaseModel, Field
+from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, model_validator
 
 from packages.contracts.enums import (
     AvailabilityType,
@@ -55,13 +56,29 @@ class Task(BaseModel):
 
 
 class AvailabilityBlock(BaseModel):
-    """Blok availability minimum yang dikirim ke planning/solver layer."""
+    """Timezone-aware availability interval with half-open [start, end) semantics."""
 
-    start: datetime
-    end: datetime
+    model_config = ConfigDict(extra="forbid")
+
+    start: AwareDatetime
+    end: AwareDatetime
     timezone: str
     source: str
     availability_type: AvailabilityType
+
+    @model_validator(mode="after")
+    def validate_block(self) -> "AvailabilityBlock":
+        if self.end.astimezone(UTC) <= self.start.astimezone(UTC):
+            raise ValueError("availability end must be after start by instant")
+        if self.start.second != 0 or self.start.microsecond != 0:
+            raise ValueError("availability start must be minute-aligned")
+        if self.end.second != 0 or self.end.microsecond != 0:
+            raise ValueError("availability end must be minute-aligned")
+        try:
+            ZoneInfo(self.timezone)
+        except ZoneInfoNotFoundError as exc:
+            raise ValueError(f"unknown IANA timezone: {self.timezone}") from exc
+        return self
 
 
 class CandidateAllocation(BaseModel):
