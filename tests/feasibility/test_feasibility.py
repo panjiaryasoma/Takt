@@ -460,6 +460,7 @@ def test_solver_input_failure_is_not_domain_infeasible(monkeypatch) -> None:
     (
         SolverInvariantError("broken invariant"),
         SolverDependencyUnavailableError("missing dependency"),
+        RuntimeError("unexpected scheduler failure"),
     ),
 )
 def test_solver_execution_failure_is_not_domain_infeasible(monkeypatch, error) -> None:

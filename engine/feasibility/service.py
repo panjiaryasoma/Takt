@@ -11,11 +11,11 @@ from engine.feasibility.models import (
     FeasibilityScenarioResult,
 )
 from engine.feasibility.scenarios import SCENARIO_ORDER, analyze_scenario
-from engine.scheduler.cp_sat import SolverDependencyUnavailableError
-from engine.scheduler.models import SolverConfig, SolverResult, SolverRunStatus
-from engine.scheduler.service import (
+from engine.scheduler import (
+    SolverConfig,
     SolverInputError,
-    SolverInvariantError,
+    SolverResult,
+    SolverRunStatus,
     solve_candidate_allocations,
 )
 from engine.workload import analyze_workload
@@ -140,7 +140,7 @@ def _solve_scenario(
         raise FeasibilityInputError(
             f"{scenario.value} solver rejected feasibility input: {exc}"
         ) from exc
-    except (SolverInvariantError, SolverDependencyUnavailableError) as exc:
+    except RuntimeError as exc:
         raise FeasibilityExecutionError(
             f"{scenario.value} solver execution failed: {exc}"
         ) from exc
