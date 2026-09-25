@@ -1,0 +1,30 @@
+{
+  "tasks": [
+    {
+      "task_id": "core",
+      "name": "Core deliverable",
+      "mandatory": true,
+      "dependencies": [],
+      "effort_min_minutes": 60,
+      "effort_likely_minutes": 120,
+      "effort_max_minutes": 180,
+      "assumptions": ["core estimate remains within stated range"]
+    },
+    {
+      "task_id": "optional",
+      "name": "Optional polish",
+      "mandatory": false,
+      "dependencies": [],
+      "effort_min_minutes": 60,
+      "effort_likely_minutes": 120,
+      "effort_max_minutes": 120,
+      "assumptions": []
+    }
+  ],
+  "assumptions": [
+    {
+      "task_id": null,
+      "description": "scope remains unchanged"
+    }
+  ]
+}
