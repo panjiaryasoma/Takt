@@ -1,0 +1,40 @@
+{
+  "tasks": [
+    {
+      "task_id": "backend",
+      "name": "Build backend API",
+      "mandatory": true,
+      "dependencies": ["schema"],
+      "effort_min_minutes": 240,
+      "effort_likely_minutes": 360,
+      "effort_max_minutes": 540,
+      "assumptions": ["No authentication is required for the MVP"]
+    },
+    {
+      "task_id": "polish",
+      "name": "Optional demo polish",
+      "mandatory": false,
+      "dependencies": ["backend"],
+      "effort_min_minutes": 60,
+      "effort_likely_minutes": 90,
+      "effort_max_minutes": 180,
+      "assumptions": []
+    },
+    {
+      "task_id": "schema",
+      "name": "Define API schema",
+      "mandatory": false,
+      "dependencies": [],
+      "effort_min_minutes": 60,
+      "effort_likely_minutes": 90,
+      "effort_max_minutes": 120,
+      "assumptions": []
+    }
+  ],
+  "assumptions": [
+    {
+      "task_id": null,
+      "description": "Workload estimate assumes a two-person team"
+    }
+  ]
+}

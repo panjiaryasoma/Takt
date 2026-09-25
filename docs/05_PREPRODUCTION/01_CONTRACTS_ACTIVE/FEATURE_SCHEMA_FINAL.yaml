@@ -1,6 +1,6 @@
 meta:
   project: Competition Decision Support System
-  schema_version: "1.0.0"
+  schema_version: "2.0.0"
   status: ACTIVE
 enums:
   readiness_status: [READY_TO_EVALUATE, NEEDS_REVIEW, ELIGIBILITY_BLOCKED, DEADLINE_PASSED, INSUFFICIENT_INFORMATION]
@@ -16,7 +16,8 @@ contracts:
     required: [status, blocking_reasons, review_items, passed_checks, rule_version]
     decision_authority: deterministic
   Task:
-    required: [task_id, name, mandatory, dependencies, effort_min_hours, effort_likely_hours, effort_max_hours]
+    required: [task_id, name, mandatory, dependencies, effort_min_minutes, effort_likely_minutes, effort_max_minutes, assumptions]
+    effort_unit: integer_minutes
     point_estimate_only_forbidden: true
   AvailabilityBlock:
     required: [start, end, timezone, source, availability_type]

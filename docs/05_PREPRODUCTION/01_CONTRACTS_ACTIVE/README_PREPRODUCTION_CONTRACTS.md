@@ -7,13 +7,15 @@ Read order:
 2. `SCHEMA_FINALIZATION_DECISION.md`
 3. `FEATURE_SCHEMA_FINAL.yaml`
 4. `SCHEMA_CHANGE_REQUEST_001.md`
-5. `TOOLCHAIN_DECISION.md`
-6. `SCHEMA_SUPERSESSION_NOTICE.md`
+5. `SCHEMA_CHANGE_REQUEST_002.md`
+6. `TOOLCHAIN_DECISION.md`
+7. `SCHEMA_SUPERSESSION_NOTICE.md`
 
 Authority:
 ```text
 BASELINE_CONTRACT
 + FEATURE_SCHEMA_FINAL
++ approved schema change requests
 + domain_rules_v1.0.yaml
 → implementation
 ```

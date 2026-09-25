@@ -42,6 +42,12 @@ from packages.contracts.triage import (
     ReadinessRequest,
     UserContext,
 )
+from packages.contracts.workload import (
+    EffortRange,
+    WorkloadAnalysis,
+    WorkloadAssumption,
+    WorkloadInput,
+)
 
 __all__ = [
     "AcceptedCommitment",
@@ -57,6 +63,7 @@ __all__ = [
     "CommitmentType",
     "CompetitionBrief",
     "DecisionSupportReport",
+    "EffortRange",
     "EligibilityRule",
     "EvidenceSpan",
     "ExtractionPath",
@@ -78,4 +85,7 @@ __all__ = [
     "SourceType",
     "Task",
     "UserContext",
+    "WorkloadAnalysis",
+    "WorkloadAssumption",
+    "WorkloadInput",
 ]

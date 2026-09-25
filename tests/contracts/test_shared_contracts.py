@@ -140,9 +140,10 @@ def test_task_requires_three_effort_estimates() -> None:
             name="Build demo",
             mandatory=True,
             dependencies=[],
-            effort_likely_hours=2,
-            effort_max_hours=3,
-            # effort_min_hours sengaja hilang
+            assumptions=[],
+            effort_likely_minutes=120,
+            effort_max_minutes=180,
+            # effort_min_minutes sengaja hilang
         )
 
 
