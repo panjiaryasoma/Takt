@@ -78,7 +78,7 @@ class Task(BaseModel):
     assumptions: tuple[NonEmptyStrictStr, ...]
 
     @model_validator(mode="after")
-    def validate_task(self) -> "Task":
+    def validate_task(self) -> Task:
         if not (
             self.effort_min_minutes
             <= self.effort_likely_minutes
@@ -106,7 +106,7 @@ class AvailabilityBlock(BaseModel):
     availability_type: AvailabilityType
 
     @model_validator(mode="after")
-    def validate_block(self) -> "AvailabilityBlock":
+    def validate_block(self) -> AvailabilityBlock:
         if self.end.astimezone(UTC) <= self.start.astimezone(UTC):
             raise ValueError("availability end must be after start by instant")
         if self.start.second != 0 or self.start.microsecond != 0:
@@ -120,14 +120,43 @@ class AvailabilityBlock(BaseModel):
         return self
 
 
-class CandidateAllocation(BaseModel):
-    """Candidate plan hasil solver sebelum menjadi commitment."""
+class AllocationBlock(BaseModel):
+    """Typed solver allocation inside an upstream AVAILABLE interval."""
 
-    candidate_id: str
-    work_blocks: list[Any]
-    buffer_hours: float = Field(ge=0)
-    hard_constraint_violations: list[str]
-    assumptions: list[Any]
+    model_config = ConfigDict(extra="forbid", frozen=True, validate_default=True)
+
+    task_id: NonEmptyStrictStr
+    start: AwareDatetime
+    end: AwareDatetime
+    allocated_minutes: StrictInt = Field(gt=0)
+    availability_source: NonEmptyStrictStr
+
+    @model_validator(mode="after")
+    def validate_allocation(self) -> AllocationBlock:
+        if self.start.second != 0 or self.start.microsecond != 0:
+            raise ValueError("allocation start must be minute-aligned")
+        if self.end.second != 0 or self.end.microsecond != 0:
+            raise ValueError("allocation end must be minute-aligned")
+        start_utc = self.start.astimezone(UTC)
+        end_utc = self.end.astimezone(UTC)
+        if end_utc <= start_utc:
+            raise ValueError("allocation end must be after start by instant")
+        elapsed = int((end_utc - start_utc).total_seconds() // 60)
+        if elapsed != self.allocated_minutes:
+            raise ValueError("allocated_minutes must equal exact interval duration")
+        return self
+
+
+class CandidateAllocation(BaseModel):
+    """Typed candidate plan hasil solver sebelum menjadi commitment."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, validate_default=True)
+
+    candidate_id: NonEmptyStrictStr
+    work_blocks: tuple[AllocationBlock, ...]
+    buffer_minutes: StrictInt = Field(ge=0)
+    hard_constraint_violations: tuple[NonEmptyStrictStr, ...]
+    assumptions: tuple[NonEmptyStrictStr, ...]
 
     @property
     def is_recommendable(self) -> bool:

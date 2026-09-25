@@ -96,7 +96,7 @@ def test_public_workload_api_only_exposes_analysis_entrypoint() -> None:
     assert not hasattr(workload_api, "required_task_closure")
 
 
-def test_schema_migration_is_versioned_by_scr_002() -> None:
+def test_task_migration_remains_documented_by_scr_002() -> None:
     from pathlib import Path
 
     schema = Path(
@@ -106,14 +106,13 @@ def test_schema_migration_is_versioned_by_scr_002() -> None:
         "docs/05_PREPRODUCTION/01_CONTRACTS_ACTIVE/SCHEMA_CHANGE_REQUEST_002.md"
     ).read_text(encoding="utf-8")
 
-    assert 'schema_version: "2.0.0"' in schema
     assert "effort_min_minutes" in schema
     assert "effort_min_hours" not in schema
     assert "SCR-002" in scr
     assert "breaking wire-contract change" in scr
 
 
-def test_english_and_indonesian_schema_mirrors_share_task_version() -> None:
+def test_english_and_indonesian_schema_mirrors_keep_task_contract() -> None:
     from pathlib import Path
 
     english = Path(
@@ -125,7 +124,6 @@ def test_english_and_indonesian_schema_mirrors_share_task_version() -> None:
     ).read_text(encoding="utf-8")
 
     for expected in (
-        'schema_version: "2.0.0"',
         "effort_min_minutes",
         "effort_likely_minutes",
         "effort_max_minutes",

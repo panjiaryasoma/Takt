@@ -9,6 +9,7 @@ from packages.contracts.enums import (
     SourceType,
 )
 from packages.contracts.models import (
+    AllocationBlock,
     AvailabilityBlock,
     CandidateAllocation,
     CompetitionBrief,
@@ -50,7 +51,9 @@ from packages.contracts.workload import (
 )
 
 __all__ = [
+    "MAX_PLANNING_HORIZON_DAYS",
     "AcceptedCommitment",
+    "AllocationBlock",
     "AvailabilityBlock",
     "AvailabilityInput",
     "AvailabilityType",
@@ -68,7 +71,6 @@ __all__ = [
     "EvidenceSpan",
     "ExtractionPath",
     "FeasibilityStatus",
-    "MAX_PLANNING_HORIZON_DAYS",
     "PlanningCommitment",
     "PlanningHorizon",
     "PlanningPreferences",

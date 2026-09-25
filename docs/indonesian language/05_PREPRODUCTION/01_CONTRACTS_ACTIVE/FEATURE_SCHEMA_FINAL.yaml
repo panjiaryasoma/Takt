@@ -1,6 +1,6 @@
 meta:
   project: Competition Decision Support System
-  schema_version: "2.0.0"
+  schema_version: "3.0.0"
   status: ACTIVE
 enums:
   readiness_status: [READY_TO_EVALUATE, NEEDS_REVIEW, ELIGIBILITY_BLOCKED, DEADLINE_PASSED, INSUFFICIENT_INFORMATION]
@@ -22,8 +22,13 @@ contracts:
   AvailabilityBlock:
     required: [start, end, timezone, source, availability_type]
     allowed_types: [AVAILABLE, FIXED_BUSY, FLEXIBLE_BUSY, ACCEPTED_PROJECT_COMMITMENT]
+  AllocationBlock:
+    required: [task_id, start, end, allocated_minutes, availability_source]
+    effort_unit: integer_minutes
   CandidateAllocation:
-    required: [candidate_id, work_blocks, buffer_hours, hard_constraint_violations, assumptions]
+    required: [candidate_id, work_blocks, buffer_minutes, hard_constraint_violations, assumptions]
+    work_blocks_type: AllocationBlock
+    buffer_unit: integer_minutes
     recommendable_requires_zero_hard_violations: true
   Recommendation:
     required: [recommended_candidate_id, recommended_next_work, suggested_windows, alternatives, rationale, tradeoffs, assumptions]
