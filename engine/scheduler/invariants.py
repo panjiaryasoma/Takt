@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from collections import defaultdict
 from datetime import UTC, date, datetime, time, timedelta
+from itertools import pairwise
 from zoneinfo import ZoneInfo
 
 from engine.availability.models import AvailabilityResult
@@ -74,7 +75,7 @@ def _check_no_overlap(
         candidate.work_blocks,
         key=lambda item: (item.start.astimezone(UTC), item.task_id),
     )
-    for previous, current in zip(ordered, ordered[1:]):
+    for previous, current in pairwise(ordered):
         if current.start.astimezone(UTC) < previous.end.astimezone(UTC):
             violations.add("ALLOCATION_OVERLAP")
 
