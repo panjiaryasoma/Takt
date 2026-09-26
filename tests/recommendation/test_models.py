@@ -6,6 +6,7 @@ import pytest
 from pydantic import ValidationError
 
 from engine.recommendation.models import (
+    RecommendationAlternative,
     RecommendationAssembly,
     RecommendationPayload,
     RecommendationTraceContext,
@@ -116,7 +117,7 @@ def _payload(
     *,
     windows: tuple[SuggestedWorkWindow, ...] = (),
     next_work: RecommendedNextWork | None = None,
-    alternatives: tuple[str, ...] = (),
+    alternatives: tuple[RecommendationAlternative, ...] = (),
     rationale: tuple[str, ...] = ("A rationale.",),
     tradeoffs: tuple[str, ...] = (),
 ) -> RecommendationPayload:
@@ -131,9 +132,43 @@ def _payload(
     )
 
 
-def test_payload_rejects_non_empty_mvp_alternatives() -> None:
-    with pytest.raises(ValidationError, match="does not support alternatives"):
-        _payload(alternatives=("candidate-002",))
+def _alternative(
+    *,
+    candidate_id: str = "candidate-002",
+    start: datetime = START + timedelta(hours=1),
+) -> RecommendationAlternative:
+    window = _window(task_id="core", start=start)
+    return RecommendationAlternative(
+        candidate_id=candidate_id,
+        buffer_minutes=60,
+        recommended_next_work=_next_work(window),
+        suggested_windows=(window,),
+        tradeoffs=("Completes later than the primary candidate.",),
+    )
+
+
+def test_payload_accepts_distinct_alternatives() -> None:
+    payload = _payload(alternatives=(_alternative(),))
+    assert tuple(item.candidate_id for item in payload.alternatives) == (
+        "candidate-002",
+    )
+
+
+def test_alternative_requires_non_empty_tradeoff_explanation() -> None:
+    window = _window(task_id="core", start=START + timedelta(hours=1))
+    with pytest.raises(ValidationError, match="non-empty tradeoffs"):
+        RecommendationAlternative(
+            candidate_id="candidate-002",
+            buffer_minutes=60,
+            recommended_next_work=_next_work(window),
+            suggested_windows=(window,),
+            tradeoffs=(),
+        )
+
+
+def test_payload_rejects_primary_repeated_as_alternative() -> None:
+    with pytest.raises(ValidationError, match="primary candidate"):
+        _payload(alternatives=(_alternative(candidate_id="candidate-001"),))
 
 
 def test_payload_requires_non_empty_rationale() -> None:
@@ -265,25 +300,23 @@ def test_assembly_rejects_payload_and_assembly_alternative_mismatch() -> None:
         )
 
 
-def test_assembly_rejects_non_empty_mvp_alternatives() -> None:
-    payload = _payload().model_copy(
-        update={"alternatives": ("candidate-002",)}
+def test_assembly_accepts_alternatives_with_choose_action() -> None:
+    payload = _payload(alternatives=(_alternative(),))
+    assembly = RecommendationAssembly(
+        recommendation_payload=payload,
+        primary_candidate_id="candidate-001",
+        alternative_candidate_ids=("candidate-002",),
+        allowed_actions=(
+            RecommendationAction.ACCEPT,
+            RecommendationAction.CHOOSE_ALTERNATIVE,
+            RecommendationAction.EDIT_CONSTRAINTS,
+            RecommendationAction.IGNORE,
+        ),
+        source_feasibility_status=FeasibilityStatus.FEASIBLE,
+        source_competition_id="cmp-001",
+        source_report_version=1,
     )
-    with pytest.raises(ValidationError, match="does not support alternative"):
-        RecommendationAssembly(
-            recommendation_payload=payload,
-            primary_candidate_id="candidate-001",
-            alternative_candidate_ids=("candidate-002",),
-            allowed_actions=(
-                RecommendationAction.ACCEPT,
-                RecommendationAction.CHOOSE_ALTERNATIVE,
-                RecommendationAction.EDIT_CONSTRAINTS,
-                RecommendationAction.IGNORE,
-            ),
-            source_feasibility_status=FeasibilityStatus.FEASIBLE,
-            source_competition_id="cmp-001",
-            source_report_version=1,
-        )
+    assert assembly.alternative_candidate_ids == ("candidate-002",)
 
 
 def test_tradeoff_status_requires_non_empty_tradeoff_explanation() -> None:

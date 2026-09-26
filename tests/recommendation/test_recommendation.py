@@ -354,8 +354,8 @@ def test_unknown_assessment_evidence_is_rejected() -> None:
         _build(broken)
 
 
-# REC-012, REC-013 deferred
-def test_mvp_has_no_fake_alternatives_or_choose_alternative_action() -> None:
+# REC-012, REC-013: action remains conditional when no alternative exists.
+def test_single_candidate_has_no_alternatives_or_choose_alternative_action() -> None:
     assembly = _build(_run())
     assert assembly.alternative_candidate_ids == ()
     assert assembly.recommendation_payload is not None
@@ -437,21 +437,55 @@ def test_likely_solver_status_mismatch_is_rejected() -> None:
         _build(broken)
 
 
-# REC-026
-def test_multiple_feasible_candidates_are_rejected_in_mvp() -> None:
+# REC-026 + Issue #3 multi-candidate completion
+def test_multiple_valid_candidates_are_ranked_and_exposed_as_alternatives() -> None:
     run = _run()
-    extra = _candidate(candidate_id="candidate-002")
-    altered_solver = run.likely_solver_result.model_copy(
-        update={
-            "candidate_allocations": (
-                run.likely_solver_result.candidate_allocations[0],
-                extra,
-            )
-        }
+    primary = run.likely_solver_result.candidate_allocations[0]
+    extra = _candidate(
+        candidate_id="candidate-002",
+        work_blocks=(_block(start_offset=30),),
     )
-    broken = run.model_copy(update={"likely_solver_result": altered_solver})
-    with pytest.raises(RecommendationInvariantError, match="exactly one"):
-        _build(broken)
+    altered_solver = run.likely_solver_result.model_copy(
+        update={"candidate_allocations": (extra, primary)}
+    )
+    expanded = run.model_copy(update={"likely_solver_result": altered_solver})
+
+    assembly = _build(expanded)
+
+    assert assembly.primary_candidate_id == "candidate-001"
+    assert assembly.alternative_candidate_ids == ("candidate-002",)
+    assert assembly.recommendation_payload is not None
+    assert tuple(
+        item.candidate_id
+        for item in assembly.recommendation_payload.alternatives
+    ) == ("candidate-002",)
+    assert any(
+        "ranking prioritizes fewer work blocks" in item
+        for item in assembly.recommendation_payload.rationale
+    )
+    assert assembly.recommendation_payload.alternatives[0].tradeoffs == (
+        "Completes 30 minutes later than the primary candidate.",
+    )
+    assert RecommendationAction.CHOOSE_ALTERNATIVE in assembly.allowed_actions
+
+
+def test_invalid_candidate_is_excluded_from_ranking_and_alternatives() -> None:
+    run = _run()
+    primary = run.likely_solver_result.candidate_allocations[0]
+    invalid = _candidate(
+        candidate_id="candidate-broken",
+        violations=("BROKEN",),
+    )
+    altered_solver = run.likely_solver_result.model_copy(
+        update={"candidate_allocations": (invalid, primary)}
+    )
+    expanded = run.model_copy(update={"likely_solver_result": altered_solver})
+
+    assembly = _build(expanded)
+
+    assert assembly.primary_candidate_id == "candidate-001"
+    assert assembly.alternative_candidate_ids == ()
+    assert RecommendationAction.CHOOSE_ALTERNATIVE not in assembly.allowed_actions
 
 
 # REC-027
@@ -627,3 +661,27 @@ def test_missing_tradeoff_evidence_is_normalized_to_invariant_error() -> None:
         match="assembly contradicts feasibility state",
     ):
         _build(broken)
+
+
+def test_public_materialization_includes_alternative_plan_details() -> None:
+    run = _run()
+    primary = run.likely_solver_result.candidate_allocations[0]
+    extra = _candidate(
+        candidate_id="candidate-002",
+        work_blocks=(_block(start_offset=30),),
+    )
+    altered_solver = run.likely_solver_result.model_copy(
+        update={"candidate_allocations": (primary, extra)}
+    )
+    expanded = run.model_copy(update={"likely_solver_result": altered_solver})
+
+    payload = _build(expanded).recommendation_payload
+    assert payload is not None
+    public = materialize_public_recommendation(payload)
+
+    assert len(public.alternatives) == 1
+    assert public.alternatives[0]["candidate_id"] == "candidate-002"
+    assert public.alternatives[0]["suggested_windows"]
+    assert public.alternatives[0]["tradeoffs"] == [
+        "Completes 30 minutes later than the primary candidate."
+    ]

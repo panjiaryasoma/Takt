@@ -12,6 +12,7 @@ from engine.recommendation.messages import (
     render_tradeoffs,
 )
 from engine.recommendation.models import (
+    RecommendationAlternative,
     RecommendationAssembly,
     RecommendationBuildInput,
     RecommendationPayload,
@@ -19,6 +20,7 @@ from engine.recommendation.models import (
     SuggestedWorkWindow,
 )
 from engine.scheduler.models import SolverRunStatus
+from engine.scheduler.ranking import rank_candidate_allocations
 from packages.contracts.enums import FeasibilityStatus, RecommendationAction
 from packages.contracts.models import CandidateAllocation, Recommendation
 
@@ -39,6 +41,14 @@ _FEASIBLE_SOLVER_STATUSES = {
 
 _RECOMMENDATION_ACTIONS = (
     RecommendationAction.ACCEPT,
+    RecommendationAction.EDIT_CONSTRAINTS,
+    RecommendationAction.IGNORE,
+)
+
+
+_RECOMMENDATION_ACTIONS_WITH_ALTERNATIVES = (
+    RecommendationAction.ACCEPT,
+    RecommendationAction.CHOOSE_ALTERNATIVE,
     RecommendationAction.EDIT_CONSTRAINTS,
     RecommendationAction.IGNORE,
 )
@@ -84,19 +94,27 @@ def build_recommendation(data: RecommendationBuildInput) -> RecommendationAssemb
                 "recommendation assembly contradicts feasibility state"
             ) from exc
 
-    candidate = _primary_candidate(solver_result.candidate_allocations)
+    ranked_candidates = _ranked_candidates(solver_result.candidate_allocations)
+    candidate = ranked_candidates[0]
     _validate_primary_candidate(candidate, assessment.likely_candidate_id, likely)
     task_by_id = _task_index(baseline.tasks)
-    _validate_candidate_task_references(candidate, task_by_id)
+    for ranked_candidate in ranked_candidates:
+        _validate_candidate_task_references(ranked_candidate, task_by_id)
 
     windows = _suggested_windows(candidate)
     next_work = _recommended_next_work(windows, task_by_id)
+    alternatives = tuple(
+        _alternative_recommendation(item, candidate, task_by_id)
+        for item in ranked_candidates[1:]
+    )
+    alternative_ids = tuple(item.candidate_id for item in alternatives)
+    rationale = rationale + _ranking_rationale(candidate, ranked_candidates[1:])
     try:
         payload = RecommendationPayload(
             recommended_candidate_id=candidate.candidate_id,
             recommended_next_work=next_work,
             suggested_windows=windows,
-            alternatives=(),
+            alternatives=alternatives,
             rationale=rationale,
             tradeoffs=tradeoffs,
             assumptions=assessment.assumptions,
@@ -110,8 +128,8 @@ def build_recommendation(data: RecommendationBuildInput) -> RecommendationAssemb
         return RecommendationAssembly(
             recommendation_payload=payload,
             primary_candidate_id=candidate.candidate_id,
-            alternative_candidate_ids=(),
-            allowed_actions=_RECOMMENDATION_ACTIONS,
+            alternative_candidate_ids=alternative_ids,
+            allowed_actions=_actions_for_alternatives(alternative_ids),
             source_feasibility_status=assessment.status,
             source_competition_id=clean.trace_context.competition_id,
             source_report_version=clean.trace_context.report_version,
@@ -144,7 +162,7 @@ def materialize_public_recommendation(payload: RecommendationPayload) -> Recomme
         recommended_candidate_id=clean.recommended_candidate_id,
         recommended_next_work=next_work,
         suggested_windows=[item.model_dump(mode="python") for item in clean.suggested_windows],
-        alternatives=list(clean.alternatives),
+        alternatives=[_materialize_alternative(item) for item in clean.alternatives],
         rationale=list(clean.rationale),
         tradeoffs=list(clean.tradeoffs),
         assumptions=[item.model_dump(mode="python") for item in clean.assumptions],
@@ -212,20 +230,22 @@ def _validate_run_consistency(run, likely) -> None:
         raise RecommendationInvariantError(
             "recommendable assessment requires a feasible LIKELY solver result"
         )
-    if len(solver_result.candidate_allocations) != 1:
+    if not rank_candidate_allocations(solver_result.candidate_allocations):
         raise RecommendationInvariantError(
-            "Block 5 MVP requires exactly one feasible LIKELY candidate"
+            "recommendable assessment requires at least one valid LIKELY candidate "
+            "after hard-constraint filtering"
         )
 
 
-def _primary_candidate(
+def _ranked_candidates(
     candidates: tuple[CandidateAllocation, ...],
-) -> CandidateAllocation:
-    if len(candidates) != 1:
+) -> tuple[CandidateAllocation, ...]:
+    ranked = rank_candidate_allocations(candidates)
+    if not ranked:
         raise RecommendationInvariantError(
-            "Block 5 MVP requires exactly one primary LIKELY candidate"
+            "recommendation candidate pool contains no valid candidates"
         )
-    return candidates[0]
+    return ranked
 
 
 def _validate_primary_candidate(candidate, likely_candidate_id, likely) -> None:
@@ -249,6 +269,112 @@ def _validate_primary_candidate(candidate, likely_candidate_id, likely) -> None:
         raise RecommendationInvariantError(
             "primary recommendation candidate contains hard-constraint violations"
         )
+
+
+def _alternative_recommendation(
+    candidate: CandidateAllocation,
+    primary: CandidateAllocation,
+    task_by_id,
+) -> RecommendationAlternative:
+    windows = _suggested_windows(candidate)
+    return RecommendationAlternative(
+        candidate_id=candidate.candidate_id,
+        buffer_minutes=candidate.buffer_minutes,
+        recommended_next_work=_recommended_next_work(windows, task_by_id),
+        suggested_windows=windows,
+        tradeoffs=_alternative_tradeoffs(primary, candidate),
+    )
+
+
+def _ranking_rationale(
+    primary: CandidateAllocation,
+    alternatives: tuple[CandidateAllocation, ...],
+) -> tuple[str, ...]:
+    if not alternatives:
+        return ()
+    completion = _candidate_completion(primary)
+    completion_text = (
+        completion.isoformat()
+        if completion is not None
+        else "the planning horizon start for a zero-work candidate"
+    )
+    message = (
+        "Primary candidate ranks first among valid candidates because ranking "
+        "prioritizes fewer work blocks, then earlier completion, with a "
+        "deterministic schedule signature as the final tie-breaker. "
+        f"It uses {len(primary.work_blocks)} work blocks and completes at "
+        f"{completion_text}."
+    )
+    return (message,)
+
+
+def _alternative_tradeoffs(
+    primary: CandidateAllocation,
+    alternative: CandidateAllocation,
+) -> tuple[str, ...]:
+    messages: list[str] = []
+    fragment_delta = len(alternative.work_blocks) - len(primary.work_blocks)
+    if fragment_delta > 0:
+        messages.append(
+            f"Uses {fragment_delta} more work block(s) than the primary candidate."
+        )
+
+    primary_completion = _candidate_completion(primary)
+    alternative_completion = _candidate_completion(alternative)
+    if (
+        primary_completion is not None
+        and alternative_completion is not None
+        and alternative_completion > primary_completion
+    ):
+        minutes = int(
+            (alternative_completion - primary_completion).total_seconds() // 60
+        )
+        messages.append(
+            f"Completes {minutes} minutes later than the primary candidate."
+        )
+
+    buffer_delta = primary.buffer_minutes - alternative.buffer_minutes
+    if buffer_delta > 0:
+        messages.append(
+            f"Leaves {buffer_delta} fewer buffer minutes than the primary candidate."
+        )
+
+    if not messages:
+        messages.append(
+            "Uses a different work-window arrangement with the same primary "
+            "ranking factors; deterministic schedule signature breaks the tie."
+        )
+    return tuple(messages)
+
+
+def _candidate_completion(candidate: CandidateAllocation):
+    if not candidate.work_blocks:
+        return None
+    return max(item.end.astimezone(UTC) for item in candidate.work_blocks)
+
+
+def _materialize_alternative(item: RecommendationAlternative) -> dict:
+    next_work = None
+    if item.recommended_next_work is not None:
+        next_work = item.recommended_next_work.model_dump(mode="python")
+    return {
+        "candidate_id": item.candidate_id,
+        "buffer_minutes": item.buffer_minutes,
+        "recommended_next_work": next_work,
+        "suggested_windows": [
+            window.model_dump(mode="python")
+            for window in item.suggested_windows
+        ],
+        "tradeoffs": list(item.tradeoffs),
+    }
+
+
+def _actions_for_alternatives(
+    alternative_ids: tuple[str, ...],
+) -> tuple[RecommendationAction, ...]:
+    if alternative_ids:
+        return _RECOMMENDATION_ACTIONS_WITH_ALTERNATIVES
+    return _RECOMMENDATION_ACTIONS
 
 
 def _task_index(tasks):

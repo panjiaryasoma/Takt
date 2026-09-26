@@ -19,6 +19,7 @@ from engine.scheduler import (
     SolverRunStatus,
     solve_candidate_allocations,
 )
+from engine.scheduler.ranking import rank_candidate_allocations
 from engine.workload import analyze_workload
 from engine.workload.graph import WorkloadGraphError
 from packages.contracts.enums import FeasibilityStatus
@@ -177,15 +178,13 @@ def _solve_scenario(
         ) from exc
 
     if _is_feasible(result.status):
-        if len(result.candidate_allocations) != 1:
+        ranked = rank_candidate_allocations(result.candidate_allocations)
+        if not ranked:
             raise FeasibilityInvariantError(
-                "Block 4 cannot select among multiple solver candidates without ranking"
+                f"{scenario.value} solver produced no recommendable candidate "
+                "after hard-constraint filtering"
             )
-        candidate = result.candidate_allocations[0]
-        if not candidate.is_recommendable:
-            raise FeasibilityInvariantError(
-                f"{scenario.value} solver candidate contains hard-constraint violations"
-            )
+        candidate = ranked[0]
         scenario_result = FeasibilityScenarioResult(
             scenario=scenario,
             solver_status=result.status,

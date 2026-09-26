@@ -2,6 +2,7 @@
 
 from engine.recommendation.messages import RecommendationEvidenceError
 from engine.recommendation.models import (
+    RecommendationAlternative,
     RecommendationAssembly,
     RecommendationBuildInput,
     RecommendationPayload,
@@ -17,6 +18,7 @@ from engine.recommendation.service import (
 )
 
 __all__ = [
+    "RecommendationAlternative",
     "RecommendationAssembly",
     "RecommendationBuildInput",
     "RecommendationEvidenceError",
