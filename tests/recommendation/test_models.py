@@ -143,6 +143,7 @@ def _alternative(
         buffer_minutes=60,
         recommended_next_work=_next_work(window),
         suggested_windows=(window,),
+        tradeoffs=("Completes later than the primary candidate.",),
     )
 
 
@@ -151,6 +152,18 @@ def test_payload_accepts_distinct_alternatives() -> None:
     assert tuple(item.candidate_id for item in payload.alternatives) == (
         "candidate-002",
     )
+
+
+def test_alternative_requires_non_empty_tradeoff_explanation() -> None:
+    window = _window(task_id="core", start=START + timedelta(hours=1))
+    with pytest.raises(ValidationError, match="non-empty tradeoffs"):
+        RecommendationAlternative(
+            candidate_id="candidate-002",
+            buffer_minutes=60,
+            recommended_next_work=_next_work(window),
+            suggested_windows=(window,),
+            tradeoffs=(),
+        )
 
 
 def test_payload_rejects_primary_repeated_as_alternative() -> None:
