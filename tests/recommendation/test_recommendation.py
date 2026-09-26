@@ -354,8 +354,8 @@ def test_unknown_assessment_evidence_is_rejected() -> None:
         _build(broken)
 
 
-# REC-012, REC-013 deferred
-def test_mvp_has_no_fake_alternatives_or_choose_alternative_action() -> None:
+# REC-012, REC-013: action remains conditional when no alternative exists.
+def test_single_candidate_has_no_alternatives_or_choose_alternative_action() -> None:
     assembly = _build(_run())
     assert assembly.alternative_candidate_ids == ()
     assert assembly.recommendation_payload is not None
@@ -459,6 +459,13 @@ def test_multiple_valid_candidates_are_ranked_and_exposed_as_alternatives() -> N
         item.candidate_id
         for item in assembly.recommendation_payload.alternatives
     ) == ("candidate-002",)
+    assert any(
+        "ranking prioritizes fewer work blocks" in item
+        for item in assembly.recommendation_payload.rationale
+    )
+    assert assembly.recommendation_payload.alternatives[0].tradeoffs == (
+        "Completes 30 minutes later than the primary candidate.",
+    )
     assert RecommendationAction.CHOOSE_ALTERNATIVE in assembly.allowed_actions
 
 
@@ -675,3 +682,6 @@ def test_public_materialization_includes_alternative_plan_details() -> None:
     assert len(public.alternatives) == 1
     assert public.alternatives[0]["candidate_id"] == "candidate-002"
     assert public.alternatives[0]["suggested_windows"]
+    assert public.alternatives[0]["tradeoffs"] == [
+        "Completes 30 minutes later than the primary candidate."
+    ]
