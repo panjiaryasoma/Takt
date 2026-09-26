@@ -4,7 +4,8 @@ from datetime import UTC, date, datetime, timedelta
 
 import engine.scheduler.service as scheduler_service
 from engine.availability.models import AvailabilityResult, DailyCapacity
-from engine.scheduler import SolverConfig, rank_candidate_allocations, solve_candidate_allocations
+from engine.scheduler import SolverConfig, solve_candidate_allocations
+from engine.scheduler.ranking import rank_candidate_allocations
 from engine.scheduler.cp_sat import RawSolverSolution
 from engine.scheduler.models import SolverRunStatus
 from engine.workload import analyze_workload
