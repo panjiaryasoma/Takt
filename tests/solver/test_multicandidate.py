@@ -107,14 +107,16 @@ def _config() -> SolverConfig:
 
 
 def test_solver_builds_distinct_valid_candidate_pool_when_slack_exists(monkeypatch) -> None:
-    monkeypatch.setattr(
-        scheduler_service,
-        "solve_cp_sat",
-        lambda *_args, **_kwargs: RawSolverSolution(
+    def fake_solver(*_args, materially_distinct_from=(), **_kwargs):
+        index = len(materially_distinct_from)
+        return RawSolverSolution(
             status=SolverRunStatus.OPTIMAL,
-            work_blocks=(_block(0),),
-        ),
-    )
+            work_blocks=(_block(index * 30),),
+            used_window_ids=("w0",),
+            makespan_minutes=60 + index * 30,
+        )
+
+    monkeypatch.setattr(scheduler_service, "solve_cp_sat", fake_solver)
 
     result = solve_candidate_allocations(_availability(), _workload(), _config())
 
