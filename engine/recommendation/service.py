@@ -104,10 +104,11 @@ def build_recommendation(data: RecommendationBuildInput) -> RecommendationAssemb
     windows = _suggested_windows(candidate)
     next_work = _recommended_next_work(windows, task_by_id)
     alternatives = tuple(
-        _alternative_recommendation(item, task_by_id)
+        _alternative_recommendation(item, candidate, task_by_id)
         for item in ranked_candidates[1:]
     )
     alternative_ids = tuple(item.candidate_id for item in alternatives)
+    rationale = rationale + _ranking_rationale(candidate, ranked_candidates[1:])
     try:
         payload = RecommendationPayload(
             recommended_candidate_id=candidate.candidate_id,
@@ -272,6 +273,7 @@ def _validate_primary_candidate(candidate, likely_candidate_id, likely) -> None:
 
 def _alternative_recommendation(
     candidate: CandidateAllocation,
+    primary: CandidateAllocation,
     task_by_id,
 ) -> RecommendationAlternative:
     windows = _suggested_windows(candidate)
@@ -280,7 +282,74 @@ def _alternative_recommendation(
         buffer_minutes=candidate.buffer_minutes,
         recommended_next_work=_recommended_next_work(windows, task_by_id),
         suggested_windows=windows,
+        tradeoffs=_alternative_tradeoffs(primary, candidate),
     )
+
+
+def _ranking_rationale(
+    primary: CandidateAllocation,
+    alternatives: tuple[CandidateAllocation, ...],
+) -> tuple[str, ...]:
+    if not alternatives:
+        return ()
+    completion = _candidate_completion(primary)
+    completion_text = (
+        completion.isoformat()
+        if completion is not None
+        else "the planning horizon start for a zero-work candidate"
+    )
+    return (
+        "Primary candidate ranks first among valid candidates because ranking "
+        "prioritizes fewer work blocks, then earlier completion, with a "
+        "deterministic schedule signature as the final tie-breaker. "
+        f"It uses {len(primary.work_blocks)} work blocks and completes at "
+        f"{completion_text}.",
+    )
+
+
+def _alternative_tradeoffs(
+    primary: CandidateAllocation,
+    alternative: CandidateAllocation,
+) -> tuple[str, ...]:
+    messages: list[str] = []
+    fragment_delta = len(alternative.work_blocks) - len(primary.work_blocks)
+    if fragment_delta > 0:
+        messages.append(
+            f"Uses {fragment_delta} more work block(s) than the primary candidate."
+        )
+
+    primary_completion = _candidate_completion(primary)
+    alternative_completion = _candidate_completion(alternative)
+    if (
+        primary_completion is not None
+        and alternative_completion is not None
+        and alternative_completion > primary_completion
+    ):
+        minutes = int(
+            (alternative_completion - primary_completion).total_seconds() // 60
+        )
+        messages.append(
+            f"Completes {minutes} minutes later than the primary candidate."
+        )
+
+    buffer_delta = primary.buffer_minutes - alternative.buffer_minutes
+    if buffer_delta > 0:
+        messages.append(
+            f"Leaves {buffer_delta} fewer buffer minutes than the primary candidate."
+        )
+
+    if not messages:
+        messages.append(
+            "Uses a different work-window arrangement with the same primary "
+            "ranking factors; deterministic schedule signature breaks the tie."
+        )
+    return tuple(messages)
+
+
+def _candidate_completion(candidate: CandidateAllocation):
+    if not candidate.work_blocks:
+        return None
+    return max(item.end.astimezone(UTC) for item in candidate.work_blocks)
 
 
 def _materialize_alternative(item: RecommendationAlternative) -> dict:
@@ -295,6 +364,7 @@ def _materialize_alternative(item: RecommendationAlternative) -> dict:
             window.model_dump(mode="python")
             for window in item.suggested_windows
         ],
+        "tradeoffs": list(item.tradeoffs),
     }
 
 
