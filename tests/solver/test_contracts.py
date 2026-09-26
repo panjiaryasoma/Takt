@@ -147,3 +147,38 @@ def test_solver_config_only_accepts_likely_effort_basis() -> None:
             buffer_target_minutes=0,
             effort_basis="MAX",
         )
+
+
+
+def test_scr_004_freezes_candidate_diversity_and_ranking_policy() -> None:
+    from pathlib import Path
+
+    english = Path(
+        "docs/05_PREPRODUCTION/01_CONTRACTS_ACTIVE/SCHEMA_CHANGE_REQUEST_004.md"
+    ).read_text(encoding="utf-8")
+    indonesian = Path(
+        "docs/indonesian language/05_PREPRODUCTION/01_CONTRACTS_ACTIVE/"
+        "SCHEMA_CHANGE_REQUEST_004.md"
+    ).read_text(encoding="utf-8")
+
+    for expected in (
+        "APPROVED FOR ISSUE 3A COMPLETION",
+        "materially different",
+        "30 minutes",
+        "fewer work blocks",
+        "earlier completion",
+        "CHOOSE_ALTERNATIVE",
+        "3.0.0",
+    ):
+        assert expected in english
+
+    for expected in (
+        "APPROVED FOR ISSUE 3A COMPLETION",
+        "materially different",
+        "30 menit",
+        "jumlah work block lebih sedikit",
+        "completion lebih awal",
+        "CHOOSE_ALTERNATIVE",
+        "3.0.0",
+    ):
+        assert expected in indonesian
