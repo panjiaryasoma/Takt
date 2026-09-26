@@ -89,9 +89,12 @@ class RecommendationAlternative(RecommendationModel):
     buffer_minutes: NonNegativeStrictInt
     recommended_next_work: RecommendedNextWork | None
     suggested_windows: tuple[SuggestedWorkWindow, ...]
+    tradeoffs: tuple[NonEmptyStr, ...]
 
     @model_validator(mode="after")
     def validate_alternative(self) -> RecommendationAlternative:
+        if not self.tradeoffs:
+            raise ValueError("recommendation alternative requires non-empty tradeoffs")
         _validate_window_projection(
             self.suggested_windows,
             self.recommended_next_work,
