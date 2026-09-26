@@ -329,3 +329,41 @@ def test_reordered_semantic_input_produces_same_candidate() -> None:
     first = solve_candidate_allocations(first_availability, first_workload, _config())
     second = solve_candidate_allocations(second_availability, second_workload, _config())
     assert first == second
+
+
+
+def test_candidate_enumeration_finds_disjoint_window_alternative() -> None:
+    later_start = START + timedelta(hours=4)
+    availability = _availability(
+        (
+            (START, START + timedelta(hours=1), "window-a"),
+            (later_start, later_start + timedelta(hours=1), "window-b"),
+        ),
+        horizon_end=later_start + timedelta(hours=1),
+    )
+    result = solve_candidate_allocations(
+        availability,
+        _analysis((_task("a", 60),)),
+        _config(deadline=later_start + timedelta(hours=1)),
+    )
+
+    source_sets = {
+        frozenset(block.availability_source for block in candidate.work_blocks)
+        for candidate in result.candidate_allocations
+    }
+    assert frozenset({"window-a"}) in source_sets
+    assert frozenset({"window-b"}) in source_sets
+
+
+def test_candidate_enumeration_does_not_emit_tiny_same_window_clone() -> None:
+    availability = _availability(
+        ((START, START + timedelta(minutes=61), "window-a"),),
+        horizon_end=START + timedelta(minutes=61),
+    )
+    result = solve_candidate_allocations(
+        availability,
+        _analysis((_task("a", 60),)),
+        _config(deadline=START + timedelta(minutes=61)),
+    )
+
+    assert len(result.candidate_allocations) == 1
