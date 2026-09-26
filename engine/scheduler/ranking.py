@@ -13,7 +13,23 @@ def rank_candidate_allocations(
     """Rank only recommendable candidates by fragmentation, completion, then signature."""
 
     valid = tuple(candidate for candidate in candidates if candidate.is_recommendable)
-    return tuple(sorted(valid, key=_candidate_rank_key))
+    ordered = sorted(
+        valid,
+        key=lambda candidate: (
+            _candidate_rank_key(candidate),
+            candidate.candidate_id,
+        ),
+    )
+
+    unique: list[CandidateAllocation] = []
+    seen_signatures = set()
+    for candidate in ordered:
+        signature = _candidate_signature(candidate)
+        if signature in seen_signatures:
+            continue
+        seen_signatures.add(signature)
+        unique.append(candidate)
+    return tuple(unique)
 
 
 def _candidate_rank_key(candidate: CandidateAllocation):
@@ -32,7 +48,22 @@ def _candidate_rank_key(candidate: CandidateAllocation):
         if blocks
         else datetime.min.replace(tzinfo=UTC)
     )
-    signature = tuple(
+    signature = _candidate_signature(candidate)
+    return (len(blocks), completion, signature)
+
+
+def _candidate_signature(candidate: CandidateAllocation):
+    blocks = tuple(
+        sorted(
+            candidate.work_blocks,
+            key=lambda item: (
+                item.start.astimezone(UTC),
+                item.task_id,
+                item.end.astimezone(UTC),
+            ),
+        )
+    )
+    return tuple(
         (
             block.task_id,
             block.start.astimezone(UTC),
@@ -42,4 +73,3 @@ def _candidate_rank_key(candidate: CandidateAllocation):
         )
         for block in blocks
     )
-    return (len(blocks), completion, signature)

@@ -155,3 +155,16 @@ def test_ranking_uses_validity_fragmentation_completion_and_deterministic_signat
         "late",
         "fragmented",
     )
+
+
+def test_ranking_deduplicates_identical_schedule_alternatives() -> None:
+    first = _candidate("candidate-b", (_block(0),))
+    duplicate = _candidate("candidate-a", (_block(0),))
+    distinct = _candidate("candidate-c", (_block(60),))
+
+    ranked = rank_candidate_allocations((first, duplicate, distinct))
+
+    assert tuple(item.candidate_id for item in ranked) == (
+        "candidate-a",
+        "candidate-c",
+    )

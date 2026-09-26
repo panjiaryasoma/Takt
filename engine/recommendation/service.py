@@ -231,7 +231,8 @@ def _validate_run_consistency(run, likely) -> None:
         )
     if not rank_candidate_allocations(solver_result.candidate_allocations):
         raise RecommendationInvariantError(
-            "recommendable assessment requires at least one valid LIKELY candidate"
+            "recommendable assessment requires at least one valid LIKELY candidate "
+            "after hard-constraint filtering"
         )
 
 
