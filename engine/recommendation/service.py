@@ -19,8 +19,8 @@ from engine.recommendation.models import (
     RecommendedNextWork,
     SuggestedWorkWindow,
 )
-from engine.scheduler import rank_candidate_allocations
 from engine.scheduler.models import SolverRunStatus
+from engine.scheduler.ranking import rank_candidate_allocations
 from packages.contracts.enums import FeasibilityStatus, RecommendationAction
 from packages.contracts.models import CandidateAllocation, Recommendation
 

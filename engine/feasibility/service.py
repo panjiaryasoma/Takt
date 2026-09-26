@@ -17,9 +17,9 @@ from engine.scheduler import (
     SolverInputError,
     SolverResult,
     SolverRunStatus,
-    rank_candidate_allocations,
     solve_candidate_allocations,
 )
+from engine.scheduler.ranking import rank_candidate_allocations
 from engine.workload import analyze_workload
 from engine.workload.graph import WorkloadGraphError
 from packages.contracts.enums import FeasibilityStatus
