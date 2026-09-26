@@ -7,9 +7,9 @@ from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, StringConstraints, model_validator
 
-from engine.scheduler.models import SolverRunStatus
+from engine.scheduler.models import SolverResult, SolverRunStatus
 from packages.contracts.enums import FeasibilityStatus
-from packages.contracts.workload import WorkloadAssumption
+from packages.contracts.workload import WorkloadAnalysis, WorkloadAssumption
 
 NonEmptyStr = Annotated[
     str,
@@ -122,3 +122,11 @@ class FeasibilityAssessment(FeasibilityModel):
                 }:
                     raise ValueError("FEASIBLE requires MAX and FULL_SCOPE_LIKELY feasibility")
         return self
+
+
+class FeasibilityRun(FeasibilityModel):
+    """Self-contained Block 4 run artifacts consumed by recommendation assembly."""
+
+    assessment: FeasibilityAssessment
+    likely_solver_result: SolverResult
+    baseline_workload_analysis: WorkloadAnalysis

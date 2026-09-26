@@ -7,6 +7,7 @@ from pydantic import ValidationError
 from engine.availability.models import AvailabilityResult
 from engine.feasibility.models import (
     FeasibilityAssessment,
+    FeasibilityRun,
     FeasibilityScenario,
     FeasibilityScenarioResult,
 )
@@ -45,7 +46,17 @@ def assess_feasibility(
     workload_input: WorkloadInput,
     config: SolverConfig,
 ) -> FeasibilityAssessment:
-    """Run frozen MIN/LIKELY/MAX/FULL scenarios and classify modeled feasibility."""
+    """Compatibility API returning only the frozen Block 4 assessment."""
+
+    return assess_feasibility_run(availability, workload_input, config).assessment
+
+
+def assess_feasibility_run(
+    availability: AvailabilityResult,
+    workload_input: WorkloadInput,
+    config: SolverConfig,
+) -> FeasibilityRun:
+    """Run all four scenarios once and preserve exact same-run Block 5 artifacts."""
 
     availability, workload_input, config, baseline = _validate_source_inputs(
         availability,
@@ -54,12 +65,24 @@ def assess_feasibility(
     )
 
     results: list[FeasibilityScenarioResult] = []
+    likely_solver_result: SolverResult | None = None
     for scenario in SCENARIO_ORDER:
         analysis = baseline if scenario is FeasibilityScenario.LIKELY else _analyze_scenario(
             workload_input,
             scenario,
         )
-        results.append(_solve_scenario(availability, analysis, config, scenario))
+        scenario_result, solver_result = _solve_scenario(
+            availability,
+            analysis,
+            config,
+            scenario,
+        )
+        results.append(scenario_result)
+        if scenario is FeasibilityScenario.LIKELY:
+            likely_solver_result = solver_result
+
+    if likely_solver_result is None:
+        raise FeasibilityInvariantError("LIKELY solver result was not captured")
 
     ordered_results = tuple(results)
     has_truly_optional = bool(
@@ -69,23 +92,24 @@ def assess_feasibility(
     _validate_full_scope_equivalence(ordered_results, has_truly_optional)
     status = _classify(ordered_results)
 
-    reason_codes = _reason_codes(ordered_results)
-    tradeoff_codes = _tradeoff_codes(ordered_results, has_truly_optional)
-    sensitivity_codes = _sensitivity_codes(ordered_results)
-
     likely = ordered_results[1]
     likely_candidate_id = None
     if status is not FeasibilityStatus.NOT_FEASIBLE_UNDER_CURRENT_CONSTRAINTS:
         likely_candidate_id = likely.candidate_id
 
-    return FeasibilityAssessment(
+    assessment = FeasibilityAssessment(
         status=status,
         likely_candidate_id=likely_candidate_id,
         scenario_results=ordered_results,
-        reason_codes=reason_codes,
-        tradeoff_codes=tradeoff_codes,
-        sensitivity_codes=sensitivity_codes,
+        reason_codes=_reason_codes(ordered_results),
+        tradeoff_codes=_tradeoff_codes(ordered_results, has_truly_optional),
+        sensitivity_codes=_sensitivity_codes(ordered_results),
         assumptions=baseline.assumptions,
+    )
+    return FeasibilityRun(
+        assessment=assessment,
+        likely_solver_result=likely_solver_result,
+        baseline_workload_analysis=baseline,
     )
 
 
@@ -133,7 +157,7 @@ def _solve_scenario(
     workload: WorkloadAnalysis,
     config: SolverConfig,
     scenario: FeasibilityScenario,
-) -> FeasibilityScenarioResult:
+) -> tuple[FeasibilityScenarioResult, SolverResult]:
     try:
         raw = solve_candidate_allocations(availability, workload, config)
     except SolverInputError as exc:
@@ -162,21 +186,23 @@ def _solve_scenario(
             raise FeasibilityInvariantError(
                 f"{scenario.value} solver candidate contains hard-constraint violations"
             )
-        return FeasibilityScenarioResult(
+        scenario_result = FeasibilityScenarioResult(
             scenario=scenario,
             solver_status=result.status,
             candidate_id=candidate.candidate_id,
             buffer_minutes=candidate.buffer_minutes,
             solver_reason_codes=result.reason_codes,
         )
+        return scenario_result, result
 
-    return FeasibilityScenarioResult(
+    scenario_result = FeasibilityScenarioResult(
         scenario=scenario,
         solver_status=result.status,
         candidate_id=None,
         buffer_minutes=None,
         solver_reason_codes=result.reason_codes,
     )
+    return scenario_result, result
 
 
 def _validate_monotonicity(

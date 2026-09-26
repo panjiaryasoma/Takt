@@ -2,6 +2,7 @@
 
 from engine.feasibility.models import (
     FeasibilityAssessment,
+    FeasibilityRun,
     FeasibilityScenario,
     FeasibilityScenarioResult,
 )
@@ -11,6 +12,7 @@ from engine.feasibility.service import (
     FeasibilityInputError,
     FeasibilityInvariantError,
     assess_feasibility,
+    assess_feasibility_run,
 )
 
 __all__ = [
@@ -19,7 +21,9 @@ __all__ = [
     "FeasibilityIndeterminateError",
     "FeasibilityInputError",
     "FeasibilityInvariantError",
+    "FeasibilityRun",
     "FeasibilityScenario",
     "FeasibilityScenarioResult",
     "assess_feasibility",
+    "assess_feasibility_run",
 ]
