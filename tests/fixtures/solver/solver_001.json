@@ -1,0 +1,22 @@
+{
+  "description": "required chain A -> B inside one four-hour availability window",
+  "timezone": "UTC",
+  "horizon_start": "2026-10-01T09:00:00Z",
+  "horizon_end": "2026-10-01T13:00:00Z",
+  "submission_deadline": "2026-10-01T13:00:00Z",
+  "buffer_target_minutes": 60,
+  "tasks": [
+    {
+      "task_id": "a",
+      "mandatory": true,
+      "dependencies": [],
+      "effort_likely_minutes": 60
+    },
+    {
+      "task_id": "b",
+      "mandatory": true,
+      "dependencies": ["a"],
+      "effort_likely_minutes": 60
+    }
+  ]
+}

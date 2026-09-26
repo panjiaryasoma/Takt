@@ -9,6 +9,7 @@ from packages.contracts.enums import (
     SourceType,
 )
 from packages.contracts.models import (
+    AllocationBlock,
     AvailabilityBlock,
     CandidateAllocation,
     CompetitionBrief,
@@ -16,6 +17,18 @@ from packages.contracts.models import (
     ReadinessTriage,
     Recommendation,
     Task,
+)
+from packages.contracts.planning import (
+    MAX_PLANNING_HORIZON_DAYS,
+    AcceptedCommitment,
+    AvailabilityInput,
+    PlanningCommitment,
+    PlanningHorizon,
+    PlanningPreferences,
+    PlanningWorkWindow,
+    RecurrenceException,
+    RecurrenceExceptionAction,
+    RecurrenceSpec,
 )
 from packages.contracts.source import (
     CandidateExtractionReport,
@@ -30,9 +43,19 @@ from packages.contracts.triage import (
     ReadinessRequest,
     UserContext,
 )
+from packages.contracts.workload import (
+    EffortRange,
+    WorkloadAnalysis,
+    WorkloadAssumption,
+    WorkloadInput,
+)
 
 __all__ = [
+    "MAX_PLANNING_HORIZON_DAYS",
+    "AcceptedCommitment",
+    "AllocationBlock",
     "AvailabilityBlock",
+    "AvailabilityInput",
     "AvailabilityType",
     "CandidateAllocation",
     "CandidateExtractionReport",
@@ -43,17 +66,28 @@ __all__ = [
     "CommitmentType",
     "CompetitionBrief",
     "DecisionSupportReport",
+    "EffortRange",
     "EligibilityRule",
     "EvidenceSpan",
     "ExtractionPath",
     "FeasibilityStatus",
+    "PlanningCommitment",
+    "PlanningHorizon",
+    "PlanningPreferences",
+    "PlanningWorkWindow",
     "ReadinessRequest",
     "ReadinessStatus",
     "ReadinessTriage",
     "Recommendation",
     "RecommendationAction",
+    "RecurrenceException",
+    "RecurrenceExceptionAction",
+    "RecurrenceSpec",
     "SourceRecord",
     "SourceType",
     "Task",
     "UserContext",
+    "WorkloadAnalysis",
+    "WorkloadAssumption",
+    "WorkloadInput",
 ]

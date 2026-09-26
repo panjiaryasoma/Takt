@@ -4,6 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from packages.contracts import (
+    AllocationBlock,
     AvailabilityBlock,
     AvailabilityType,
     CandidateAllocation,
@@ -140,21 +141,33 @@ def test_task_requires_three_effort_estimates() -> None:
             name="Build demo",
             mandatory=True,
             dependencies=[],
-            effort_likely_hours=2,
-            effort_max_hours=3,
-            # effort_min_hours sengaja hilang
+            assumptions=[],
+            effort_likely_minutes=120,
+            effort_max_minutes=180,
+            # effort_min_minutes sengaja hilang
         )
 
 
 def test_candidate_with_hard_violation_is_not_recommendable() -> None:
     candidate = CandidateAllocation(
         candidate_id="ca_1",
-        work_blocks=[],
-        buffer_hours=2,
-        hard_constraint_violations=["deadline_overlap"],
-        assumptions=[],
+        work_blocks=(),
+        buffer_minutes=120,
+        hard_constraint_violations=("deadline_overlap",),
+        assumptions=(),
     )
     assert candidate.is_recommendable is False
+
+
+def test_allocation_block_serializes_integer_minutes() -> None:
+    block = AllocationBlock(
+        task_id="task_1",
+        start=NOW,
+        end=LATER,
+        allocated_minutes=120,
+        availability_source="derived:work_window:0",
+    )
+    assert block.model_dump(mode="json")["allocated_minutes"] == 120
 
 
 def test_decision_support_report_accepts_null_recommendation() -> None:

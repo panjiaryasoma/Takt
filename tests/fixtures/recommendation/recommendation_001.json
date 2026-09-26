@@ -1,0 +1,12 @@
+{
+  "trace_context": {
+    "competition_id": "cmp-001",
+    "report_version": 3
+  },
+  "expected_primary_candidate_id": "candidate-001",
+  "expected_allowed_actions": [
+    "ACCEPT",
+    "EDIT_CONSTRAINTS",
+    "IGNORE"
+  ]
+}

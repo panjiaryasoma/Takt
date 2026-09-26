@@ -1,0 +1,48 @@
+{
+  "horizon": {
+    "start": "2026-09-28T00:00:00+07:00",
+    "end": "2026-09-29T00:00:00+07:00"
+  },
+  "work_windows": [
+    {
+      "start": "2026-09-28T08:00:00+07:00",
+      "end": "2026-09-28T22:00:00+07:00"
+    }
+  ],
+  "preferences": {
+    "timezone": "Asia/Jakarta",
+    "max_project_minutes_per_day": 180,
+    "preferred_focus_minutes": 90,
+    "buffer_target_minutes": 60
+  },
+  "commitments": [
+    {
+      "commitment_id": "class",
+      "type": "FIXED",
+      "start_at": "2026-09-28T08:00:00+07:00",
+      "end_at": "2026-09-28T12:00:00+07:00",
+      "timezone": "Asia/Jakarta",
+      "recurrence": null,
+      "exceptions": [],
+      "source": "fixture"
+    },
+    {
+      "commitment_id": "gym",
+      "type": "FLEXIBLE",
+      "start_at": "2026-09-28T17:00:00+07:00",
+      "end_at": "2026-09-28T18:00:00+07:00",
+      "timezone": "Asia/Jakarta",
+      "recurrence": null,
+      "exceptions": [],
+      "source": "fixture"
+    }
+  ],
+  "accepted_commitments": [
+    {
+      "accepted_commitment_id": "accepted-work",
+      "start_at": "2026-09-28T20:00:00+07:00",
+      "end_at": "2026-09-28T21:00:00+07:00",
+      "source": "fixture"
+    }
+  ]
+}

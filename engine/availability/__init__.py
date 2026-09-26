@@ -1,4 +1,20 @@
-"""Calendar-aware availability modeling.
+"""Issue 3A Block 1 availability engine."""
 
-Preserve temporal block structure; do not collapse capacity into weekly hours only.
-"""
+from engine.availability.models import AvailabilityResult, DailyCapacity
+from engine.availability.recurrence import (
+    InvalidLocalTimeError,
+    InvalidRecurrenceExceptionError,
+    RecurrenceError,
+    UnsupportedRecurrenceRuleError,
+)
+from engine.availability.service import build_availability
+
+__all__ = [
+    "AvailabilityResult",
+    "DailyCapacity",
+    "InvalidLocalTimeError",
+    "InvalidRecurrenceExceptionError",
+    "RecurrenceError",
+    "UnsupportedRecurrenceRuleError",
+    "build_availability",
+]

@@ -7,10 +7,20 @@ dibuat longgar (`Any`) daripada ditebak diam-diam.
 
 from __future__ import annotations
 
-from datetime import datetime
-from typing import Any
+from datetime import UTC
+from typing import Annotated, Any
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import AwareDatetime, BaseModel, Field
+from pydantic import (
+    AwareDatetime,
+    BaseModel,
+    ConfigDict,
+    Field,
+    StrictBool,
+    StrictInt,
+    StringConstraints,
+    model_validator,
+)
 
 from packages.contracts.enums import (
     AvailabilityType,
@@ -42,36 +52,111 @@ class ReadinessTriage(BaseModel):
     rule_version: str
 
 
-class Task(BaseModel):
-    """Task workload dengan estimasi effort min/likely/max."""
+NonEmptyStrictStr = Annotated[
+    str,
+    StringConstraints(strip_whitespace=True, min_length=1, strict=True),
+]
 
-    task_id: str
-    name: str
-    mandatory: bool
-    dependencies: list[str]
-    effort_min_hours: float = Field(ge=0)
-    effort_likely_hours: float = Field(ge=0)
-    effort_max_hours: float = Field(ge=0)
+
+class Task(BaseModel):
+    """Canonical workload task menggunakan integer minutes.
+
+    Integer minutes adalah unit canonical untuk menyamakan workload dengan
+    availability dan CP-SAT yang integer-based. Range effort dipertahankan
+    sebagai min/likely/max agar engine tidak menciptakan fake precision.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True, validate_default=True)
+
+    task_id: NonEmptyStrictStr
+    name: NonEmptyStrictStr
+    mandatory: StrictBool
+    dependencies: tuple[NonEmptyStrictStr, ...]
+    effort_min_minutes: StrictInt = Field(ge=0)
+    effort_likely_minutes: StrictInt = Field(ge=0)
+    effort_max_minutes: StrictInt = Field(ge=0)
+    assumptions: tuple[NonEmptyStrictStr, ...]
+
+    @model_validator(mode="after")
+    def validate_task(self) -> Task:
+        if not (
+            self.effort_min_minutes
+            <= self.effort_likely_minutes
+            <= self.effort_max_minutes
+        ):
+            raise ValueError(
+                "task effort must satisfy min <= likely <= max in canonical minutes"
+            )
+        if self.task_id in self.dependencies:
+            raise ValueError("task must not depend on itself")
+        if len(set(self.dependencies)) != len(self.dependencies):
+            raise ValueError("task dependencies must be unique")
+        return self
 
 
 class AvailabilityBlock(BaseModel):
-    """Blok availability minimum yang dikirim ke planning/solver layer."""
+    """Timezone-aware availability interval with half-open [start, end) semantics."""
 
-    start: datetime
-    end: datetime
+    model_config = ConfigDict(extra="forbid")
+
+    start: AwareDatetime
+    end: AwareDatetime
     timezone: str
     source: str
     availability_type: AvailabilityType
 
+    @model_validator(mode="after")
+    def validate_block(self) -> AvailabilityBlock:
+        if self.end.astimezone(UTC) <= self.start.astimezone(UTC):
+            raise ValueError("availability end must be after start by instant")
+        if self.start.second != 0 or self.start.microsecond != 0:
+            raise ValueError("availability start must be minute-aligned")
+        if self.end.second != 0 or self.end.microsecond != 0:
+            raise ValueError("availability end must be minute-aligned")
+        try:
+            ZoneInfo(self.timezone)
+        except ZoneInfoNotFoundError as exc:
+            raise ValueError(f"unknown IANA timezone: {self.timezone}") from exc
+        return self
+
+
+class AllocationBlock(BaseModel):
+    """Typed solver allocation inside an upstream AVAILABLE interval."""
+
+    model_config = ConfigDict(extra="forbid", frozen=True, validate_default=True)
+
+    task_id: NonEmptyStrictStr
+    start: AwareDatetime
+    end: AwareDatetime
+    allocated_minutes: StrictInt = Field(gt=0)
+    availability_source: NonEmptyStrictStr
+
+    @model_validator(mode="after")
+    def validate_allocation(self) -> AllocationBlock:
+        if self.start.second != 0 or self.start.microsecond != 0:
+            raise ValueError("allocation start must be minute-aligned")
+        if self.end.second != 0 or self.end.microsecond != 0:
+            raise ValueError("allocation end must be minute-aligned")
+        start_utc = self.start.astimezone(UTC)
+        end_utc = self.end.astimezone(UTC)
+        if end_utc <= start_utc:
+            raise ValueError("allocation end must be after start by instant")
+        elapsed = int((end_utc - start_utc).total_seconds() // 60)
+        if elapsed != self.allocated_minutes:
+            raise ValueError("allocated_minutes must equal exact interval duration")
+        return self
+
 
 class CandidateAllocation(BaseModel):
-    """Candidate plan hasil solver sebelum menjadi commitment."""
+    """Typed candidate plan hasil solver sebelum menjadi commitment."""
 
-    candidate_id: str
-    work_blocks: list[Any]
-    buffer_hours: float = Field(ge=0)
-    hard_constraint_violations: list[str]
-    assumptions: list[Any]
+    model_config = ConfigDict(extra="forbid", frozen=True, validate_default=True)
+
+    candidate_id: NonEmptyStrictStr
+    work_blocks: tuple[AllocationBlock, ...]
+    buffer_minutes: StrictInt = Field(ge=0)
+    hard_constraint_violations: tuple[NonEmptyStrictStr, ...]
+    assumptions: tuple[NonEmptyStrictStr, ...]
 
     @property
     def is_recommendable(self) -> bool:
