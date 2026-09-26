@@ -21,6 +21,8 @@ class SolverDependencyUnavailableError(RuntimeError):
 class RawSolverSolution:
     status: SolverRunStatus
     work_blocks: tuple[AllocationBlock, ...]
+    used_window_ids: tuple[str, ...] = ()
+    makespan_minutes: int | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -50,6 +52,8 @@ def solve_cp_sat(
     availability: AvailabilityResult,
     workload: WorkloadAnalysis,
     config: SolverConfig,
+    *,
+    materially_distinct_from: tuple[RawSolverSolution, ...] = (),
 ) -> RawSolverSolution:
     """Solve one deterministic required-task candidate using likely effort."""
 
@@ -84,6 +88,7 @@ def solve_cp_sat(
     model = cp_model.CpModel()
     fragments: dict[str, list[_FragmentVars]] = defaultdict(list)
     intervals_by_window: dict[str, list[object]] = defaultdict(list)
+    presence_by_window: dict[str, list[object]] = defaultdict(list)
     daily_durations: dict[date, list[object]] = defaultdict(list)
     all_presence: list[object] = []
 
@@ -120,6 +125,7 @@ def solve_cp_sat(
                 _FragmentVars(task_id, window, start, duration, end, present)
             )
             intervals_by_window[window.window_id].append(interval)
+            presence_by_window[window.window_id].append(present)
             daily_durations[window.local_date].append(duration)
             all_presence.append(present)
 
@@ -130,6 +136,17 @@ def solve_cp_sat(
 
     for intervals in intervals_by_window.values():
         model.AddNoOverlap(intervals)
+
+    window_used: dict[str, object] = {}
+    for window in windows:
+        used = model.NewBoolVar(f"used_{window.window_id}")
+        presences = presence_by_window[window.window_id]
+        if presences:
+            model.Add(sum(presences) >= 1).OnlyEnforceIf(used)
+            model.Add(sum(presences) == 0).OnlyEnforceIf(used.Not())
+        else:
+            model.Add(used == 0)
+        window_used[window.window_id] = used
 
     daily_limits = _effective_daily_limits(availability, windows)
     for local_date, durations in daily_durations.items():
@@ -193,9 +210,20 @@ def solve_cp_sat(
         return RawSolverSolution(SolverRunStatus.INFEASIBLE, ())
 
     positive_end_vars = [task_end[task_id] for task_id in positive_ids]
+    makespan = None
     if positive_end_vars:
         makespan = model.NewIntVar(0, horizon_minutes, "makespan")
         model.AddMaxEquality(makespan, positive_end_vars)
+
+    _add_material_difference_constraints(
+        model,
+        window_used,
+        makespan,
+        horizon_minutes,
+        materially_distinct_from,
+    )
+
+    if makespan is not None:
         weight = horizon_minutes + 1
         model.Minimize(sum(all_presence) * weight + makespan)
 
@@ -210,6 +238,7 @@ def solve_cp_sat(
         return RawSolverSolution(mapped_status, ())
 
     work_blocks: list[AllocationBlock] = []
+    used_window_ids: set[str] = set()
     for task_id in positive_ids:
         for fragment in fragments[task_id]:
             if not solver.BooleanValue(fragment.present):
@@ -218,6 +247,7 @@ def solve_cp_sat(
             duration = solver.Value(fragment.duration)
             if duration <= 0:
                 continue
+            used_window_ids.add(fragment.window.window_id)
             end_offset = start_offset + duration
             start_utc = base_utc + timedelta(minutes=start_offset)
             end_utc = base_utc + timedelta(minutes=end_offset)
@@ -237,7 +267,51 @@ def solve_cp_sat(
             key=lambda item: (item.start.astimezone(UTC), item.task_id),
         )
     )
-    return RawSolverSolution(mapped_status, ordered)
+    makespan_minutes = solver.Value(makespan) if makespan is not None else None
+    return RawSolverSolution(
+        mapped_status,
+        ordered,
+        tuple(sorted(used_window_ids)),
+        makespan_minutes,
+    )
+
+
+_MATERIAL_COMPLETION_DELTA_MINUTES = 30
+
+
+def _add_material_difference_constraints(
+    model,
+    window_used: dict[str, object],
+    makespan,
+    horizon_minutes: int,
+    previous_solutions: tuple[RawSolverSolution, ...],
+) -> None:
+    for index, previous in enumerate(previous_solutions):
+        literals = []
+        previous_windows = set(previous.used_window_ids)
+        for window_id, used in sorted(window_used.items()):
+            literals.append(
+                used.Not() if window_id in previous_windows else used
+            )
+
+        if makespan is not None and previous.makespan_minutes is not None:
+            earlier_limit = (
+                previous.makespan_minutes - _MATERIAL_COMPLETION_DELTA_MINUTES
+            )
+            if earlier_limit >= 0:
+                earlier = model.NewBoolVar(f"material_earlier_{index}")
+                model.Add(makespan <= earlier_limit).OnlyEnforceIf(earlier)
+                literals.append(earlier)
+
+            later_limit = (
+                previous.makespan_minutes + _MATERIAL_COMPLETION_DELTA_MINUTES
+            )
+            if later_limit <= horizon_minutes:
+                later = model.NewBoolVar(f"material_later_{index}")
+                model.Add(makespan >= later_limit).OnlyEnforceIf(later)
+                literals.append(later)
+
+        model.AddBoolOr(literals)
 
 
 def _solver_windows(
