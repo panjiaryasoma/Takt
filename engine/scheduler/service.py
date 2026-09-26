@@ -9,7 +9,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from pydantic import ValidationError
 
 from engine.availability.models import AvailabilityResult
-from engine.scheduler.cp_sat import solve_cp_sat
+from engine.scheduler.cp_sat import RawSolverSolution, solve_cp_sat
 from engine.scheduler.invariants import (
     candidate_hard_constraint_violations,
     effective_capacity_before_deadline,
@@ -21,7 +21,7 @@ from engine.workload.graph import (
     required_task_closure,
 )
 from packages.contracts.enums import AvailabilityType
-from packages.contracts.models import AllocationBlock, CandidateAllocation
+from packages.contracts.models import CandidateAllocation
 from packages.contracts.workload import EffortRange, WorkloadAnalysis
 
 
@@ -77,36 +77,39 @@ def solve_candidate_allocations(
             reason_codes=("INSUFFICIENT_CAPACITY_BEFORE_DEADLINE",),
         )
 
-    raw = solve_cp_sat(availability, workload, config)
-    if raw.status is SolverRunStatus.INFEASIBLE:
-        return SolverResult(
-            status=raw.status,
-            candidate_allocations=(),
-            reason_codes=("CP_SAT_INFEASIBLE",),
-        )
-    if raw.status is SolverRunStatus.UNKNOWN:
-        return SolverResult(
-            status=raw.status,
-            candidate_allocations=(),
-            reason_codes=("CP_SAT_UNKNOWN",),
-        )
-
-    primary = CandidateAllocation(
-        candidate_id="candidate-001",
-        work_blocks=raw.work_blocks,
-        buffer_minutes=max(capacity - required_minutes, 0),
-        hard_constraint_violations=(),
-        assumptions=_candidate_assumptions(workload),
-    )
-    candidates = _candidate_pool(
-        primary,
+    raw_solutions = _solve_candidate_pool(
         availability,
         workload,
         config,
     )
+    primary = raw_solutions[0]
+    if primary.status is SolverRunStatus.INFEASIBLE:
+        return SolverResult(
+            status=primary.status,
+            candidate_allocations=(),
+            reason_codes=("CP_SAT_INFEASIBLE",),
+        )
+    if primary.status is SolverRunStatus.UNKNOWN:
+        return SolverResult(
+            status=primary.status,
+            candidate_allocations=(),
+            reason_codes=("CP_SAT_UNKNOWN",),
+        )
 
+    candidates = tuple(
+        _candidate_from_raw(
+            raw,
+            index,
+            capacity,
+            required_minutes,
+            workload,
+            availability,
+            config,
+        )
+        for index, raw in enumerate(raw_solutions, start=1)
+    )
     return SolverResult(
-        status=raw.status,
+        status=primary.status,
         candidate_allocations=candidates,
         reason_codes=(),
     )
@@ -115,42 +118,84 @@ def solve_candidate_allocations(
 _MAX_CANDIDATES = 3
 
 
-def _candidate_pool(
-    primary: CandidateAllocation,
+def _solve_candidate_pool(
     availability: AvailabilityResult,
     workload: WorkloadAnalysis,
     config: SolverConfig,
-) -> tuple[CandidateAllocation, ...]:
-    _raise_on_candidate_violations(primary, availability, workload, config)
-    candidates = [primary]
-    if not primary.work_blocks:
-        return tuple(candidates)
+) -> tuple[RawSolverSolution, ...]:
+    solutions: list[RawSolverSolution] = []
+    seen_signatures = set()
 
-    zone = ZoneInfo(availability.timezone)
-    for offset_minutes in _candidate_shift_offsets():
-        shifted = CandidateAllocation(
-            candidate_id=f"candidate-{len(candidates) + 1:03d}",
-            work_blocks=_shift_work_blocks(
-                primary.work_blocks,
-                offset_minutes,
-                zone,
-            ),
-            buffer_minutes=primary.buffer_minutes,
-            hard_constraint_violations=(),
-            assumptions=primary.assumptions,
-        )
-        violations = candidate_hard_constraint_violations(
-            shifted,
+    while len(solutions) < _MAX_CANDIDATES:
+        raw = solve_cp_sat(
             availability,
             workload,
             config,
+            materially_distinct_from=tuple(solutions),
         )
-        if violations:
+        if not solutions:
+            solutions.append(raw)
+            if raw.status not in {
+                SolverRunStatus.OPTIMAL,
+                SolverRunStatus.FEASIBLE,
+            }:
+                break
+            if not raw.work_blocks:
+                break
+            seen_signatures.add(_raw_solution_signature(raw))
             continue
-        candidates.append(shifted)
-        if len(candidates) >= _MAX_CANDIDATES:
+
+        if raw.status not in {
+            SolverRunStatus.OPTIMAL,
+            SolverRunStatus.FEASIBLE,
+        }:
             break
-    return tuple(candidates)
+
+        signature = _raw_solution_signature(raw)
+        if signature in seen_signatures:
+            break
+        seen_signatures.add(signature)
+        solutions.append(raw)
+
+    return tuple(solutions)
+
+
+def _raw_solution_signature(raw: RawSolverSolution):
+    return tuple(
+        (
+            block.task_id,
+            block.start.astimezone(UTC),
+            block.end.astimezone(UTC),
+            block.allocated_minutes,
+            block.availability_source,
+        )
+        for block in raw.work_blocks
+    )
+
+
+def _candidate_from_raw(
+    raw: RawSolverSolution,
+    index: int,
+    capacity: int,
+    required_minutes: int,
+    workload: WorkloadAnalysis,
+    availability: AvailabilityResult,
+    config: SolverConfig,
+) -> CandidateAllocation:
+    candidate = CandidateAllocation(
+        candidate_id=f"candidate-{index:03d}",
+        work_blocks=raw.work_blocks,
+        buffer_minutes=max(capacity - required_minutes, 0),
+        hard_constraint_violations=(),
+        assumptions=_candidate_assumptions(workload),
+    )
+    _raise_on_candidate_violations(
+        candidate,
+        availability,
+        workload,
+        config,
+    )
+    return candidate
 
 
 def _raise_on_candidate_violations(
@@ -168,34 +213,6 @@ def _raise_on_candidate_violations(
     if violations:
         joined = ", ".join(violations)
         raise SolverInvariantError(f"post-solver invariant failure: {joined}")
-
-
-def _candidate_shift_offsets() -> tuple[int, ...]:
-    preferred = tuple(range(15, 121, 15))
-    fallback = tuple(range(1, 15))
-    return preferred + fallback
-
-
-def _shift_work_blocks(
-    blocks: tuple[AllocationBlock, ...],
-    offset_minutes: int,
-    zone: ZoneInfo,
-) -> tuple[AllocationBlock, ...]:
-    shift = timedelta(minutes=offset_minutes)
-    shifted: list[AllocationBlock] = []
-    for block in blocks:
-        start_utc = block.start.astimezone(UTC) + shift
-        end_utc = block.end.astimezone(UTC) + shift
-        shifted.append(
-            AllocationBlock(
-                task_id=block.task_id,
-                start=start_utc.astimezone(zone),
-                end=end_utc.astimezone(zone),
-                allocated_minutes=block.allocated_minutes,
-                availability_source=block.availability_source,
-            )
-        )
-    return tuple(shifted)
 
 
 def _validate_upstream_semantics(
