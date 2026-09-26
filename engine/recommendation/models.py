@@ -98,10 +98,6 @@ class RecommendationPayload(RecommendationModel):
             raise ValueError(
                 "Block 5 MVP recommendation payload does not support alternatives"
             )
-        if len(set(self.alternatives)) != len(self.alternatives):
-            raise ValueError("alternatives must not contain duplicate candidate IDs")
-        if self.recommended_candidate_id in self.alternatives:
-            raise ValueError("primary candidate must not also appear in alternatives")
         if not self.rationale:
             raise ValueError("recommendation payload requires non-empty rationale")
 
