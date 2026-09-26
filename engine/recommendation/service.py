@@ -298,13 +298,14 @@ def _ranking_rationale(
         if completion is not None
         else "the planning horizon start for a zero-work candidate"
     )
-    return (
+    message = (
         "Primary candidate ranks first among valid candidates because ranking "
         "prioritizes fewer work blocks, then earlier completion, with a "
         "deterministic schedule signature as the final tie-breaker. "
         f"It uses {len(primary.work_blocks)} work blocks and completes at "
-        f"{completion_text}.",
+        f"{completion_text}."
     )
+    return (message,)
 
 
 def _alternative_tradeoffs(
