@@ -25,6 +25,7 @@ NonEmptyStr = Annotated[
     StringConstraints(strip_whitespace=True, min_length=1, strict=True),
 ]
 PositiveStrictInt = Annotated[StrictInt, Field(gt=0)]
+NonNegativeStrictInt = Annotated[StrictInt, Field(ge=0)]
 PositiveVersion = Annotated[StrictInt, Field(ge=1)]
 
 
@@ -83,60 +84,47 @@ class SuggestedWorkWindow(RecommendationModel):
         return self
 
 
+class RecommendationAlternative(RecommendationModel):
+    candidate_id: NonEmptyStr
+    buffer_minutes: NonNegativeStrictInt
+    recommended_next_work: RecommendedNextWork | None
+    suggested_windows: tuple[SuggestedWorkWindow, ...]
+
+    @model_validator(mode="after")
+    def validate_alternative(self) -> RecommendationAlternative:
+        _validate_window_projection(
+            self.suggested_windows,
+            self.recommended_next_work,
+            owner="alternative",
+        )
+        return self
+
+
 class RecommendationPayload(RecommendationModel):
     recommended_candidate_id: NonEmptyStr
     recommended_next_work: RecommendedNextWork | None
     suggested_windows: tuple[SuggestedWorkWindow, ...]
-    alternatives: tuple[NonEmptyStr, ...] = ()
+    alternatives: tuple[RecommendationAlternative, ...] = ()
     rationale: tuple[NonEmptyStr, ...]
     tradeoffs: tuple[NonEmptyStr, ...]
     assumptions: tuple[WorkloadAssumption, ...]
 
     @model_validator(mode="after")
     def validate_payload(self) -> RecommendationPayload:
-        if self.alternatives:
-            raise ValueError(
-                "Block 5 MVP recommendation payload does not support alternatives"
-            )
         if not self.rationale:
             raise ValueError("recommendation payload requires non-empty rationale")
 
-        ordered = tuple(
-            sorted(
-                self.suggested_windows,
-                key=lambda item: (
-                    item.start.astimezone(UTC),
-                    item.task_id,
-                    item.end.astimezone(UTC),
-                ),
-            )
+        alternative_ids = tuple(item.candidate_id for item in self.alternatives)
+        if len(set(alternative_ids)) != len(alternative_ids):
+            raise ValueError("recommendation alternatives must use unique candidate IDs")
+        if self.recommended_candidate_id in alternative_ids:
+            raise ValueError("primary candidate must not appear in recommendation alternatives")
+
+        _validate_window_projection(
+            self.suggested_windows,
+            self.recommended_next_work,
+            owner="recommendation",
         )
-        if self.suggested_windows != ordered:
-            raise ValueError("suggested_windows must use canonical chronological order")
-
-        if not self.suggested_windows:
-            if self.recommended_next_work is not None:
-                raise ValueError(
-                    "recommended_next_work must be None when suggested_windows is empty"
-                )
-            return self
-
-        if self.recommended_next_work is None:
-            raise ValueError(
-                "recommended_next_work is required when suggested_windows is non-empty"
-            )
-        first = self.suggested_windows[0]
-        next_work = self.recommended_next_work
-        if (
-            next_work.task_id != first.task_id
-            or next_work.start != first.start
-            or next_work.end != first.end
-            or next_work.allocated_minutes != first.allocated_minutes
-            or next_work.availability_source != first.availability_source
-        ):
-            raise ValueError(
-                "recommended_next_work must project the first suggested work window"
-            )
         return self
 
 
@@ -155,6 +143,11 @@ class RecommendationAssembly(RecommendationModel):
             raise ValueError("alternative_candidate_ids must be unique")
         if len(set(self.allowed_actions)) != len(self.allowed_actions):
             raise ValueError("allowed_actions must not contain duplicate values")
+        if (
+            self.primary_candidate_id is not None
+            and self.primary_candidate_id in self.alternative_candidate_ids
+        ):
+            raise ValueError("primary candidate must not appear in alternative_candidate_ids")
 
         no_recommendation_actions = (
             RecommendationAction.EDIT_CONSTRAINTS,
@@ -162,6 +155,12 @@ class RecommendationAssembly(RecommendationModel):
         )
         recommendation_actions = (
             RecommendationAction.ACCEPT,
+            RecommendationAction.EDIT_CONSTRAINTS,
+            RecommendationAction.IGNORE,
+        )
+        recommendation_actions_with_alternatives = (
+            RecommendationAction.ACCEPT,
+            RecommendationAction.CHOOSE_ALTERNATIVE,
             RecommendationAction.EDIT_CONSTRAINTS,
             RecommendationAction.IGNORE,
         )
@@ -189,15 +188,21 @@ class RecommendationAssembly(RecommendationModel):
             raise ValueError("recommendable feasibility status requires a primary candidate")
         if self.recommendation_payload.recommended_candidate_id != self.primary_candidate_id:
             raise ValueError("payload candidate must match assembly primary candidate")
-        if self.recommendation_payload.alternatives != self.alternative_candidate_ids:
+
+        payload_alternative_ids = tuple(
+            item.candidate_id for item in self.recommendation_payload.alternatives
+        )
+        if payload_alternative_ids != self.alternative_candidate_ids:
             raise ValueError("payload alternatives must match assembly alternative_candidate_ids")
-        if self.alternative_candidate_ids:
-            raise ValueError("Block 5 MVP does not support alternative candidates")
-        if self.recommendation_payload.alternatives:
-            raise ValueError("Block 5 MVP recommendation payload alternatives must be empty")
-        if self.allowed_actions != recommendation_actions:
+
+        expected_actions = (
+            recommendation_actions_with_alternatives
+            if self.alternative_candidate_ids
+            else recommendation_actions
+        )
+        if self.allowed_actions != expected_actions:
             raise ValueError(
-                "recommendable assembly actions must be ACCEPT, EDIT_CONSTRAINTS, IGNORE"
+                "recommendable assembly actions must match alternative availability"
             )
         if (
             self.source_feasibility_status
@@ -211,6 +216,49 @@ class RecommendationAssembly(RecommendationModel):
 class RecommendationBuildInput(RecommendationModel):
     feasibility_run: FeasibilityRun
     trace_context: RecommendationTraceContext
+
+
+def _validate_window_projection(
+    windows: tuple[SuggestedWorkWindow, ...],
+    next_work: RecommendedNextWork | None,
+    *,
+    owner: str,
+) -> None:
+    ordered = tuple(
+        sorted(
+            windows,
+            key=lambda item: (
+                item.start.astimezone(UTC),
+                item.task_id,
+                item.end.astimezone(UTC),
+            ),
+        )
+    )
+    if windows != ordered:
+        raise ValueError(f"{owner} suggested_windows must use canonical chronological order")
+
+    if not windows:
+        if next_work is not None:
+            raise ValueError(
+                f"{owner} recommended_next_work must be None when suggested_windows is empty"
+            )
+        return
+
+    if next_work is None:
+        raise ValueError(
+            f"{owner} recommended_next_work is required when suggested_windows is non-empty"
+        )
+    first = windows[0]
+    if (
+        next_work.task_id != first.task_id
+        or next_work.start != first.start
+        or next_work.end != first.end
+        or next_work.allocated_minutes != first.allocated_minutes
+        or next_work.availability_source != first.availability_source
+    ):
+        raise ValueError(
+            f"{owner} recommended_next_work must project the first suggested work window"
+        )
 
 
 def _validate_exact_minutes(start, end, allocated_minutes: int) -> None:

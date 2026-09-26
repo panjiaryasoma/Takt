@@ -21,7 +21,7 @@ from engine.workload.graph import (
     required_task_closure,
 )
 from packages.contracts.enums import AvailabilityType
-from packages.contracts.models import CandidateAllocation
+from packages.contracts.models import AllocationBlock, CandidateAllocation
 from packages.contracts.workload import EffortRange, WorkloadAnalysis
 
 
@@ -38,7 +38,7 @@ def solve_candidate_allocations(
     workload: WorkloadAnalysis,
     config: SolverConfig,
 ) -> SolverResult:
-    """Build one valid required-task candidate without committing user calendar."""
+    """Build a deterministic pool of valid required-task candidates without committing."""
 
     try:
         availability = AvailabilityResult.model_validate(
@@ -91,13 +91,74 @@ def solve_candidate_allocations(
             reason_codes=("CP_SAT_UNKNOWN",),
         )
 
-    candidate = CandidateAllocation(
+    primary = CandidateAllocation(
         candidate_id="candidate-001",
         work_blocks=raw.work_blocks,
         buffer_minutes=max(capacity - required_minutes, 0),
         hard_constraint_violations=(),
         assumptions=_candidate_assumptions(workload),
     )
+    candidates = _candidate_pool(
+        primary,
+        availability,
+        workload,
+        config,
+    )
+
+    return SolverResult(
+        status=raw.status,
+        candidate_allocations=candidates,
+        reason_codes=(),
+    )
+
+
+_MAX_CANDIDATES = 3
+
+
+def _candidate_pool(
+    primary: CandidateAllocation,
+    availability: AvailabilityResult,
+    workload: WorkloadAnalysis,
+    config: SolverConfig,
+) -> tuple[CandidateAllocation, ...]:
+    _raise_on_candidate_violations(primary, availability, workload, config)
+    candidates = [primary]
+    if not primary.work_blocks:
+        return tuple(candidates)
+
+    zone = ZoneInfo(availability.timezone)
+    for offset_minutes in _candidate_shift_offsets():
+        shifted = CandidateAllocation(
+            candidate_id=f"candidate-{len(candidates) + 1:03d}",
+            work_blocks=_shift_work_blocks(
+                primary.work_blocks,
+                offset_minutes,
+                zone,
+            ),
+            buffer_minutes=primary.buffer_minutes,
+            hard_constraint_violations=(),
+            assumptions=primary.assumptions,
+        )
+        violations = candidate_hard_constraint_violations(
+            shifted,
+            availability,
+            workload,
+            config,
+        )
+        if violations:
+            continue
+        candidates.append(shifted)
+        if len(candidates) >= _MAX_CANDIDATES:
+            break
+    return tuple(candidates)
+
+
+def _raise_on_candidate_violations(
+    candidate: CandidateAllocation,
+    availability: AvailabilityResult,
+    workload: WorkloadAnalysis,
+    config: SolverConfig,
+) -> None:
     violations = candidate_hard_constraint_violations(
         candidate,
         availability,
@@ -108,11 +169,33 @@ def solve_candidate_allocations(
         joined = ", ".join(violations)
         raise SolverInvariantError(f"post-solver invariant failure: {joined}")
 
-    return SolverResult(
-        status=raw.status,
-        candidate_allocations=(candidate,),
-        reason_codes=(),
-    )
+
+def _candidate_shift_offsets() -> tuple[int, ...]:
+    preferred = tuple(range(15, 121, 15))
+    fallback = tuple(range(1, 15))
+    return preferred + fallback
+
+
+def _shift_work_blocks(
+    blocks: tuple[AllocationBlock, ...],
+    offset_minutes: int,
+    zone: ZoneInfo,
+) -> tuple[AllocationBlock, ...]:
+    shift = timedelta(minutes=offset_minutes)
+    shifted: list[AllocationBlock] = []
+    for block in blocks:
+        start_utc = block.start.astimezone(UTC) + shift
+        end_utc = block.end.astimezone(UTC) + shift
+        shifted.append(
+            AllocationBlock(
+                task_id=block.task_id,
+                start=start_utc.astimezone(zone),
+                end=end_utc.astimezone(zone),
+                allocated_minutes=block.allocated_minutes,
+                availability_source=block.availability_source,
+            )
+        )
+    return tuple(shifted)
 
 
 def _validate_upstream_semantics(
