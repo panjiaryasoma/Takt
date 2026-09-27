@@ -415,10 +415,49 @@ class PlanEvaluateResponseV1(ApiModel):
 
         if self.planning is None or self.basis.planning is None:
             raise ValueError("ready evaluation requires planning state and planning basis")
+        for candidate in self.planning.candidates:
+            if candidate.ref.evaluation_id != self.evaluation_id:
+                raise ValueError(
+                    "public candidate evaluation_id must match response"
+                )
+
         recommendation = self.planning.recommendation
         if recommendation is not None:
             if recommendation.primary_candidate.evaluation_id != self.evaluation_id:
-                raise ValueError("candidate reference evaluation_id must match response")
+                raise ValueError(
+                    "candidate reference evaluation_id must match response"
+                )
+            trace = recommendation.trace
+            if trace.competition_id != self.basis.report.competition_id:
+                raise ValueError(
+                    "recommendation trace competition_id must match evaluation basis"
+                )
+            if trace.report_version != self.basis.report.report_version:
+                raise ValueError(
+                    "recommendation trace report_version must match evaluation basis"
+                )
+            if (
+                trace.assembly_material_fingerprint
+                != self.basis.report.assembly_material_fingerprint
+            ):
+                raise ValueError(
+                    "recommendation report fingerprint must match evaluation basis"
+                )
+            if trace.evaluation_basis_fingerprint != self.basis.fingerprint:
+                raise ValueError(
+                    "recommendation evaluation fingerprint must match evaluation basis"
+                )
+            if (
+                trace.planning_basis_fingerprint
+                != self.basis.planning.basis_fingerprint
+            ):
+                raise ValueError(
+                    "recommendation planning fingerprint must match evaluation basis"
+                )
+            if trace.planning_policy_version != self.basis.planning.policy_version:
+                raise ValueError(
+                    "recommendation planning policy must match evaluation basis"
+                )
         return self
 
 
