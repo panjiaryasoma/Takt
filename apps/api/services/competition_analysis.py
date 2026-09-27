@@ -9,6 +9,7 @@ import httpx
 
 from apps.api.contracts import (
     AnalysisProvenanceV1,
+    RECONCILIATION_POLICY_VERSION,
     CanonicalReportBundleV1,
     CanonicalReportRefV1,
     CompetitionAnalyzePdfMetadataV1,
@@ -265,7 +266,7 @@ def _report_bundle(assembly) -> CanonicalReportBundleV1:
     initial_ref = CanonicalReportRefV1(
         competition_id=assembly.report.competition_id,
         report_version=assembly.report.report_version,
-        reconciliation_policy_version="reconciliation-v1",
+        reconciliation_policy_version=RECONCILIATION_POLICY_VERSION,
         assembly_policy_version=assembly.assembly_policy_version,
         assembly_material_fingerprint=assembly.material_fingerprint,
         wire_fingerprint_version="report-wire-jcs-sha256-v1",
