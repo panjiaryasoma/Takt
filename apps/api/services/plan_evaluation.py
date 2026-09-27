@@ -20,6 +20,7 @@ from apps.api.contracts import (
     DOMAIN_SCHEMA_VERSION,
     RECONCILIATION_POLICY_VERSION,
     REPORT_WIRE_FINGERPRINT_VERSION,
+    SOURCE_SET_FINGERPRINT_VERSION,
     CandidateRefV1,
     CanonicalReportBundleV1,
     EvaluationBasisV1,
@@ -88,7 +89,19 @@ class PlanEvaluationIndeterminateError(RuntimeError):
 
 
 class PlanEvaluationExecutionError(RuntimeError):
-    """A planning engine could not execute correctly."""
+    """Base class for server-side planning execution failures."""
+
+
+class PlanEvaluationAvailabilityError(PlanEvaluationExecutionError):
+    """Availability preparation failed before solver execution."""
+
+
+class PlanEvaluationSolverExecutionError(PlanEvaluationExecutionError):
+    """The solver/feasibility engine failed during execution."""
+
+
+class PlanEvaluationRuntimeError(PlanEvaluationExecutionError):
+    """Required planning runtime metadata or dependency is unavailable."""
 
 
 class PlanEvaluationInvariantError(RuntimeError):
@@ -128,12 +141,14 @@ def verify_report_bundle(bundle: CanonicalReportBundleV1) -> None:
         "domain_schema_version": DOMAIN_SCHEMA_VERSION,
         "reconciliation_policy_version": RECONCILIATION_POLICY_VERSION,
         "assembly_policy_version": ASSEMBLY_POLICY_VERSION,
+        "source_set_fingerprint_version": SOURCE_SET_FINGERPRINT_VERSION,
         "wire_fingerprint_version": REPORT_WIRE_FINGERPRINT_VERSION,
     }
     actual = {
         "domain_schema_version": ref.domain_schema_version,
         "reconciliation_policy_version": ref.reconciliation_policy_version,
         "assembly_policy_version": ref.assembly_policy_version,
+        "source_set_fingerprint_version": ref.source_set_fingerprint_version,
         "wire_fingerprint_version": ref.wire_fingerprint_version,
     }
     if actual != supported:
@@ -428,7 +443,7 @@ def _solver_backend_version() -> str:
     try:
         return package_version("ortools")
     except PackageNotFoundError as exc:
-        raise PlanEvaluationExecutionError(
+        raise PlanEvaluationRuntimeError(
             "OR-Tools package metadata is unavailable"
         ) from exc
 
@@ -460,12 +475,17 @@ def _evaluation_basis(
             else None
         ),
     }
-    return EvaluationBasisV1(
-        fingerprint=jcs_sha256(material),
-        report=report,
-        readiness=readiness,
-        planning=planning,
-    )
+    try:
+        return EvaluationBasisV1(
+            fingerprint=jcs_sha256(material),
+            report=report,
+            readiness=readiness,
+            planning=planning,
+        )
+    except (ValidationError, ValueError) as exc:
+        raise PlanEvaluationInvariantError(
+            "evaluation basis projection violated the public contract"
+        ) from exc
 
 
 def _new_evaluation_id(factory: EvaluationIdFactory) -> UUID:
@@ -550,13 +570,18 @@ def evaluate_plan(
             planning=None,
         )
         evaluation_id = _new_evaluation_id(evaluation_id_factory)
-        return PlanEvaluateResponseV1(
-            evaluation_id=evaluation_id,
-            evaluated_at=evaluated_at,
-            basis=basis,
-            readiness=readiness,
-            planning=None,
-        )
+        try:
+            return PlanEvaluateResponseV1(
+                evaluation_id=evaluation_id,
+                evaluated_at=evaluated_at,
+                basis=basis,
+                readiness=readiness,
+                planning=None,
+            )
+        except (ValidationError, ValueError) as exc:
+            raise PlanEvaluationInvariantError(
+                "blocked evaluation response violated the public contract"
+            ) from exc
 
     if readiness_request.submission_deadline is None:
         raise PlanEvaluationInvariantError(
@@ -581,7 +606,7 @@ def evaluate_plan(
             "planning input could not satisfy availability/solver contracts"
         ) from exc
     except RuntimeError as exc:
-        raise PlanEvaluationExecutionError(
+        raise PlanEvaluationAvailabilityError(
             "availability preparation failed"
         ) from exc
 
@@ -592,10 +617,17 @@ def evaluate_plan(
             "solver_config": _solver_material(config),
         }
     )
-    planning_basis = PlanningBasisV1(
-        basis_fingerprint=planning_fingerprint,
-        solver_backend_version=_solver_backend_version(),
-    )
+    try:
+        planning_basis = PlanningBasisV1(
+            basis_fingerprint=planning_fingerprint,
+            solver_backend_version=_solver_backend_version(),
+        )
+    except PlanEvaluationExecutionError:
+        raise
+    except (ValidationError, ValueError) as exc:
+        raise PlanEvaluationInvariantError(
+            "planning basis projection violated the public contract"
+        ) from exc
 
     try:
         feasibility_run = assess_feasibility_run(
@@ -612,7 +644,7 @@ def evaluate_plan(
             "solver result is indeterminate"
         ) from exc
     except FeasibilityExecutionError as exc:
-        raise PlanEvaluationExecutionError(
+        raise PlanEvaluationSolverExecutionError(
             "solver execution failed"
         ) from exc
     except FeasibilityInvariantError as exc:
@@ -732,19 +764,24 @@ def evaluate_plan(
         )
 
     assessment = feasibility_run.assessment
-    planning = PlanningDecisionV1(
-        feasibility=assessment.status,
-        candidates=public_candidates,
-        allowed_actions=assembly.allowed_actions,
-        reason_codes=assessment.reason_codes,
-        tradeoff_codes=assessment.tradeoff_codes,
-        sensitivity_codes=assessment.sensitivity_codes,
-        recommendation=recommendation_set,
-    )
-    return PlanEvaluateResponseV1(
-        evaluation_id=evaluation_id,
-        evaluated_at=evaluated_at,
-        basis=basis,
-        readiness=readiness,
-        planning=planning,
-    )
+    try:
+        planning = PlanningDecisionV1(
+            feasibility=assessment.status,
+            candidates=public_candidates,
+            allowed_actions=assembly.allowed_actions,
+            reason_codes=assessment.reason_codes,
+            tradeoff_codes=assessment.tradeoff_codes,
+            sensitivity_codes=assessment.sensitivity_codes,
+            recommendation=recommendation_set,
+        )
+        return PlanEvaluateResponseV1(
+            evaluation_id=evaluation_id,
+            evaluated_at=evaluated_at,
+            basis=basis,
+            readiness=readiness,
+            planning=planning,
+        )
+    except (ValidationError, ValueError) as exc:
+        raise PlanEvaluationInvariantError(
+            "public planning response violated the evaluation contract"
+        ) from exc
