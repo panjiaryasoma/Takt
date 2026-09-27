@@ -51,9 +51,9 @@ class _StaticOCRProvider:
         )
 
 
-def _source() -> SourceMetadataV1:
+def _source(source_id: str = "src-api") -> SourceMetadataV1:
     return SourceMetadataV1(
-        source_id="src-api",
+        source_id=source_id,
         source_type=SourceType.OFFICIAL_RULES,
         authority_rank={"basis": "official_rules", "tier": 1},
         scope={"category": "all"},
@@ -189,3 +189,87 @@ def test_source_fetch_failure_maps_to_public_error_without_internal_text(
     serialized = json.dumps(body)
     assert "secret upstream stack detail" not in serialized
     assert "private.example" not in serialized
+
+
+def test_sequential_analysis_preserves_full_multi_source_reconciliation(
+    monkeypatch,
+) -> None:
+    def handler(request: httpx.Request) -> httpx.Response:
+        if request.url.path.endswith("/a"):
+            content = b"<html><body>Team size: 1 to 4 members</body></html>"
+        else:
+            content = b"<html><body>No supported competition facts here</body></html>"
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/html"},
+            content=content,
+            request=request,
+        )
+
+    monkeypatch.setattr(
+        "engine.extraction.native.validate_public_http_target",
+        lambda _url: None,
+    )
+
+    first_request = CompetitionAnalyzeUrlRequestV1(
+        competition_id="cmp-multi",
+        url="https://example.test/a",
+        source=_source("src-a"),
+    )
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        first = analyze_url(first_request, client=client)
+        second_request = CompetitionAnalyzeUrlRequestV1(
+            competition_id="cmp-multi",
+            url="https://example.test/b",
+            source=_source("src-b"),
+            previous_report_bundle=first.report_bundle,
+            prior_source_artifacts=first.source_artifacts,
+        )
+        second = analyze_url(second_request, client=client)
+
+    team_size = second.report_bundle.report.canonical_fields["team_size"]
+    assert team_size.state is CanonicalFieldState.SINGLE_SOURCE
+    assert second.report_bundle.report.source_ids == ["src-a", "src-b"]
+    assert tuple(
+        item.source.source_id for item in second.source_artifacts
+    ) == ("src-a", "src-b")
+    assert tuple(
+        item.source_id for item in second.provenance.sources
+    ) == ("src-a", "src-b")
+    available = {item.evidence_id for item in second.provenance.evidence}
+    assert set(team_size.evidence_ids) <= available
+
+
+def test_previous_report_requires_complete_prior_source_artifacts(
+    monkeypatch,
+) -> None:
+    html = b"<html><body>Team size: 1 to 4 members</body></html>"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/html"},
+            content=html,
+            request=request,
+        )
+
+    monkeypatch.setattr(
+        "engine.extraction.native.validate_public_http_target",
+        lambda _url: None,
+    )
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        first = analyze_url(_url_request(), client=client)
+        invalid = CompetitionAnalyzeUrlRequestV1(
+            competition_id="cmp-analysis",
+            url="https://example.test/rules",
+            source=_source(),
+            previous_report_bundle=first.report_bundle,
+            prior_source_artifacts=(),
+        )
+        import pytest
+
+        with pytest.raises(
+            ValueError,
+            match="prior source artifacts must exactly cover",
+        ):
+            analyze_url(invalid, client=client)
