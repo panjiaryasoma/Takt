@@ -551,3 +551,34 @@ class CompetitionAnalyzeResponseV1(ApiModel):
     source_artifacts: tuple[SourceAnalysisArtifactV1, ...]
     provenance: AnalysisProvenanceV1
     report_changed: StrictBool
+
+    @model_validator(mode="after")
+    def validate_source_set_traceability(self) -> CompetitionAnalyzeResponseV1:
+        artifact_ids = tuple(
+            sorted(item.source.source_id for item in self.source_artifacts)
+        )
+        if len(set(artifact_ids)) != len(artifact_ids):
+            raise ValueError("source artifact IDs must be unique")
+
+        report_ids = tuple(sorted(self.report_bundle.report.source_ids))
+        provenance_ids = tuple(
+            sorted(item.source_id for item in self.provenance.sources)
+        )
+        if artifact_ids != report_ids or provenance_ids != report_ids:
+            raise ValueError(
+                "report, source artifacts, and provenance must share one source set"
+            )
+
+        available_evidence = {
+            item.evidence_id for item in self.provenance.evidence
+        }
+        referenced_evidence = {
+            evidence_id
+            for field in self.report_bundle.report.canonical_fields.values()
+            for evidence_id in field.evidence_ids
+        }
+        if not referenced_evidence <= available_evidence:
+            raise ValueError(
+                "canonical evidence references must resolve in public provenance"
+            )
+        return self
