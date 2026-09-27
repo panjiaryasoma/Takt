@@ -498,22 +498,6 @@ class SourceMetadataV1(ApiModel):
         return self
 
 
-class CompetitionAnalyzeUrlRequestV1(ApiModel):
-    competition_id: NonEmptyStr
-    url: NonEmptyStr
-    source: SourceMetadataV1
-    previous_report_bundle: CanonicalReportBundleV1 | None = None
-    prior_source_artifacts: tuple[SourceAnalysisArtifactV1, ...] = ()
-
-
-class CompetitionAnalyzePdfMetadataV1(ApiModel):
-    competition_id: NonEmptyStr
-    document_id: NonEmptyStr
-    source: SourceMetadataV1
-    previous_report_bundle: CanonicalReportBundleV1 | None = None
-    prior_source_artifacts: tuple[SourceAnalysisArtifactV1, ...] = ()
-
-
 class ExtractionRunAuditV1(ApiModel):
     source_id: NonEmptyStr
     snapshot_id: NonEmptyStr
@@ -538,6 +522,22 @@ class SourceAnalysisArtifactV1(ApiModel):
                 "extraction run source_id must match source artifact source_id"
             )
         return self
+
+
+class CompetitionAnalyzeUrlRequestV1(ApiModel):
+    competition_id: NonEmptyStr
+    url: NonEmptyStr
+    source: SourceMetadataV1
+    previous_report_bundle: CanonicalReportBundleV1 | None = None
+    prior_source_artifacts: tuple[SourceAnalysisArtifactV1, ...] = ()
+
+
+class CompetitionAnalyzePdfMetadataV1(ApiModel):
+    competition_id: NonEmptyStr
+    document_id: NonEmptyStr
+    source: SourceMetadataV1
+    previous_report_bundle: CanonicalReportBundleV1 | None = None
+    prior_source_artifacts: tuple[SourceAnalysisArtifactV1, ...] = ()
 
 
 class AnalysisProvenanceV1(ApiModel):
