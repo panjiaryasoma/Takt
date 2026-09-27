@@ -7,6 +7,7 @@ from typing import Annotated
 
 from fastapi import APIRouter, File, Form, Request, UploadFile
 from pydantic import ValidationError
+
 from apps.api.contracts import (
     ApiErrorResponseV1,
     CompetitionAnalyzePdfMetadataV1,
@@ -17,6 +18,18 @@ from apps.api.errors import (
     ApiContractError,
     validation_contract,
     validation_details,
+)
+from apps.api.services.competition_analysis import (
+    AnalysisContinuationError,
+    AnalysisInputError,
+    AnalysisInvariantError,
+    AnalysisReconciliationError,
+    analyze_pdf,
+    analyze_url,
+)
+from apps.api.services.plan_evaluation import (
+    ReportBundleError,
+    UnsupportedReportContractError,
 )
 from engine.extraction import (
     MAX_SOURCE_BYTES,
@@ -32,18 +45,6 @@ from engine.extraction import (
     SourceFetchError,
     SourceLimitExceededError,
     UnsupportedMediaTypeError,
-)
-from apps.api.services.competition_analysis import (
-    AnalysisContinuationError,
-    AnalysisInputError,
-    AnalysisInvariantError,
-    AnalysisReconciliationError,
-    analyze_pdf,
-    analyze_url,
-)
-from apps.api.services.plan_evaluation import (
-    ReportBundleError,
-    UnsupportedReportContractError,
 )
 
 router = APIRouter(tags=["competitions"])
