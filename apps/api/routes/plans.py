@@ -9,10 +9,12 @@ from apps.api.contracts import (
 )
 from apps.api.errors import ApiContractError
 from apps.api.services.plan_evaluation import (
+    PlanEvaluationAvailabilityError,
     PlanEvaluationIndeterminateError,
     PlanEvaluationInputError,
     PlanEvaluationInvariantError,
-    PlanEvaluationExecutionError,
+    PlanEvaluationRuntimeError,
+    PlanEvaluationSolverExecutionError,
     ReportBundleError,
     UnsupportedReportContractError,
     evaluate_plan,
@@ -63,12 +65,26 @@ def evaluate_plan_route(request: PlanEvaluateRequestV1) -> PlanEvaluateResponseV
             message="The solver could not determine a planning result.",
             stage="solver",
         ) from exc
-    except PlanEvaluationExecutionError as exc:
+    except PlanEvaluationAvailabilityError as exc:
+        raise ApiContractError(
+            status_code=500,
+            code="AVAILABILITY_EXECUTION_FAILED",
+            message="Availability preparation could not complete.",
+            stage="availability",
+        ) from exc
+    except PlanEvaluationSolverExecutionError as exc:
         raise ApiContractError(
             status_code=500,
             code="SOLVER_EXECUTION_FAILED",
-            message="The planning engine could not complete execution.",
+            message="The solver could not complete execution.",
             stage="solver",
+        ) from exc
+    except PlanEvaluationRuntimeError as exc:
+        raise ApiContractError(
+            status_code=500,
+            code="PLANNING_RUNTIME_UNAVAILABLE",
+            message="A required planning runtime dependency is unavailable.",
+            stage="planning",
         ) from exc
     except PlanEvaluationInvariantError as exc:
         raise ApiContractError(
