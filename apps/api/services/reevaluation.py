@@ -368,6 +368,7 @@ def reevaluate_plan(
         if not current_ready:
             prepared = finalize_evaluation_basis(readiness, None)
             transition = _final_transition(request, prepared.basis, witness)
+            trusted_transition = transition
             if transition.kind == "UNCHANGED":
                 return PlanReevaluateResponseV1(
                     transition=transition,
@@ -409,6 +410,7 @@ def reevaluate_plan(
 
         prepared = finalize_evaluation_basis(readiness, planning)
         transition = _final_transition(request, prepared.basis, witness)
+        trusted_transition = transition
         if transition.kind == "UNCHANGED":
             return PlanReevaluateResponseV1(
                 transition=transition,
