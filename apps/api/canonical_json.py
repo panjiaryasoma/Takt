@@ -1,4 +1,4 @@
-"""RFC 8785-compatible canonical JSON for public wire fingerprints."""
+"""Deterministic JCS/I-JSON subset for public wire fingerprints."""
 
 from __future__ import annotations
 
@@ -32,12 +32,16 @@ def _serialize_number(value: int | float) -> str:
     if isinstance(value, int):
         if abs(value) > _MAX_SAFE_INTEGER:
             raise CanonicalJsonError(
-                "integer exceeds the exact IEEE 754 safe-integer range"
+                "integral number exceeds the exact IEEE 754 safe-integer range"
             )
         value = float(value)
 
     if not math.isfinite(value):
         raise CanonicalJsonError("non-finite float is not valid JSON")
+    if value.is_integer() and abs(value) > _MAX_SAFE_INTEGER:
+        raise CanonicalJsonError(
+            "integral number exceeds the exact IEEE 754 safe-integer range"
+        )
     if value == 0:
         return "0"
 
