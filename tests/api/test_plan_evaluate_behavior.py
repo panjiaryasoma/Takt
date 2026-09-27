@@ -20,7 +20,7 @@ from apps.api.contracts import (
 )
 from apps.api.fingerprints import report_wire_fingerprint
 from apps.api.main import app
-from engine.integration.plan_evaluation import (
+from apps.api.services.plan_evaluation import (
     PlanEvaluationIndeterminateError,
     evaluate_plan,
     planning_cutoff,

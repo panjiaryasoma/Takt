@@ -7,7 +7,7 @@ from apps.api.contracts import (
     CanonicalReportRefV1,
 )
 from apps.api.fingerprints import report_wire_fingerprint
-from engine.integration.plan_evaluation import verify_report_bundle
+from apps.api.services.plan_evaluation import verify_report_bundle
 from packages.contracts import (
     CanonicalCompetitionReport,
     CanonicalField,

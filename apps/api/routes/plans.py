@@ -4,7 +4,7 @@ from fastapi import APIRouter
 
 from apps.api.contracts import PlanEvaluateRequestV1, PlanEvaluateResponseV1
 from apps.api.errors import ApiContractError
-from engine.integration.plan_evaluation import (
+from apps.api.services.plan_evaluation import (
     PlanEvaluationIndeterminateError,
     PlanEvaluationInputError,
     PlanEvaluationInvariantError,

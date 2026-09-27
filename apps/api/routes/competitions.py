@@ -33,13 +33,13 @@ from engine.extraction import (
     SourceLimitExceededError,
     UnsupportedMediaTypeError,
 )
-from engine.integration.competition_api import (
+from apps.api.services.competition_analysis import (
     AnalysisInvariantError,
     AnalysisReconciliationError,
     analyze_pdf,
     analyze_url,
 )
-from engine.integration.plan_evaluation import (
+from apps.api.services.plan_evaluation import (
     ReportBundleError,
     UnsupportedReportContractError,
 )
