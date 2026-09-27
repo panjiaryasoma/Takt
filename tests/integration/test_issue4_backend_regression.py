@@ -9,6 +9,7 @@ from uuid import UUID
 import httpx
 from fastapi.testclient import TestClient
 
+import apps.api.routes.plans as plans_route
 import apps.api.services.competition_analysis as competition_analysis_service
 from apps.api.contracts import (
     CanonicalReportBundleV1,
@@ -464,8 +465,6 @@ def test_issue4_infeasible_path_regression(monkeypatch) -> None:
         _bundle(_canonical_report()),
         effort_minutes=200,
     )
-    import apps.api.routes.plans as plans_route
-
     real_evaluate = evaluate_plan
 
     def deterministic(value: PlanEvaluateRequestV1):
