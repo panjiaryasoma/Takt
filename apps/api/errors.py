@@ -1,8 +1,9 @@
-"""Stable public error envelope and FastAPI exception handlers."""
+"""Stable public error envelopes and FastAPI exception handlers."""
 
 from __future__ import annotations
 
 from collections.abc import Iterable
+from dataclasses import dataclass
 
 from fastapi import Request
 from fastapi.encoders import jsonable_encoder
@@ -13,6 +14,19 @@ from apps.api.contracts import (
     ApiErrorBodyV1,
     ApiErrorDetailV1,
     ApiErrorResponseV1,
+    PlanReevaluateErrorResponseV1,
+    ReevaluationTransitionV1,
+)
+from apps.api.services.plan_evaluation import (
+    PlanEvaluationAvailabilityError,
+    PlanEvaluationExecutionError,
+    PlanEvaluationIndeterminateError,
+    PlanEvaluationInputError,
+    PlanEvaluationInvariantError,
+    PlanEvaluationRuntimeError,
+    PlanEvaluationSolverExecutionError,
+    ReportBundleError,
+    UnsupportedReportContractError,
 )
 
 
@@ -34,6 +48,109 @@ class ApiContractError(Exception):
         self.public_message = message
         self.stage = stage
         self.details = tuple(details)
+
+
+class PlanReevaluateContractError(ApiContractError):
+    """Public re-evaluation failure with optional trusted stale transition."""
+
+    def __init__(
+        self,
+        *,
+        status_code: int,
+        code: str,
+        message: str,
+        stage: str,
+        transition: ReevaluationTransitionV1 | None,
+        details: Iterable[ApiErrorDetailV1] = (),
+    ) -> None:
+        super().__init__(
+            status_code=status_code,
+            code=code,
+            message=message,
+            stage=stage,
+            details=details,
+        )
+        self.transition = transition
+
+
+@dataclass(frozen=True, slots=True)
+class PlanFailureContract:
+    status_code: int
+    code: str
+    message: str
+    stage: str
+
+
+def classify_plan_failure(exc: Exception) -> PlanFailureContract:
+    if isinstance(exc, UnsupportedReportContractError):
+        return PlanFailureContract(
+            422,
+            "UNSUPPORTED_REPORT_CONTRACT",
+            "Canonical report contract or policy version is not supported.",
+            "report",
+        )
+    if isinstance(exc, ReportBundleError):
+        return PlanFailureContract(
+            422,
+            "REPORT_BUNDLE_INVALID",
+            "Canonical report bundle failed integrity validation.",
+            "report",
+        )
+    if isinstance(exc, PlanEvaluationInputError):
+        return PlanFailureContract(
+            422,
+            "PLANNING_INPUT_INVALID",
+            "Evaluation input cannot be used by the planning pipeline.",
+            "evaluation",
+        )
+    if isinstance(exc, PlanEvaluationIndeterminateError):
+        return PlanFailureContract(
+            503,
+            "SOLVER_INDETERMINATE",
+            "The solver could not determine a planning result.",
+            "solver",
+        )
+    if isinstance(exc, PlanEvaluationAvailabilityError):
+        return PlanFailureContract(
+            500,
+            "AVAILABILITY_EXECUTION_FAILED",
+            "Availability preparation could not complete.",
+            "availability",
+        )
+    if isinstance(exc, PlanEvaluationSolverExecutionError):
+        return PlanFailureContract(
+            500,
+            "SOLVER_EXECUTION_FAILED",
+            "The solver could not complete execution.",
+            "solver",
+        )
+    if isinstance(exc, PlanEvaluationRuntimeError):
+        return PlanFailureContract(
+            500,
+            "PLANNING_RUNTIME_UNAVAILABLE",
+            "A required planning runtime dependency is unavailable.",
+            "planning",
+        )
+    if isinstance(exc, PlanEvaluationExecutionError):
+        return PlanFailureContract(
+            500,
+            "PLANNING_EXECUTION_FAILED",
+            "The planning pipeline could not complete execution.",
+            "planning",
+        )
+    if isinstance(exc, PlanEvaluationInvariantError):
+        return PlanFailureContract(
+            500,
+            "EVALUATION_INVARIANT_FAILED",
+            "The server produced inconsistent evaluation artifacts.",
+            "evaluation",
+        )
+    return PlanFailureContract(
+        500,
+        "INTERNAL_ERROR",
+        "The server could not complete the request.",
+        "internal",
+    )
 
 
 def _clean_loc(loc: tuple[object, ...]) -> tuple[object, ...]:
@@ -95,6 +212,12 @@ def validation_contract(
 ) -> tuple[str, str, str]:
     items = tuple(errors)
     types = {str(item.get("type", "")) for item in items}
+    if "unsupported_reevaluation_contract" in types:
+        return (
+            "UNSUPPORTED_REEVALUATION_CONTRACT",
+            "Prior evaluation basis structural version is not supported.",
+            "reevaluation",
+        )
     if "unsupported_report_contract" in types:
         return (
             "UNSUPPORTED_REPORT_CONTRACT",
@@ -120,6 +243,21 @@ def validation_contract(
     return ("VALIDATION_ERROR", "Request validation failed.", "validation")
 
 
+def _api_payload(
+    *,
+    code: str,
+    message: str,
+    stage: str,
+    details: tuple[ApiErrorDetailV1, ...] = (),
+) -> ApiErrorBodyV1:
+    return ApiErrorBodyV1(
+        code=code,
+        message=message,
+        stage=stage,
+        details=details,
+    )
+
+
 def _response(
     *,
     status_code: int,
@@ -129,12 +267,36 @@ def _response(
     details: tuple[ApiErrorDetailV1, ...] = (),
 ) -> JSONResponse:
     payload = ApiErrorResponseV1(
-        error=ApiErrorBodyV1(
+        error=_api_payload(
             code=code,
             message=message,
             stage=stage,
             details=details,
         )
+    )
+    return JSONResponse(
+        status_code=status_code,
+        content=payload.model_dump(mode="json", warnings=False),
+    )
+
+
+def _reevaluation_response(
+    *,
+    status_code: int,
+    code: str,
+    message: str,
+    stage: str,
+    transition: ReevaluationTransitionV1 | None,
+    details: tuple[ApiErrorDetailV1, ...] = (),
+) -> JSONResponse:
+    payload = PlanReevaluateErrorResponseV1(
+        error=_api_payload(
+            code=code,
+            message=message,
+            stage=stage,
+            details=details,
+        ),
+        transition=transition,
     )
     return JSONResponse(
         status_code=status_code,
@@ -156,6 +318,21 @@ async def api_contract_error_handler(
     )
 
 
+async def reevaluation_contract_error_handler(
+    request: Request,
+    exc: PlanReevaluateContractError,
+) -> JSONResponse:
+    del request
+    return _reevaluation_response(
+        status_code=exc.status_code,
+        code=exc.code,
+        message=exc.public_message,
+        stage=exc.stage,
+        transition=exc.transition,
+        details=exc.details,
+    )
+
+
 async def request_validation_error_handler(
     request: Request,
     exc: RequestValidationError,
@@ -171,12 +348,22 @@ async def request_validation_error_handler(
         errors,
         request_path=request.url.path,
     )
+    details = validation_details(errors)
+    if request.url.path == "/api/v1/plans/re-evaluate":
+        return _reevaluation_response(
+            status_code=422,
+            code=code,
+            message=message,
+            stage=stage,
+            transition=None,
+            details=details,
+        )
     return _response(
         status_code=422,
         code=code,
         message=message,
         stage=stage,
-        details=validation_details(errors),
+        details=details,
     )
 
 
@@ -184,7 +371,15 @@ async def unhandled_error_handler(
     request: Request,
     exc: Exception,
 ) -> JSONResponse:
-    del request, exc
+    del exc
+    if request.url.path == "/api/v1/plans/re-evaluate":
+        return _reevaluation_response(
+            status_code=500,
+            code="INTERNAL_ERROR",
+            message="The server could not complete the request.",
+            stage="internal",
+            transition=None,
+        )
     return _response(
         status_code=500,
         code="INTERNAL_ERROR",
