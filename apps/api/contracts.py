@@ -464,7 +464,7 @@ class PlanEvaluateResponseV1(ApiModel):
 class ApiErrorDetailV1(ApiModel):
     path: NonEmptyStr
     message: NonEmptyStr
-    type: NonEmptyStr | None = None
+    code: NonEmptyStr
 
 
 class ApiErrorBodyV1(ApiModel):
