@@ -12,6 +12,9 @@ class CanonicalJsonError(ValueError):
     """Raised when material cannot be represented by the supported JCS/I-JSON subset."""
 
 
+_MAX_SAFE_INTEGER = (1 << 53) - 1
+
+
 def _validate_unicode(value: str) -> None:
     if any(0xD800 <= ord(char) <= 0xDFFF for char in value):
         raise CanonicalJsonError("lone UTF-16 surrogate is not valid I-JSON text")
@@ -27,12 +30,11 @@ def _serialize_number(value: int | float) -> str:
         raise TypeError("bool is not a numeric JCS value")
 
     if isinstance(value, int):
-        try:
-            value = float(value)
-        except OverflowError as exc:
+        if abs(value) > _MAX_SAFE_INTEGER:
             raise CanonicalJsonError(
-                "integer cannot be represented as an IEEE 754 double"
-            ) from exc
+                "integer exceeds the exact IEEE 754 safe-integer range"
+            )
+        value = float(value)
 
     if not math.isfinite(value):
         raise CanonicalJsonError("non-finite float is not valid JSON")
