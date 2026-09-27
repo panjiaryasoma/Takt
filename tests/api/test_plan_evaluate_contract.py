@@ -18,7 +18,8 @@ from apps.api.contracts import (
     ReadinessContextV1,
     ReadinessUserContextV1,
 )
-from apps.api.fingerprints import jcs_dumps, report_wire_fingerprint
+from apps.api.canonical_json import CanonicalJsonError, jcs_dumps
+from apps.api.fingerprints import report_wire_fingerprint
 from apps.api.main import app
 from engine.integration.plan_evaluation import (
     ReportBundleError,
@@ -187,3 +188,34 @@ def test_unsupported_report_contract_is_distinct_from_bundle_mismatch() -> None:
     )
     with pytest.raises(ReportBundleError):
         verify_report_bundle(mismatched)
+
+
+def test_raw_wire_fingerprint_is_checked_before_pydantic_coercion() -> None:
+    payload = _request().model_dump(mode="json")
+    payload["report_bundle"]["report"]["report_version"] = 3.0
+
+    response = TestClient(app).post("/api/v1/plans/evaluate", json=payload)
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "REPORT_BUNDLE_INVALID"
+
+
+def test_unsupported_schema_uses_public_contract_error_code() -> None:
+    payload = _request().model_dump(mode="json")
+    payload["report_bundle"]["ref"]["domain_schema_version"] = "99.0.0"
+
+    response = TestClient(app).post("/api/v1/plans/evaluate", json=payload)
+
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "UNSUPPORTED_REPORT_CONTRACT"
+
+
+def test_jcs_rejects_lone_surrogate_object_key_cleanly() -> None:
+    with pytest.raises(CanonicalJsonError):
+        jcs_dumps({"\ud800": "invalid"})
+
+
+def test_jcs_number_serialization_matches_rfc8785_examples() -> None:
+    value = [333333333.33333329, 1e30, 4.50, 2e-3, 1e-27]
+
+    assert jcs_dumps(value) == "[333333333.3333333,1e+30,4.5,0.002,1e-27]"

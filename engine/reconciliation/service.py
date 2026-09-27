@@ -331,6 +331,10 @@ def assemble_canonical_report(
             "previous_material_fingerprint requires previous_report"
         )
     if previous_material_fingerprint is not None:
+        if not isinstance(previous_material_fingerprint, str):
+            raise ReconciliationInputError(
+                "previous_material_fingerprint must be a SHA-256 hex digest"
+            )
         normalized_previous_fingerprint = previous_material_fingerprint.strip().lower()
         if len(normalized_previous_fingerprint) != 64:
             raise ReconciliationInputError(

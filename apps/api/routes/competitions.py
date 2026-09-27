@@ -14,7 +14,11 @@ from apps.api.contracts import (
     CompetitionAnalyzeResponseV1,
     CompetitionAnalyzeUrlRequestV1,
 )
-from apps.api.errors import ApiContractError
+from apps.api.errors import (
+    ApiContractError,
+    validation_contract,
+    validation_details,
+)
 from engine.extraction import (
     MAX_SOURCE_BYTES,
     CandidateNormalizationError,
@@ -42,24 +46,6 @@ from engine.integration.plan_evaluation import (
 )
 
 router = APIRouter(tags=["competitions"])
-
-
-def _validation_details(exc: ValidationError) -> tuple[ApiErrorDetailV1, ...]:
-    details = []
-    for item in exc.errors():
-        loc = tuple(item.get("loc", ()))
-        path = "/" + "/".join(
-            str(part).replace("~", "~0").replace("/", "~1")
-            for part in loc
-        )
-        details.append(
-            ApiErrorDetailV1(
-                path=path or "/",
-                message=str(item.get("msg", "Invalid value.")),
-                type=str(item.get("type")) if item.get("type") else None,
-            )
-        )
-    return tuple(details)
 
 
 def _raise_analysis_error(exc: Exception) -> None:
@@ -227,13 +213,17 @@ async def analyze_pdf_route(request: Request) -> CompetitionAnalyzeResponseV1:
         decoded = json.loads(metadata_raw)
         metadata = CompetitionAnalyzePdfMetadataV1.model_validate(decoded)
     except (json.JSONDecodeError, ValidationError) as exc:
-        details = _validation_details(exc) if isinstance(exc, ValidationError) else ()
+        errors = tuple(exc.errors()) if isinstance(exc, ValidationError) else ()
+        code, message, stage = validation_contract(
+            errors,
+            request_path="/api/v1/competitions/analyze/pdf",
+        )
         raise ApiContractError(
             status_code=422,
-            code="VALIDATION_ERROR",
-            message="PDF analysis metadata validation failed.",
-            stage="validation",
-            details=details,
+            code=code,
+            message=message,
+            stage=stage,
+            details=validation_details(errors),
         ) from exc
 
     content = await upload.read(MAX_SOURCE_BYTES + 1)

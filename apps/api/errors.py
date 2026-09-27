@@ -35,18 +35,67 @@ class ApiContractError(Exception):
         self.details = tuple(details)
 
 
-def _json_pointer(loc: tuple[object, ...]) -> str:
-    parts = list(loc)
+def _clean_loc(loc: tuple[object, ...]) -> tuple[object, ...]:
+    parts = tuple(loc)
     if parts and parts[0] in {"body", "query", "path", "header", "cookie"}:
-        parts = parts[1:]
+        return parts[1:]
+    return parts
+
+
+def json_pointer(loc: tuple[object, ...]) -> str:
+    parts = _clean_loc(loc)
     if not parts:
         return "/"
-
-    encoded = []
-    for item in parts:
-        token = str(item).replace("~", "~0").replace("/", "~1")
-        encoded.append(token)
+    encoded = [
+        str(item).replace("~", "~0").replace("/", "~1")
+        for item in parts
+    ]
     return "/" + "/".join(encoded)
+
+
+def validation_details(
+    errors: Iterable[dict[str, object]],
+) -> tuple[ApiErrorDetailV1, ...]:
+    return tuple(
+        ApiErrorDetailV1(
+            path=json_pointer(tuple(item.get("loc", ()))),
+            message=str(item.get("msg", "Invalid value.")),
+            type=str(item.get("type")) if item.get("type") else None,
+        )
+        for item in errors
+    )
+
+
+def validation_contract(
+    errors: Iterable[dict[str, object]],
+    *,
+    request_path: str,
+) -> tuple[str, str, str]:
+    items = tuple(errors)
+    types = {str(item.get("type", "")) for item in items}
+    if "unsupported_report_contract" in types:
+        return (
+            "UNSUPPORTED_REPORT_CONTRACT",
+            "Canonical report contract or policy version is not supported.",
+            "report",
+        )
+    if "report_bundle_invalid" in types:
+        return (
+            "REPORT_BUNDLE_INVALID",
+            "Canonical report bundle failed integrity validation.",
+            "report",
+        )
+
+    if request_path.startswith("/api/v1/competitions/analyze/") and items:
+        locations = [_clean_loc(tuple(item.get("loc", ()))) for item in items]
+        if all(location and location[0] == "source" for location in locations):
+            return (
+                "SOURCE_METADATA_INVALID",
+                "Source metadata validation failed.",
+                "ingestion",
+            )
+
+    return ("VALIDATION_ERROR", "Request validation failed.", "validation")
 
 
 def _response(
@@ -89,21 +138,17 @@ async def request_validation_error_handler(
     request: Request,
     exc: RequestValidationError,
 ) -> JSONResponse:
-    del request
-    details = tuple(
-        ApiErrorDetailV1(
-            path=_json_pointer(tuple(item.get("loc", ()))),
-            message=str(item.get("msg", "Invalid value.")),
-            type=str(item.get("type")) if item.get("type") else None,
-        )
-        for item in exc.errors()
+    errors = tuple(exc.errors())
+    code, message, stage = validation_contract(
+        errors,
+        request_path=request.url.path,
     )
     return _response(
         status_code=422,
-        code="VALIDATION_ERROR",
-        message="Request validation failed.",
-        stage="validation",
-        details=details,
+        code=code,
+        message=message,
+        stage=stage,
+        details=validation_details(errors),
     )
 
 

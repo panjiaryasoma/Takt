@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hmac
 from typing import Annotated, Any, Literal
 from uuid import UUID
 
@@ -16,13 +17,15 @@ from pydantic import (
     model_validator,
 )
 
+from pydantic_core import PydanticCustomError
+
+from apps.api.canonical_json import CanonicalJsonError, jcs_sha256
 from packages.contracts import (
     AvailabilityInput,
     CanonicalCompetitionReport,
     FeasibilityStatus,
     ReadinessStatus,
     ReadinessTriage,
-    Recommendation,
     RecommendationAction,
     SourceRecord,
     SourceType,
@@ -60,7 +63,7 @@ class ApiModel(BaseModel):
 
 
 class CanonicalReportRefV1(ApiModel):
-    domain_schema_version: Literal["3.0.0"] = DOMAIN_SCHEMA_VERSION
+    domain_schema_version: NonEmptyStr = DOMAIN_SCHEMA_VERSION
     competition_id: NonEmptyStr
     report_version: StrictInt = Field(ge=1)
     reconciliation_policy_version: NonEmptyStr = RECONCILIATION_POLICY_VERSION
@@ -73,6 +76,78 @@ class CanonicalReportRefV1(ApiModel):
 class CanonicalReportBundleV1(ApiModel):
     report: CanonicalCompetitionReport
     ref: CanonicalReportRefV1
+
+    @model_validator(mode="before")
+    @classmethod
+    def verify_raw_wire_bundle(cls, value: Any) -> Any:
+        """Verify raw parsed JSON before Pydantic can coerce wire values."""
+
+        if not isinstance(value, dict):
+            return value
+        report = value.get("report")
+        ref = value.get("ref")
+        if not isinstance(report, dict) or not isinstance(ref, dict):
+            return value
+
+        supported = {
+            "domain_schema_version": DOMAIN_SCHEMA_VERSION,
+            "reconciliation_policy_version": RECONCILIATION_POLICY_VERSION,
+            "assembly_policy_version": ASSEMBLY_POLICY_VERSION,
+            "wire_fingerprint_version": REPORT_WIRE_FINGERPRINT_VERSION,
+        }
+        actual = {key: ref.get(key) for key in supported}
+        if actual != supported:
+            raise PydanticCustomError(
+                "unsupported_report_contract",
+                "Canonical report contract or policy version is not supported.",
+            )
+
+        if ref.get("competition_id") != report.get("competition_id"):
+            raise PydanticCustomError(
+                "report_bundle_invalid",
+                "Canonical report reference competition_id does not match report.",
+            )
+        if ref.get("report_version") != report.get("report_version"):
+            raise PydanticCustomError(
+                "report_bundle_invalid",
+                "Canonical report reference report_version does not match report.",
+            )
+
+        wire_fingerprint = ref.get("wire_fingerprint")
+        assembly_fingerprint = ref.get("assembly_material_fingerprint")
+        for fingerprint in (wire_fingerprint, assembly_fingerprint):
+            if (
+                not isinstance(fingerprint, str)
+                or len(fingerprint) != 64
+                or fingerprint != fingerprint.lower()
+            ):
+                raise PydanticCustomError(
+                    "report_bundle_invalid",
+                    "Canonical report bundle contains an invalid fingerprint.",
+                )
+            try:
+                int(fingerprint, 16)
+            except ValueError as exc:
+                raise PydanticCustomError(
+                    "report_bundle_invalid",
+                    "Canonical report bundle contains an invalid fingerprint.",
+                ) from exc
+
+        ref_material = dict(ref)
+        ref_material.pop("wire_fingerprint", None)
+        try:
+            expected = jcs_sha256({"report": report, "ref": ref_material})
+        except CanonicalJsonError as exc:
+            raise PydanticCustomError(
+                "report_bundle_invalid",
+                "Canonical report bundle cannot be canonicalized.",
+            ) from exc
+        if not hmac.compare_digest(expected, wire_fingerprint):
+            raise PydanticCustomError(
+                "report_bundle_invalid",
+                "Canonical report bundle failed wire fingerprint validation.",
+            )
+        return value
 
 
 class ReadinessUserContextV1(ApiModel):
@@ -148,10 +223,50 @@ class CandidateRefV1(ApiModel):
     candidate_id: NonEmptyStr
 
 
+class RecommendedNextWorkV1(ApiModel):
+    task_id: NonEmptyStr
+    task_name: NonEmptyStr
+    start: AwareDatetime
+    end: AwareDatetime
+    allocated_minutes: StrictInt = Field(gt=0)
+    availability_source: NonEmptyStr
+
+
+class SuggestedWorkWindowV1(ApiModel):
+    task_id: NonEmptyStr
+    start: AwareDatetime
+    end: AwareDatetime
+    allocated_minutes: StrictInt = Field(gt=0)
+    availability_source: NonEmptyStr
+
+
+class RecommendationAlternativeV1(ApiModel):
+    candidate_id: NonEmptyStr
+    buffer_minutes: StrictInt = Field(ge=0)
+    recommended_next_work: RecommendedNextWorkV1 | None
+    suggested_windows: tuple[SuggestedWorkWindowV1, ...]
+    tradeoffs: tuple[NonEmptyStr, ...]
+
+
+class RecommendationAssumptionV1(ApiModel):
+    task_id: NonEmptyStr | None = None
+    description: NonEmptyStr
+
+
+class RecommendationV1(ApiModel):
+    recommended_candidate_id: NonEmptyStr
+    recommended_next_work: RecommendedNextWorkV1 | None
+    suggested_windows: tuple[SuggestedWorkWindowV1, ...]
+    alternatives: tuple[RecommendationAlternativeV1, ...] = ()
+    rationale: tuple[NonEmptyStr, ...]
+    tradeoffs: tuple[NonEmptyStr, ...]
+    assumptions: tuple[RecommendationAssumptionV1, ...]
+
+
 class RecommendationSetV1(ApiModel):
     primary_candidate: CandidateRefV1
     alternative_candidates: tuple[CandidateRefV1, ...] = ()
-    recommendation: Recommendation
+    recommendation: RecommendationV1
     allowed_actions: tuple[RecommendationAction, ...]
 
     @model_validator(mode="after")

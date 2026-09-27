@@ -24,15 +24,12 @@ from apps.api.contracts import (
     PlanningBasisV1,
     PlanningDecisionV1,
     RecommendationSetV1,
+    RecommendationV1,
     ReadinessBasisV1,
     ReportBasisV1,
 )
-from apps.api.fingerprints import (
-    CanonicalJsonError,
-    canonical_utc,
-    jcs_sha256,
-    report_wire_fingerprint,
-)
+from apps.api.canonical_json import CanonicalJsonError, jcs_sha256
+from apps.api.fingerprints import canonical_utc, report_wire_fingerprint
 from engine.availability import build_availability
 from engine.feasibility.service import (
     FeasibilityExecutionError,
@@ -52,7 +49,6 @@ from engine.recommendation import (
     RecommendationInvariantError,
     RecommendationTraceContext,
     build_recommendation,
-    materialize_public_recommendation,
 )
 from engine.scheduler import SolverConfig
 from engine.triage.scope import ResolvedEligibilityScope
@@ -604,8 +600,11 @@ def evaluate_plan(
     recommendation_set = None
     if assembly.recommendation_payload is not None:
         try:
-            recommendation = materialize_public_recommendation(
-                assembly.recommendation_payload
+            recommendation = RecommendationV1.model_validate(
+                assembly.recommendation_payload.model_dump(
+                    mode="python",
+                    warnings=False,
+                )
             )
             if assembly.primary_candidate_id is None:
                 raise PlanEvaluationInvariantError(
