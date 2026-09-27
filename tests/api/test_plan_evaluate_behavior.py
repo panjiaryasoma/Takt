@@ -6,7 +6,6 @@ import json
 from datetime import UTC, datetime
 from uuid import UUID
 
-import pytest
 from fastapi.testclient import TestClient
 
 import apps.api.routes.plans as plans_route
@@ -313,3 +312,43 @@ def test_public_response_does_not_leak_internal_feasibility_artifacts() -> None:
         "source_feasibility_status",
     ):
         assert internal_name not in payload
+
+
+def test_readiness_fingerprint_ignores_clock_changes_with_same_open_decision() -> None:
+    request = _request(effort_minutes=60)
+    morning = lambda: datetime(2026, 9, 27, 10, 0, tzinfo=UTC)
+    later = lambda: datetime(2026, 9, 27, 11, 0, tzinfo=UTC)
+
+    first = evaluate_plan(
+        request,
+        clock=morning,
+        evaluation_id_factory=_id_one,
+    )
+    second = evaluate_plan(
+        request,
+        clock=later,
+        evaluation_id_factory=_id_two,
+    )
+
+    assert first.readiness.status is ReadinessStatus.READY_TO_EVALUATE
+    assert second.readiness.status is ReadinessStatus.READY_TO_EVALUATE
+    assert (
+        first.basis.readiness.basis_fingerprint
+        == second.basis.readiness.basis_fingerprint
+    )
+
+
+def test_server_clock_after_deadline_blocks_before_planning() -> None:
+    after_deadline = lambda: datetime(2026, 10, 1, 0, 0, tzinfo=UTC)
+
+    result = evaluate_plan(
+        _request(effort_minutes=60),
+        clock=after_deadline,
+        evaluation_id_factory=_id_one,
+    )
+
+    assert result.evaluation_id == _id_one()
+    assert result.evaluated_at == after_deadline()
+    assert result.readiness.status is ReadinessStatus.DEADLINE_PASSED
+    assert result.planning is None
+    assert result.basis.planning is None

@@ -19,6 +19,7 @@ from apps.api.contracts import (
 )
 from apps.api.fingerprints import report_wire_fingerprint
 from engine.extraction import (
+    OCRProvider,
     SnapshotExtractionResult,
     SourceContext,
     create_pdf_snapshot,
@@ -240,6 +241,8 @@ def analyze_url(
 def analyze_pdf(
     metadata: CompetitionAnalyzePdfMetadataV1,
     content: bytes,
+    *,
+    ocr_provider: OCRProvider | None = None,
 ) -> CompetitionAnalyzeResponseV1:
     previous = _previous_report(
         competition_id=metadata.competition_id,
@@ -250,7 +253,7 @@ def analyze_pdf(
         content,
         context=_source_context(metadata.source),
     )
-    result = extract_snapshot(snapshot)
+    result = extract_snapshot(snapshot, ocr_provider=ocr_provider)
     return _response(
         competition_id=metadata.competition_id,
         results=(result,),
