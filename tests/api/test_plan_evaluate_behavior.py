@@ -1543,3 +1543,44 @@ def test_malformed_whole_request_never_uses_changed_current_subtree_for_stale() 
     body = response.json()
     assert body["error"]["code"] == "VALIDATION_ERROR"
     assert body["transition"] is None
+
+
+def test_passage_of_time_can_supersede_ready_evaluation_without_input_edit() -> None:
+    request, _ = _prior_request()
+    after_deadline = lambda: datetime(2026, 10, 1, 0, 0, tzinfo=UTC)
+
+    result = reevaluate_plan(
+        request,
+        clock=after_deadline,
+        evaluation_id_factory=_id_two,
+    )
+
+    assert result.transition.kind == "SUPERSEDED"
+    assert result.transition.change_reasons == ("READINESS_BASIS_CHANGED",)
+    assert result.evaluation is not None
+    assert result.evaluation.evaluation_id == _id_two()
+    assert result.evaluation.readiness.status is ReadinessStatus.DEADLINE_PASSED
+    assert result.evaluation.planning is None
+    assert result.evaluation.basis.planning is None
+
+
+def test_unhandled_route_error_still_uses_reevaluate_error_envelope(
+    monkeypatch,
+) -> None:
+    request, _ = _prior_request()
+
+    def explode(_request):
+        raise RuntimeError("route-level surprise")
+
+    monkeypatch.setattr(plans_route, "reevaluate_plan", explode)
+    with TestClient(app, raise_server_exceptions=False) as client:
+        response = client.post(
+            "/api/v1/plans/re-evaluate",
+            json=request.model_dump(mode="json", warnings=False),
+        )
+
+    assert response.status_code == 500
+    body = response.json()
+    assert body["error"]["code"] == "INTERNAL_ERROR"
+    assert body["transition"] is None
+    assert "route-level surprise" not in json.dumps(body)
