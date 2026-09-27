@@ -44,6 +44,10 @@ class ReevaluationContextInvalid(ValueError):
     """Trusted comparison context is internally inconsistent."""
 
 
+class ReevaluationComparisonInvariant(PlanEvaluationInvariantError):
+    """Component reasons and full deterministic fingerprint disagree."""
+
+
 class ReevaluationExecutionFailure(Exception):
     """Carry a downstream failure together with already-proven freshness."""
 
@@ -272,7 +276,7 @@ def _final_transition(
 ) -> ReevaluationTransitionV1:
     changed = current_basis.fingerprint != request.prior.basis.fingerprint
     if changed != witness.established:
-        raise PlanEvaluationInvariantError(
+        raise ReevaluationComparisonInvariant(
             "evaluation fingerprint and component change reasons disagree"
         )
     if not changed:
@@ -289,14 +293,13 @@ def _final_transition(
         current_basis_fingerprint=current_basis.fingerprint,
     )
     if transition is None:
-        raise PlanEvaluationInvariantError(
+        raise ReevaluationComparisonInvariant(
             "changed evaluation basis requires stale witness"
         )
     return transition
 
 
 def _execute_success(
-    request: PlanReevaluateRequestV1,
     prepared: PreparedEvaluation,
     transition: ReevaluationTransitionV1,
     *,
@@ -371,7 +374,6 @@ def reevaluate_plan(
                     evaluation=None,
                 )
             return _execute_success(
-                request,
                 prepared,
                 transition,
                 evaluation_id_factory=evaluation_id_factory,
@@ -423,13 +425,12 @@ def reevaluate_plan(
         raise
     except ReevaluationExecutionFailure:
         raise
+    except ReevaluationComparisonInvariant as exc:
+        raise ReevaluationExecutionFailure(
+            cause=exc,
+            transition=None,
+        ) from exc
     except PlanEvaluationInvariantError as exc:
-        # A comparison/fingerprint contradiction is not trustworthy stale evidence.
-        if "fingerprint and component change reasons disagree" in str(exc):
-            raise ReevaluationExecutionFailure(
-                cause=exc,
-                transition=None,
-            ) from exc
         raise ReevaluationExecutionFailure(
             cause=exc,
             transition=trusted_transition,
