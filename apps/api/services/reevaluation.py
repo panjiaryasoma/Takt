@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hmac
 from dataclasses import dataclass
+from datetime import UTC, datetime
 from uuid import uuid4
 
 from apps.api.canonical_json import jcs_sha256
@@ -43,15 +44,23 @@ class ReevaluationContextInvalid(ValueError):
     """Trusted comparison context is internally inconsistent."""
 
 
-@dataclass(frozen=True, slots=True)
 class ReevaluationExecutionFailure(Exception):
     """Carry a downstream failure together with already-proven freshness."""
 
-    cause: Exception
-    transition: ReevaluationTransitionV1 | None
+    def __init__(
+        self,
+        *,
+        cause: Exception,
+        transition: ReevaluationTransitionV1 | None,
+    ) -> None:
+        super().__init__(str(cause))
+        self.cause = cause
+        self.transition = transition
 
-    def __post_init__(self) -> None:
-        Exception.__init__(self, str(self.cause))
+
+@dataclass(slots=True)
+def _utc_now() -> datetime:
+    return datetime.now(UTC)
 
 
 @dataclass(slots=True)
@@ -307,7 +316,7 @@ def _execute_success(
 def reevaluate_plan(
     request: PlanReevaluateRequestV1,
     *,
-    clock: Clock,
+    clock: Clock = _utc_now,
     evaluation_id_factory: EvaluationIdFactory = uuid4,
 ) -> PlanReevaluateResponseV1:
     """Compare semantic state first; execute only when the prior state is stale."""
