@@ -8,6 +8,7 @@ from decimal import Decimal
 from hashlib import sha256
 from typing import Any
 
+
 class CanonicalJsonError(ValueError):
     """Raised when material cannot be represented by the supported JCS/I-JSON subset."""
 
@@ -79,7 +80,7 @@ def _serialize_number(value: int | float) -> str:
 
 
 def jcs_dumps(value: Any) -> str:
-    """Serialize an I-JSON tree with RFC 8785 key ordering and number form."""
+    """Serialize the API's deterministic JCS/I-JSON subset."""
 
     if value is None:
         return "null"
