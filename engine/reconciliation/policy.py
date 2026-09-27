@@ -158,10 +158,10 @@ def _parse_nonempty_string_list(value: Any, *, field_name: str) -> tuple[str, ..
     return tuple(sorted(set(parsed)))
 
 
-def parse_authority(source: SourceRecord) -> AuthorityDescriptor:
-    """Validate the internal authority contract without numeric winner logic."""
-
-    metadata = source.authority_rank
+def _parse_authority_metadata(
+    source_type: SourceType,
+    metadata: Any,
+) -> AuthorityDescriptor:
     if not isinstance(metadata, dict):
         raise ReconciliationInputError("authority_rank must be an object")
 
@@ -177,7 +177,7 @@ def parse_authority(source: SourceRecord) -> AuthorityDescriptor:
             raise ReconciliationInputError(
                 f"unknown authority basis: {normalized_basis!r}"
             )
-        if normalized_basis != source.source_type.value:
+        if normalized_basis != source_type.value:
             raise ReconciliationInputError(
                 "authority basis must match SourceRecord.source_type"
             )
@@ -191,10 +191,16 @@ def parse_authority(source: SourceRecord) -> AuthorityDescriptor:
         )
 
     return AuthorityDescriptor(
-        source_type=source.source_type,
+        source_type=source_type,
         basis=normalized_basis,
         tier=tier,
     )
+
+
+def parse_authority(source: SourceRecord) -> AuthorityDescriptor:
+    """Validate the internal authority contract without numeric winner logic."""
+
+    return _parse_authority_metadata(source.source_type, source.authority_rank)
 
 
 def _parse_effective_at(value: Any) -> datetime | None:
@@ -215,14 +221,7 @@ def _parse_effective_at(value: Any) -> datetime | None:
     return parsed.astimezone(UTC)
 
 
-def parse_freshness(source: SourceRecord) -> FreshnessDescriptor:
-    """Validate the internal freshness/update contract.
-
-    Missing effective_at is valid-but-unknown. Malformed values are input errors.
-    retrieved_at is intentionally absent from this policy.
-    """
-
-    metadata = source.freshness_metadata
+def _parse_freshness_metadata(metadata: Any) -> FreshnessDescriptor:
     if not isinstance(metadata, dict):
         raise ReconciliationInputError("freshness_metadata must be an object")
 
@@ -250,6 +249,32 @@ def parse_freshness(source: SourceRecord) -> FreshnessDescriptor:
         update_kind=update_kind,
         applies_to_fields=applies_to_fields,
     )
+
+
+def parse_freshness(source: SourceRecord) -> FreshnessDescriptor:
+    """Validate the internal freshness/update contract.
+
+    Missing effective_at is valid-but-unknown. Malformed values are input errors.
+    retrieved_at is intentionally absent from this policy.
+    """
+
+    return _parse_freshness_metadata(source.freshness_metadata)
+
+
+def validate_source_policy_metadata(
+    *,
+    source_type: SourceType,
+    authority_rank: Any,
+    scope: Any,
+    freshness_metadata: Any,
+) -> None:
+    """Validate caller-owned source policy metadata using reconciliation truth."""
+
+    if not isinstance(source_type, SourceType):
+        raise ReconciliationInputError("source_type must be a SourceType")
+    parse_scope(scope)
+    _parse_authority_metadata(source_type, authority_rank)
+    _parse_freshness_metadata(freshness_metadata)
 
 
 def _json_key(value: Any) -> str:

@@ -4,6 +4,8 @@ from packages.contracts.enums import ReadinessStatus
 from packages.contracts.models import ReadinessTriage
 from packages.contracts.triage import ReadinessRequest
 
+READINESS_RULE_VERSION = "1.0"
+
 
 def evaluate_readiness(request: ReadinessRequest) -> ReadinessTriage:
     """Evaluasi readiness secara deterministik.
@@ -25,7 +27,7 @@ def evaluate_readiness(request: ReadinessRequest) -> ReadinessTriage:
                 for field in request.unresolved_critical_fields
             ],
             passed_checks=passed_checks,
-            rule_version="1.0",
+            rule_version=READINESS_RULE_VERSION,
         )
 
     # Deadline authoritative adalah critical field untuk readiness.
@@ -35,7 +37,7 @@ def evaluate_readiness(request: ReadinessRequest) -> ReadinessTriage:
             blocking_reasons=[],
             review_items=["submission_deadline_missing"],
             passed_checks=passed_checks,
-            rule_version="1.0",
+            rule_version=READINESS_RULE_VERSION,
         )
 
     # Deadline yang lewat hanya boleh diloloskan jika extension authoritative
@@ -49,7 +51,7 @@ def evaluate_readiness(request: ReadinessRequest) -> ReadinessTriage:
             blocking_reasons=["authoritative_submission_deadline_passed"],
             review_items=[],
             passed_checks=passed_checks,
-            rule_version="1.0",
+            rule_version=READINESS_RULE_VERSION,
         )
 
     passed_checks.append("deadline_valid")
@@ -61,7 +63,7 @@ def evaluate_readiness(request: ReadinessRequest) -> ReadinessTriage:
             blocking_reasons=[],
             review_items=["mandatory_competition_information_missing"],
             passed_checks=passed_checks,
-            rule_version="1.0",
+            rule_version=READINESS_RULE_VERSION,
         )
 
     rules = request.eligibility
@@ -75,7 +77,7 @@ def evaluate_readiness(request: ReadinessRequest) -> ReadinessTriage:
                 blocking_reasons=[],
                 review_items=["user_age_unknown"],
                 passed_checks=passed_checks,
-                rule_version="1.0",
+                rule_version=READINESS_RULE_VERSION,
             )
 
         if user.age < rules.minimum_age:
@@ -84,7 +86,7 @@ def evaluate_readiness(request: ReadinessRequest) -> ReadinessTriage:
                 blocking_reasons=["minimum_age_not_met"],
                 review_items=[],
                 passed_checks=passed_checks,
-                rule_version="1.0",
+                rule_version=READINESS_RULE_VERSION,
             )
 
         passed_checks.append("minimum_age_met")
@@ -96,7 +98,7 @@ def evaluate_readiness(request: ReadinessRequest) -> ReadinessTriage:
                 blocking_reasons=[],
                 review_items=["student_status_unknown"],
                 passed_checks=passed_checks,
-                rule_version="1.0",
+                rule_version=READINESS_RULE_VERSION,
             )
 
         if user.student_status is False:
@@ -105,7 +107,7 @@ def evaluate_readiness(request: ReadinessRequest) -> ReadinessTriage:
                 blocking_reasons=["student_status_requirement_not_met"],
                 review_items=[],
                 passed_checks=passed_checks,
-                rule_version="1.0",
+                rule_version=READINESS_RULE_VERSION,
             )
 
         passed_checks.append("student_status_met")
@@ -124,7 +126,7 @@ def evaluate_readiness(request: ReadinessRequest) -> ReadinessTriage:
                 blocking_reasons=[],
                 review_items=["user_country_unknown"],
                 passed_checks=passed_checks,
-                rule_version="1.0",
+                rule_version=READINESS_RULE_VERSION,
             )
 
         if user.country.strip().lower() not in normalized_regions:
@@ -133,7 +135,7 @@ def evaluate_readiness(request: ReadinessRequest) -> ReadinessTriage:
                 blocking_reasons=["region_requirement_not_met"],
                 review_items=[],
                 passed_checks=passed_checks,
-                rule_version="1.0",
+                rule_version=READINESS_RULE_VERSION,
             )
 
         passed_checks.append("region_eligible")
@@ -145,5 +147,5 @@ def evaluate_readiness(request: ReadinessRequest) -> ReadinessTriage:
         blocking_reasons=[],
         review_items=[],
         passed_checks=passed_checks,
-        rule_version="1.0",
+        rule_version=READINESS_RULE_VERSION,
     )

@@ -100,6 +100,7 @@ def build_canonical_report(
     competition_id: str,
     snapshot_results: Iterable[SnapshotExtractionResult],
     previous_report: CanonicalCompetitionReport | None = None,
+    previous_material_fingerprint: str | None = None,
 ) -> CanonicalReportAssemblyResult:
     """Compose 4c -> 4a -> 4b without inventing new field semantics."""
 
@@ -126,6 +127,7 @@ def build_canonical_report(
         field_results=field_results,
         snapshot_source_ids=snapshot_source_ids,
         previous_report=previous_report,
+        previous_material_fingerprint=previous_material_fingerprint,
         policy=CANONICAL_V1,
     )
 
@@ -335,6 +337,16 @@ def _resolve_eligibility_scope_validated(
         return None
 
     scope, rule = matches[0]
+    concrete_scope = [
+        (key, _normalized_scope_token(value))
+        for key, value in scope.items()
+        if isinstance(value, str)
+        and _normalized_scope_token(value)
+        and _normalized_scope_token(value) not in _SCOPE_WILDCARDS
+    ]
+    if len(concrete_scope) != 1:
+        return None
+    dimension, value = concrete_scope[0]
     return ResolvedEligibilityScope(
         selected_scope=selected_scope.strip(),
         effective_rule=rule,
@@ -343,6 +355,8 @@ def _resolve_eligibility_scope_validated(
             selected_scope=selected_scope.strip(),
             scope_material=scope,
         ),
+        canonical_dimension=dimension,
+        canonical_value=value,
     )
 
 

@@ -4,7 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from engine.triage.scope import ResolvedEligibilityScope
-from engine.triage.service import evaluate_readiness
+from engine.triage.service import READINESS_RULE_VERSION, evaluate_readiness
 from packages.contracts import ReadinessStatus, ReadinessTriage
 from packages.contracts.triage import EligibilityRule, ReadinessRequest, UserContext
 
@@ -140,7 +140,7 @@ def test_triage_001_through_007_acceptance(
     assert result.blocking_reasons == expected_blocking
     assert result.review_items == expected_review
     assert result.passed_checks == expected_passed
-    assert result.rule_version == "1.0"
+    assert result.rule_version == READINESS_RULE_VERSION
 
 
 def test_triage_008_scoped_category_rule() -> None:
@@ -186,7 +186,7 @@ def test_triage_008_scoped_category_rule() -> None:
         "student_status_met",
         "mandatory_information_complete",
     ]
-    assert result.rule_version == "1.0"
+    assert result.rule_version == READINESS_RULE_VERSION
 
 
 def test_resolved_scope_requires_traceable_provenance() -> None:
