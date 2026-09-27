@@ -53,6 +53,27 @@ def json_pointer(loc: tuple[object, ...]) -> str:
     return "/" + "/".join(encoded)
 
 
+def _public_validation_detail_code(error_type: object) -> str:
+    value = str(error_type or "")
+    if value == "missing":
+        return "REQUIRED"
+    if value == "extra_forbidden":
+        return "UNKNOWN_FIELD"
+    if (
+        value.endswith("_type")
+        or value in {
+            "bool_parsing",
+            "date_parsing",
+            "datetime_parsing",
+            "float_parsing",
+            "int_parsing",
+            "string_type",
+        }
+    ):
+        return "INVALID_TYPE"
+    return "INVALID_VALUE"
+
+
 def validation_details(
     errors: Iterable[dict[str, object]],
 ) -> tuple[ApiErrorDetailV1, ...]:
@@ -60,7 +81,7 @@ def validation_details(
         ApiErrorDetailV1(
             path=json_pointer(tuple(item.get("loc", ()))),
             message=str(item.get("msg", "Invalid value.")),
-            type=str(item.get("type")) if item.get("type") else None,
+            code=_public_validation_detail_code(item.get("type")),
         )
         for item in errors
     )
