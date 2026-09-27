@@ -304,6 +304,7 @@ def assemble_canonical_report(
     field_results: Iterable[FieldReconciliationResult],
     snapshot_source_ids: Iterable[str],
     previous_report: CanonicalCompetitionReport | None = None,
+    previous_material_fingerprint: str | None = None,
     policy: CanonicalAssemblyPolicy = CANONICAL_V1,
 ) -> CanonicalReportAssemblyResult:
     """Assemble a canonical report without invoking field reconciliation.
@@ -325,6 +326,24 @@ def assemble_canonical_report(
         if previous_report is not None
         else None
     )
+    if validated_previous is None and previous_material_fingerprint is not None:
+        raise ReconciliationInputError(
+            "previous_material_fingerprint requires previous_report"
+        )
+    if previous_material_fingerprint is not None:
+        normalized_previous_fingerprint = previous_material_fingerprint.strip().lower()
+        if len(normalized_previous_fingerprint) != 64:
+            raise ReconciliationInputError(
+                "previous_material_fingerprint must be a SHA-256 hex digest"
+            )
+        try:
+            int(normalized_previous_fingerprint, 16)
+        except ValueError as exc:
+            raise ReconciliationInputError(
+                "previous_material_fingerprint must be a SHA-256 hex digest"
+            ) from exc
+    else:
+        normalized_previous_fingerprint = None
 
     if (
         validated_previous is not None
@@ -354,7 +373,11 @@ def assemble_canonical_report(
         report_version = 1
         report_changed = True
     else:
-        previous_fingerprint = material_fingerprint(validated_previous)
+        previous_fingerprint = (
+            normalized_previous_fingerprint
+            if normalized_previous_fingerprint is not None
+            else material_fingerprint(validated_previous)
+        )
         report_changed = previous_fingerprint != provisional_fingerprint
         report_version = (
             validated_previous.report_version + 1
