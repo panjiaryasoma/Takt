@@ -11,6 +11,7 @@ import httpx
 from apps.api.contracts import (
     AnalysisProvenanceV1,
     RECONCILIATION_POLICY_VERSION,
+    REPORT_WIRE_FINGERPRINT_VERSION,
     CanonicalReportBundleV1,
     CanonicalReportRefV1,
     CompetitionAnalyzePdfMetadataV1,
@@ -308,7 +309,7 @@ def _report_bundle(
         assembly_policy_version=assembly.assembly_policy_version,
         assembly_material_fingerprint=assembly.material_fingerprint,
         source_set_fingerprint=source_set_fingerprint(artifacts),
-        wire_fingerprint_version="report-wire-jcs-sha256-v1",
+        wire_fingerprint_version=REPORT_WIRE_FINGERPRINT_VERSION,
         wire_fingerprint="0" * 64,
     )
     fingerprint = report_wire_fingerprint(assembly.report, initial_ref)
