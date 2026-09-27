@@ -33,6 +33,7 @@ from engine.feasibility.service import assess_feasibility_run
 from engine.integration.competition_analysis import build_readiness_request
 from engine.recommendation.service import build_recommendation
 from engine.reconciliation import reconcile_field
+from apps.api.services.plan_evaluation import evaluate_plan
 from engine.scheduler.models import SolverConfig
 from engine.scheduler.service import _MAX_CANDIDATES, solve_candidate_allocations
 from engine.triage.service import evaluate_readiness
@@ -43,7 +44,6 @@ from packages.contracts import (
     CanonicalCompetitionReport,
     CanonicalField,
     CanonicalFieldState,
-    EligibilityRule,
     EvidenceSpan,
     ExtractionPath,
     FeasibilityStatus,
@@ -488,18 +488,18 @@ def test_revenuecat_required_technology_is_competition_fact_not_entitlement() ->
 
 
 def test_solver_infeasible_remains_domain_result_without_tier_semantics() -> None:
-    request = _plan_request(effort_minutes=200)
-    payload = request.model_dump(mode="json", warnings=False)
-    response = TestClient(app).post(
-        "/api/v1/plans/evaluate",
-        json=payload,
+    result = evaluate_plan(
+        _plan_request(effort_minutes=200),
+        clock=lambda: datetime(2026, 9, 27, 13, 20, 17, tzinfo=UTC),
+        evaluation_id_factory=lambda: UUID(
+            "00000000-0000-4000-8000-000000000002"
+        ),
     )
 
-    assert response.status_code == 200
-    body = response.json()
+    assert result.planning is not None
     assert (
-        body["planning"]["feasibility"]
-        == FeasibilityStatus.NOT_FEASIBLE_UNDER_CURRENT_CONSTRAINTS.value
+        result.planning.feasibility
+        is FeasibilityStatus.NOT_FEASIBLE_UNDER_CURRENT_CONSTRAINTS
     )
 
 
