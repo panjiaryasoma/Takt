@@ -58,7 +58,6 @@ class ReevaluationExecutionFailure(Exception):
         self.transition = transition
 
 
-@dataclass(slots=True)
 def _utc_now() -> datetime:
     return datetime.now(UTC)
 
