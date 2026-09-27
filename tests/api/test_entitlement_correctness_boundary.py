@@ -18,8 +18,8 @@ from apps.api.contracts import (
     EvaluationBasisV1,
     PlanEvaluatePlanningV1,
     PlanEvaluateRequestV1,
-    PlanReevaluateRequestV1,
     PlanningBasisV1,
+    PlanReevaluateRequestV1,
     PriorEvaluationBasisSnapshotV1,
     PriorEvaluationV1,
     ReadinessBasisV1,
@@ -36,7 +36,6 @@ from engine.feasibility.service import assess_feasibility_run
 from engine.integration.competition_analysis import build_readiness_request
 from engine.recommendation.service import build_recommendation
 from engine.reconciliation import reconcile_field
-from apps.api.services.plan_evaluation import evaluate_plan
 from engine.scheduler.models import SolverConfig
 from engine.scheduler.service import _MAX_CANDIDATES, solve_candidate_allocations
 from engine.triage.service import evaluate_readiness
