@@ -32,9 +32,9 @@ from apps.api.services.reevaluation import reevaluate_plan
 from engine.extraction import (
     NativeDocument,
     NativeTextBlock,
-    SnapshotBoundCandidateReport,
     SnapshotExtractionResult,
 )
+from engine.extraction.models import SnapshotBoundCandidateReport
 from packages.contracts import (
     AvailabilityInput,
     CandidateExtractionReport,
