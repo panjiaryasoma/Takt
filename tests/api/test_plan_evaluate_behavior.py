@@ -9,6 +9,7 @@ from uuid import UUID
 from fastapi.testclient import TestClient
 
 import apps.api.routes.plans as plans_route
+import engine.feasibility.service as feasibility_service
 from apps.api.contracts import (
     CanonicalReportBundleV1,
     CanonicalReportRefV1,
@@ -37,9 +38,11 @@ from packages.contracts import (
     PlanningPreferences,
     PlanningWorkWindow,
     ReadinessStatus,
+    RecommendationAction,
     Task,
     WorkloadInput,
 )
+from engine.scheduler.models import SolverResult, SolverRunStatus
 from packages.contracts.source import CORE_CANONICAL_FIELDS
 
 
@@ -363,3 +366,188 @@ def test_server_clock_after_deadline_blocks_before_planning() -> None:
     assert result.readiness.status is ReadinessStatus.DEADLINE_PASSED
     assert result.planning is None
     assert result.basis.planning is None
+
+
+def _review_report(*, deadline: datetime) -> CanonicalCompetitionReport:
+    report = _ready_report(deadline=deadline)
+    left = CandidateField(
+        field_name="deliverables",
+        raw_value=["demo"],
+        normalized_value=["demo"],
+        evidence_ids=["ev-deliverables-a"],
+        extraction_path=ExtractionPath.NATIVE,
+        confidence=None,
+        scope={},
+    )
+    right = CandidateField(
+        field_name="deliverables",
+        raw_value=["pitch"],
+        normalized_value=["pitch"],
+        evidence_ids=["ev-deliverables-b"],
+        extraction_path=ExtractionPath.NATIVE,
+        confidence=None,
+        scope={},
+    )
+    fields = dict(report.canonical_fields)
+    fields["deliverables"] = CanonicalField(
+        field_name="deliverables",
+        state=CanonicalFieldState.CONFLICT,
+        candidates=[left, right],
+        evidence_ids=["ev-deliverables-a", "ev-deliverables-b"],
+    )
+    return report.model_copy(update={"canonical_fields": fields})
+
+
+def _request_for_report(
+    report: CanonicalCompetitionReport,
+    *,
+    user: ReadinessUserContextV1 | None = None,
+) -> PlanEvaluateRequestV1:
+    base = _request(effort_minutes=60)
+    return base.model_copy(
+        update={
+            "report_bundle": _bundle(report),
+            "readiness_context": ReadinessContextV1(
+                user=user or ReadinessUserContextV1(),
+                selected_scope="unscoped",
+                require_technology_information=False,
+            ),
+        }
+    )
+
+
+def test_readiness_fingerprint_is_stage_aware_for_early_review_stop() -> None:
+    report = _review_report(
+        deadline=datetime(2026, 9, 30, 23, 45, tzinfo=UTC)
+    )
+    first_request = _request_for_report(
+        report,
+        user=ReadinessUserContextV1(
+            age=20,
+            student_status=True,
+            country="Indonesia",
+        ),
+    )
+    second_request = _request_for_report(
+        report,
+        user=ReadinessUserContextV1(
+            age=99,
+            student_status=False,
+            country="Singapore",
+        ),
+    )
+
+    first = evaluate_plan(
+        first_request,
+        clock=lambda: datetime(2026, 9, 29, 12, 0, tzinfo=UTC),
+        evaluation_id_factory=_id_one,
+    )
+    second = evaluate_plan(
+        second_request,
+        clock=lambda: datetime(2026, 10, 1, 12, 0, tzinfo=UTC),
+        evaluation_id_factory=_id_two,
+    )
+
+    assert first.readiness.status is ReadinessStatus.NEEDS_REVIEW
+    assert second.readiness.status is ReadinessStatus.NEEDS_REVIEW
+    assert first.basis.planning is None
+    assert second.basis.planning is None
+    assert (
+        first.basis.readiness.basis_fingerprint
+        == second.basis.readiness.basis_fingerprint
+    )
+
+
+def test_public_candidate_pool_actions_and_trace_are_resolvable() -> None:
+    result = evaluate_plan(
+        _request(effort_minutes=60),
+        clock=_clock,
+        evaluation_id_factory=_id_one,
+    )
+
+    assert result.planning is not None
+    planning = result.planning
+    assert planning.candidates
+    assert planning.recommendation is not None
+
+    candidate_ids = tuple(item.ref.candidate_id for item in planning.candidates)
+    recommendation = planning.recommendation
+    referenced_ids = (
+        recommendation.primary_candidate.candidate_id,
+        *(
+            item.candidate_id
+            for item in recommendation.alternative_candidates
+        ),
+    )
+    assert referenced_ids == candidate_ids
+    assert all(
+        item.ref.evaluation_id == result.evaluation_id
+        for item in planning.candidates
+    )
+    assert planning.allowed_actions[-2:] == (
+        RecommendationAction.EDIT_CONSTRAINTS,
+        RecommendationAction.IGNORE,
+    )
+
+    trace = recommendation.trace
+    assert trace.competition_id == result.basis.report.competition_id
+    assert trace.report_version == result.basis.report.report_version
+    assert (
+        trace.assembly_material_fingerprint
+        == result.basis.report.assembly_material_fingerprint
+    )
+    assert trace.evaluation_basis_fingerprint == result.basis.fingerprint
+    assert result.basis.planning is not None
+    assert (
+        trace.planning_basis_fingerprint
+        == result.basis.planning.basis_fingerprint
+    )
+    assert trace.planning_policy_version == result.basis.planning.policy_version
+
+
+def test_infeasible_public_decision_preserves_advisory_actions() -> None:
+    result = evaluate_plan(
+        _request(effort_minutes=200),
+        clock=_clock,
+        evaluation_id_factory=_id_one,
+    )
+
+    assert result.planning is not None
+    assert result.planning.candidates == ()
+    assert result.planning.recommendation is None
+    assert result.planning.allowed_actions == (
+        RecommendationAction.EDIT_CONSTRAINTS,
+        RecommendationAction.IGNORE,
+    )
+
+
+def test_real_solver_unknown_pipeline_maps_to_503(monkeypatch) -> None:
+    def unknown_solver(*_args, **_kwargs):
+        return SolverResult(
+            status=SolverRunStatus.UNKNOWN,
+            candidate_allocations=(),
+            reason_codes=("CP_SAT_UNKNOWN",),
+        )
+
+    monkeypatch.setattr(
+        feasibility_service,
+        "solve_candidate_allocations",
+        unknown_solver,
+    )
+    real_evaluate = evaluate_plan
+
+    def deterministic(request: PlanEvaluateRequestV1):
+        return real_evaluate(
+            request,
+            clock=_clock,
+            evaluation_id_factory=_id_one,
+        )
+
+    monkeypatch.setattr(plans_route, "evaluate_plan", deterministic)
+    response = TestClient(app).post(
+        "/api/v1/plans/evaluate",
+        json=_request(effort_minutes=60).model_dump(mode="json"),
+    )
+
+    assert response.status_code == 503
+    assert response.json()["error"]["code"] == "SOLVER_INDETERMINATE"
