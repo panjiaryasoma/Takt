@@ -11,6 +11,8 @@ from fastapi.testclient import TestClient
 
 import apps.api.services.competition_analysis as competition_analysis_service
 from apps.api.contracts import (
+    CanonicalReportBundleV1,
+    CanonicalReportRefV1,
     CompetitionAnalyzeUrlRequestV1,
     PlanEvaluatePlanningV1,
     PlanEvaluateRequestV1,
@@ -358,9 +360,7 @@ def _canonical_report(
     )
 
 
-def _bundle(report: CanonicalCompetitionReport):
-    from apps.api.contracts import CanonicalReportBundleV1, CanonicalReportRefV1
-
+def _bundle(report: CanonicalCompetitionReport) -> CanonicalReportBundleV1:
     initial = CanonicalReportRefV1(
         competition_id=report.competition_id,
         report_version=report.report_version,
@@ -426,7 +426,7 @@ def test_issue4_happy_path_regression(monkeypatch) -> None:
             for item in recommendation.alternative_candidates
         ),
     }
-    assert referenced_ids <= candidate_ids
+    assert referenced_ids == candidate_ids
 
     report_ref = analysis.report_bundle.ref
     assert evaluation.basis.report.competition_id == report_ref.competition_id
@@ -459,11 +459,23 @@ def test_issue4_conflict_path_regression() -> None:
     assert "unresolved_critical_field:eligibility" in evaluation.readiness.review_items
 
 
-def test_issue4_infeasible_path_regression() -> None:
+def test_issue4_infeasible_path_regression(monkeypatch) -> None:
     request = _evaluation_request(
         _bundle(_canonical_report()),
         effort_minutes=200,
     )
+    import apps.api.routes.plans as plans_route
+
+    real_evaluate = evaluate_plan
+
+    def deterministic(value: PlanEvaluateRequestV1):
+        return real_evaluate(
+            value,
+            clock=_clock,
+            evaluation_id_factory=_id_one,
+        )
+
+    monkeypatch.setattr(plans_route, "evaluate_plan", deterministic)
     response = TestClient(app).post(
         "/api/v1/plans/evaluate",
         json=request.model_dump(mode="json", warnings=False),
@@ -493,7 +505,7 @@ def test_issue4_stale_reevaluation_regression() -> None:
     changed_request = initial_request.model_copy(
         update={
             "planning": initial_request.planning.model_copy(
-                update={"availability": _availability(end_hour=14)}
+                update={"availability": _availability(end_hour=16)}
             )
         }
     )
