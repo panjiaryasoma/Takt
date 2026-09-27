@@ -29,3 +29,18 @@ def test_public_policy_versions_have_explicit_authority() -> None:
     assert "recommendation assembly and allowed actions" in (
         PLANNING_POLICY.material_behaviors
     )
+
+
+def test_planning_policy_parameters_match_runtime_constants() -> None:
+    from engine.scheduler.cp_sat import _MATERIAL_COMPLETION_DELTA_MINUTES
+    from engine.scheduler.service import _MAX_CANDIDATES
+
+    parameters = dict(PLANNING_POLICY.material_parameters)
+
+    assert parameters["public_candidate_scenario"] == "LIKELY"
+    assert parameters["max_candidates"] == _MAX_CANDIDATES == 3
+    assert (
+        parameters["material_completion_delta_minutes"]
+        == _MATERIAL_COMPLETION_DELTA_MINUTES
+        == 30
+    )
