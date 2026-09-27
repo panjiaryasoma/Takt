@@ -110,6 +110,9 @@ def test_successful_empty_url_extraction_returns_domain_missing_and_audit_run(
     assert len(result.provenance.sources) == 1
     assert result.provenance.sources[0].retrieved_at.tzinfo is not None
     assert len(result.provenance.extraction_runs) == 1
+    assert result.report_bundle.ref.source_set_fingerprint == source_set_fingerprint(
+        result.source_artifacts
+    )
     run = result.provenance.extraction_runs[0]
     assert run.extraction_path is ExtractionPath.NATIVE
     assert run.extractor_version
