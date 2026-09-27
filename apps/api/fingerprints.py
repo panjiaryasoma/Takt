@@ -3,10 +3,14 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from collections.abc import Iterable
 from typing import Any
 
 from apps.api.canonical_json import jcs_sha256
-from apps.api.contracts import CanonicalReportRefV1
+from apps.api.contracts import (
+    SOURCE_SET_FINGERPRINT_VERSION,
+    CanonicalReportRefV1,
+)
 from packages.contracts import CanonicalCompetitionReport
 
 
@@ -35,3 +39,23 @@ def report_wire_fingerprint(
     ref: CanonicalReportRefV1,
 ) -> str:
     return jcs_sha256(report_wire_material(report, ref))
+
+
+def source_set_fingerprint(artifacts: Iterable[Any]) -> str:
+    """Fingerprint one public source-analysis artifact set in canonical order."""
+
+    material = []
+    for artifact in artifacts:
+        dumped = artifact.model_dump(mode="json", warnings=False)
+        source = dumped.get("source")
+        if not isinstance(source, dict) or not isinstance(source.get("source_id"), str):
+            raise ValueError("source artifact must expose source.source_id")
+        material.append(dumped)
+
+    material.sort(key=lambda item: item["source"]["source_id"])
+    return jcs_sha256(
+        {
+            "version": SOURCE_SET_FINGERPRINT_VERSION,
+            "artifacts": material,
+        }
+    )
