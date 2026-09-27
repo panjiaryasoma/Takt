@@ -14,6 +14,7 @@ from dataclasses import dataclass
 class PolicyAuthority:
     version: str
     material_behaviors: tuple[str, ...]
+    material_parameters: tuple[tuple[str, object], ...] = ()
 
 
 RECONCILIATION_POLICY = PolicyAuthority(
@@ -54,6 +55,11 @@ PLANNING_POLICY = PolicyAuthority(
         "candidate ranking",
         "recommendation assembly and allowed actions",
         "reason and tradeoff message semantics",
+    ),
+    material_parameters=(
+        ("public_candidate_scenario", "LIKELY"),
+        ("max_candidates", 3),
+        ("material_completion_delta_minutes", 30),
     ),
 )
 
