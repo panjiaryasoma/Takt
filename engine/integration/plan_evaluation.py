@@ -1,1 +1,4 @@
-"""API orchestration lives in apps.api.services.plan_evaluation.\n\nThe engine layer intentionally has no dependency on FastAPI wire contracts.\n"""\n
+"""API orchestration lives in apps.api.services.plan_evaluation.
+
+The engine layer intentionally has no dependency on FastAPI wire contracts.
+"""
