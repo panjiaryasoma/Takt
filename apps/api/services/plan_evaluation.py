@@ -286,15 +286,15 @@ def _readiness_basis_fingerprint(
 
     rules = request.eligibility
     user = request.user
+    consulted: list[dict[str, object]] = []
     eligibility_material: dict[str, object] = {
         "state": "EVALUATING",
         "canonical_effective_scope": _canonical_scope_material(
             resolved_scope,
             selected_scope,
         ),
-        "consulted_predicates": [],
+        "consulted_predicates": consulted,
     }
-    consulted: list[dict[str, object]] = eligibility_material["consulted_predicates"]  # type: ignore[assignment]
 
     if rules.minimum_age is not None:
         if user.age is None:
