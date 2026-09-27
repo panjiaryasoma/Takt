@@ -10,11 +10,13 @@ from __future__ import annotations
 import hmac
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
-from importlib.metadata import PackageNotFoundError, version as package_version
+from importlib.metadata import PackageNotFoundError
+from importlib.metadata import version as package_version
 from uuid import UUID, uuid4
 
 from pydantic import ValidationError
 
+from apps.api.canonical_json import CanonicalJsonError, jcs_sha256
 from apps.api.contracts import (
     ASSEMBLY_POLICY_VERSION,
     DOMAIN_SCHEMA_VERSION,
@@ -29,13 +31,12 @@ from apps.api.contracts import (
     PlanningBasisV1,
     PlanningDecisionV1,
     PublicCandidateV1,
+    ReadinessBasisV1,
     RecommendationSetV1,
     RecommendationTraceV1,
     RecommendationV1,
-    ReadinessBasisV1,
     ReportBasisV1,
 )
-from apps.api.canonical_json import CanonicalJsonError, jcs_sha256
 from apps.api.fingerprints import canonical_utc, report_wire_fingerprint
 from engine.availability import build_availability
 from engine.feasibility.service import (
