@@ -192,7 +192,7 @@ def test_unsupported_report_contract_is_distinct_from_bundle_mismatch() -> None:
 
 def test_raw_wire_fingerprint_is_checked_before_pydantic_coercion() -> None:
     payload = _request().model_dump(mode="json")
-    payload["report_bundle"]["report"]["report_version"] = 3.0
+    payload["report_bundle"]["report"]["report_version"] = "3"
 
     response = TestClient(app).post("/api/v1/plans/evaluate", json=payload)
 

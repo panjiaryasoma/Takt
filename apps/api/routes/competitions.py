@@ -9,7 +9,6 @@ from pydantic import ValidationError
 from starlette.datastructures import UploadFile
 
 from apps.api.contracts import (
-    ApiErrorDetailV1,
     CompetitionAnalyzePdfMetadataV1,
     CompetitionAnalyzeResponseV1,
     CompetitionAnalyzeUrlRequestV1,

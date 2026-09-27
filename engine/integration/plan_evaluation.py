@@ -450,7 +450,7 @@ def evaluate_plan(
 
     try:
         clean = PlanEvaluateRequestV1.model_validate(
-            request.model_dump(mode="python", warnings=False)
+            request.model_dump(mode="json", warnings=False)
         )
     except (AttributeError, TypeError, ValueError, ValidationError) as exc:
         raise PlanEvaluationInputError("invalid plan evaluation request") from exc
