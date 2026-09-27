@@ -24,11 +24,12 @@ from apps.api.fingerprints import report_wire_fingerprint
 from apps.api.main import app
 from apps.api.services.plan_evaluation import (
     PlanEvaluationIndeterminateError,
-    PlanEvaluationInvariantError,
     evaluate_plan,
     planning_cutoff,
     verify_report_bundle,
 )
+from engine.feasibility.service import FeasibilityExecutionError
+from engine.scheduler.models import SolverResult, SolverRunStatus
 from packages.contracts import (
     AvailabilityInput,
     CandidateField,
@@ -45,8 +46,6 @@ from packages.contracts import (
     Task,
     WorkloadInput,
 )
-from engine.feasibility.service import FeasibilityExecutionError
-from engine.scheduler.models import SolverResult, SolverRunStatus
 from packages.contracts.source import CORE_CANONICAL_FIELDS
 
 
