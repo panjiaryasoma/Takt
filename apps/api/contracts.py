@@ -46,6 +46,7 @@ DOMAIN_SCHEMA_VERSION = "3.0.0"
 RECONCILIATION_POLICY_VERSION = RECONCILIATION_POLICY.version
 ASSEMBLY_POLICY_VERSION = "canonical-v1"
 REPORT_WIRE_FINGERPRINT_VERSION = "report-wire-jcs-sha256-v1"
+SOURCE_SET_FINGERPRINT_VERSION = "source-set-jcs-sha256-v1"
 EVALUATION_BASIS_VERSION = "evaluation-basis-v1"
 READINESS_BASIS_VERSION = "readiness-basis-v1"
 READINESS_PROJECTION_VERSION = READINESS_PROJECTION_POLICY.version
@@ -76,6 +77,8 @@ class CanonicalReportRefV1(ApiModel):
     reconciliation_policy_version: NonEmptyStr = RECONCILIATION_POLICY_VERSION
     assembly_policy_version: NonEmptyStr = ASSEMBLY_POLICY_VERSION
     assembly_material_fingerprint: Sha256Hex
+    source_set_fingerprint_version: NonEmptyStr = SOURCE_SET_FINGERPRINT_VERSION
+    source_set_fingerprint: Sha256Hex | None = None
     wire_fingerprint_version: NonEmptyStr = REPORT_WIRE_FINGERPRINT_VERSION
     wire_fingerprint: Sha256Hex
 
@@ -100,6 +103,7 @@ class CanonicalReportBundleV1(ApiModel):
             "domain_schema_version": DOMAIN_SCHEMA_VERSION,
             "reconciliation_policy_version": RECONCILIATION_POLICY_VERSION,
             "assembly_policy_version": ASSEMBLY_POLICY_VERSION,
+            "source_set_fingerprint_version": SOURCE_SET_FINGERPRINT_VERSION,
             "wire_fingerprint_version": REPORT_WIRE_FINGERPRINT_VERSION,
         }
         actual = {key: ref.get(key) for key in supported}
@@ -122,7 +126,11 @@ class CanonicalReportBundleV1(ApiModel):
 
         wire_fingerprint = ref.get("wire_fingerprint")
         assembly_fingerprint = ref.get("assembly_material_fingerprint")
-        for fingerprint in (wire_fingerprint, assembly_fingerprint):
+        source_set_fingerprint = ref.get("source_set_fingerprint")
+        fingerprints = [wire_fingerprint, assembly_fingerprint]
+        if source_set_fingerprint is not None:
+            fingerprints.append(source_set_fingerprint)
+        for fingerprint in fingerprints:
             if (
                 not isinstance(fingerprint, str)
                 or len(fingerprint) != 64
