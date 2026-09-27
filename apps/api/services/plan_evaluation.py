@@ -23,7 +23,9 @@ from apps.api.contracts import (
     PlanEvaluateResponseV1,
     PlanningBasisV1,
     PlanningDecisionV1,
+    PublicCandidateV1,
     RecommendationSetV1,
+    RecommendationTraceV1,
     RecommendationV1,
     ReadinessBasisV1,
     ReportBasisV1,
@@ -687,8 +689,28 @@ def evaluate_plan(
             "recommendation trace does not match evaluation report basis"
         )
 
+    basis = _evaluation_basis(
+        report=report_basis,
+        readiness=readiness_basis,
+        planning=planning_basis,
+    )
     evaluation_id = _new_evaluation_id(evaluation_id_factory)
+
+    likely_candidates = feasibility_run.likely_solver_result.candidate_allocations
+    candidate_by_id = {
+        candidate.candidate_id: candidate
+        for candidate in likely_candidates
+        if candidate.is_recommendable
+    }
+    if len(candidate_by_id) != sum(
+        1 for candidate in likely_candidates if candidate.is_recommendable
+    ):
+        raise PlanEvaluationInvariantError(
+            "LIKELY public candidate pool contains duplicate candidate IDs"
+        )
+
     recommendation_set = None
+    public_candidates: tuple[PublicCandidateV1, ...] = ()
     if assembly.recommendation_payload is not None:
         try:
             recommendation = RecommendationV1.model_validate(
@@ -701,38 +723,62 @@ def evaluate_plan(
                 raise PlanEvaluationInvariantError(
                     "recommendation payload is missing primary candidate identity"
                 )
-            recommendation_set = RecommendationSetV1(
-                primary_candidate=CandidateRefV1(
-                    evaluation_id=evaluation_id,
-                    candidate_id=assembly.primary_candidate_id,
-                ),
-                alternative_candidates=tuple(
-                    CandidateRefV1(
+
+            public_candidate_ids = (
+                assembly.primary_candidate_id,
+                *assembly.alternative_candidate_ids,
+            )
+            if set(public_candidate_ids) != set(candidate_by_id):
+                raise PlanEvaluationInvariantError(
+                    "recommendation candidate IDs do not cover the valid LIKELY pool"
+                )
+
+            public_candidates = tuple(
+                PublicCandidateV1(
+                    ref=CandidateRefV1(
                         evaluation_id=evaluation_id,
                         candidate_id=candidate_id,
-                    )
-                    for candidate_id in assembly.alternative_candidate_ids
+                    ),
+                    work_blocks=candidate_by_id[candidate_id].work_blocks,
+                    buffer_minutes=candidate_by_id[candidate_id].buffer_minutes,
+                    assumptions=candidate_by_id[candidate_id].assumptions,
+                )
+                for candidate_id in public_candidate_ids
+            )
+            recommendation_set = RecommendationSetV1(
+                primary_candidate=public_candidates[0].ref,
+                alternative_candidates=tuple(
+                    item.ref for item in public_candidates[1:]
                 ),
                 recommendation=recommendation,
-                allowed_actions=assembly.allowed_actions,
+                trace=RecommendationTraceV1(
+                    competition_id=report_basis.competition_id,
+                    report_version=report_basis.report_version,
+                    assembly_material_fingerprint=(
+                        report_basis.assembly_material_fingerprint
+                    ),
+                    evaluation_basis_fingerprint=basis.fingerprint,
+                    planning_basis_fingerprint=planning_basis.basis_fingerprint,
+                ),
             )
-        except (RecommendationInputError, ValidationError, ValueError) as exc:
+        except (KeyError, RecommendationInputError, ValidationError, ValueError) as exc:
             raise PlanEvaluationInvariantError(
                 "public recommendation projection failed"
             ) from exc
+    elif candidate_by_id:
+        raise PlanEvaluationInvariantError(
+            "non-recommendation assembly must not leave public LIKELY candidates"
+        )
 
     assessment = feasibility_run.assessment
     planning = PlanningDecisionV1(
         feasibility=assessment.status,
+        candidates=public_candidates,
+        allowed_actions=assembly.allowed_actions,
         reason_codes=assessment.reason_codes,
         tradeoff_codes=assessment.tradeoff_codes,
         sensitivity_codes=assessment.sensitivity_codes,
         recommendation=recommendation_set,
-    )
-    basis = _evaluation_basis(
-        report=report_basis,
-        readiness=readiness_basis,
-        planning=planning_basis,
     )
     return PlanEvaluateResponseV1(
         evaluation_id=evaluation_id,
