@@ -42,6 +42,7 @@ from apps.api.services.reevaluation import (
 from engine.feasibility.service import FeasibilityExecutionError
 from engine.scheduler.models import SolverResult, SolverRunStatus
 from packages.contracts import (
+    AcceptedCommitment,
     AvailabilityInput,
     CandidateField,
     CanonicalCompetitionReport,
@@ -729,9 +730,10 @@ def test_server_produced_public_model_failure_normalizes_to_invariant_error(
 
 def _prior_request(
     *,
+    prior: PlanEvaluateRequestV1 | None = None,
     current: PlanEvaluateRequestV1 | None = None,
 ) -> tuple[PlanReevaluateRequestV1, object]:
-    base_request = _request(effort_minutes=60)
+    base_request = prior or _request(effort_minutes=60)
     prior_result = evaluate_plan(
         base_request,
         clock=_clock,
@@ -1243,3 +1245,126 @@ def test_unknown_exception_before_witness_is_internal_error_without_transition(
     assert body["error"]["code"] == "INTERNAL_ERROR"
     assert body["transition"] is None
     assert "private early surprise" not in json.dumps(body)
+
+
+def test_accepted_commitment_id_only_change_is_semantically_unchanged() -> None:
+    base = _request(effort_minutes=60)
+    accepted_a = AcceptedCommitment(
+        accepted_commitment_id="accepted-a",
+        start_at=datetime(2026, 9, 27, 14, 0, tzinfo=UTC),
+        end_at=datetime(2026, 9, 27, 14, 30, tzinfo=UTC),
+        source="recommendation-a",
+    )
+    accepted_b = accepted_a.model_copy(
+        update={
+            "accepted_commitment_id": "accepted-b",
+            "source": "recommendation-b",
+        }
+    )
+    prior_availability = base.planning.availability.model_copy(
+        update={"accepted_commitments": (accepted_a,)}
+    )
+    current_availability = base.planning.availability.model_copy(
+        update={"accepted_commitments": (accepted_b,)}
+    )
+    prior_request = base.model_copy(
+        update={
+            "planning": base.planning.model_copy(
+                update={"availability": prior_availability}
+            )
+        }
+    )
+    current_request = base.model_copy(
+        update={
+            "planning": base.planning.model_copy(
+                update={"availability": current_availability}
+            )
+        }
+    )
+    request, _ = _prior_request(
+        prior=prior_request,
+        current=current_request,
+    )
+
+    result = reevaluate_plan(request, clock=_clock)
+
+    assert result.transition.kind == "UNCHANGED"
+    assert result.transition.change_reasons == ()
+    assert result.evaluation is None
+
+
+def test_context_invalid_after_tentative_report_witness_discards_transition(
+    monkeypatch,
+) -> None:
+    base = _request(effort_minutes=60)
+    newer_report = base.report_bundle.report.model_copy(
+        update={"report_version": base.report_bundle.report.report_version + 1}
+    )
+    current = base.model_copy(update={"report_bundle": _bundle(newer_report)})
+    request, _ = _prior_request(current=current)
+    broken = _rewrite_prior_basis(
+        request,
+        lambda basis: basis.update({"planning": None}),
+    )
+
+    real_reevaluate = reevaluate_plan
+
+    def deterministic(value: PlanReevaluateRequestV1):
+        return real_reevaluate(value, clock=_clock)
+
+    monkeypatch.setattr(plans_route, "reevaluate_plan", deterministic)
+    response = TestClient(app).post(
+        "/api/v1/plans/re-evaluate",
+        json=broken.model_dump(mode="json", warnings=False),
+    )
+
+    assert response.status_code == 409
+    body = response.json()
+    assert body["error"]["code"] == "REEVALUATION_CONTEXT_INVALID"
+    assert body["transition"] is None
+
+
+def test_fingerprint_reason_contradiction_returns_invariant_with_null_transition(
+    monkeypatch,
+) -> None:
+    request, _ = _prior_request()
+
+    def fake_report_compare(_request, _current, witness):
+        witness.add("REPORT_BASIS_CHANGED")
+
+    monkeypatch.setattr(
+        reevaluation_service,
+        "_compare_report",
+        fake_report_compare,
+    )
+    real_reevaluate = reevaluate_plan
+
+    def deterministic(value: PlanReevaluateRequestV1):
+        return real_reevaluate(value, clock=_clock)
+
+    monkeypatch.setattr(plans_route, "reevaluate_plan", deterministic)
+    response = TestClient(app).post(
+        "/api/v1/plans/re-evaluate",
+        json=request.model_dump(mode="json", warnings=False),
+    )
+
+    assert response.status_code == 500
+    body = response.json()
+    assert body["error"]["code"] == "EVALUATION_INVARIANT_FAILED"
+    assert body["transition"] is None
+
+
+def test_missing_structural_marker_is_validation_error() -> None:
+    request, _ = _prior_request()
+    payload = request.model_dump(mode="json", warnings=False)
+    del payload["prior"]["basis"]["readiness"]["basis_version"]
+
+    response = TestClient(app).post(
+        "/api/v1/plans/re-evaluate",
+        json=payload,
+    )
+
+    assert response.status_code == 422
+    body = response.json()
+    assert body["error"]["code"] == "VALIDATION_ERROR"
+    assert body["transition"] is None
