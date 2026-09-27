@@ -1541,7 +1541,7 @@ def test_malformed_whole_request_never_uses_changed_current_subtree_for_stale() 
 
     assert response.status_code == 422
     body = response.json()
-    assert body["error"]["code"] == "VALIDATION_ERROR"
+    assert body["error"]["code"] == "REPORT_BUNDLE_INVALID"
     assert body["transition"] is None
 
 
