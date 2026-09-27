@@ -7,6 +7,8 @@ from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import uuid4
 
+from pydantic import ValidationError
+
 from apps.api.canonical_json import jcs_sha256
 from apps.api.contracts import (
     PLANNING_BASIS_VERSION,
@@ -86,14 +88,19 @@ class StaleWitness:
     ) -> ReevaluationTransitionV1 | None:
         if not self.established:
             return None
-        return ReevaluationTransitionV1(
-            kind="SUPERSEDED",
-            prior_evaluation_id=request.prior.evaluation_id,
-            prior_basis_fingerprint=request.prior.basis.fingerprint,
-            current_basis_fingerprint=current_basis_fingerprint,
-            prior_evaluation_freshness="STALE",
-            change_reasons=tuple(self.reasons),
-        )
+        try:
+            return ReevaluationTransitionV1(
+                kind="SUPERSEDED",
+                prior_evaluation_id=request.prior.evaluation_id,
+                prior_basis_fingerprint=request.prior.basis.fingerprint,
+                current_basis_fingerprint=current_basis_fingerprint,
+                prior_evaluation_freshness="STALE",
+                change_reasons=tuple(self.reasons),
+            )
+        except (ValidationError, ValueError) as exc:
+            raise PlanEvaluationInvariantError(
+                "stale witness could not project a valid transition"
+            ) from exc
 
 
 def _basis_material(
@@ -280,14 +287,19 @@ def _final_transition(
             "evaluation fingerprint and component change reasons disagree"
         )
     if not changed:
-        return ReevaluationTransitionV1(
-            kind="UNCHANGED",
-            prior_evaluation_id=request.prior.evaluation_id,
-            prior_basis_fingerprint=request.prior.basis.fingerprint,
-            current_basis_fingerprint=current_basis.fingerprint,
-            prior_evaluation_freshness="CURRENT",
-            change_reasons=(),
-        )
+        try:
+            return ReevaluationTransitionV1(
+                kind="UNCHANGED",
+                prior_evaluation_id=request.prior.evaluation_id,
+                prior_basis_fingerprint=request.prior.basis.fingerprint,
+                current_basis_fingerprint=current_basis.fingerprint,
+                prior_evaluation_freshness="CURRENT",
+                change_reasons=(),
+            )
+        except (ValidationError, ValueError) as exc:
+            raise PlanEvaluationInvariantError(
+                "unchanged basis could not project a valid transition"
+            ) from exc
     transition = witness.transition(
         request,
         current_basis_fingerprint=current_basis.fingerprint,
@@ -309,10 +321,19 @@ def _execute_success(
         prepared,
         evaluation_id_factory=evaluation_id_factory,
     )
-    return PlanReevaluateResponseV1(
-        transition=transition,
-        evaluation=evaluation,
-    )
+    if evaluation.evaluation_id == transition.prior_evaluation_id:
+        raise PlanEvaluationInvariantError(
+            "fresh evaluation_id must differ from prior evaluation_id"
+        )
+    try:
+        return PlanReevaluateResponseV1(
+            transition=transition,
+            evaluation=evaluation,
+        )
+    except (ValidationError, ValueError) as exc:
+        raise PlanEvaluationInvariantError(
+            "re-evaluation response violated the public contract"
+        ) from exc
 
 
 def reevaluate_plan(
