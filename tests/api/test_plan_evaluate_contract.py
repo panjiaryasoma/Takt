@@ -219,3 +219,28 @@ def test_jcs_number_serialization_matches_rfc8785_examples() -> None:
     value = [333333333.33333329, 1e30, 4.50, 2e-3, 1e-27]
 
     assert jcs_dumps(value) == "[333333333.3333333,1e+30,4.5,0.002,1e-27]"
+
+
+def test_jcs_rejects_integer_outside_exact_ieee754_range() -> None:
+    with pytest.raises(CanonicalJsonError, match="safe-integer"):
+        jcs_dumps({"value": (1 << 53)})
+
+
+def test_report_ref_rejects_malformed_sha256_fields() -> None:
+    bundle = _bundle()
+
+    with pytest.raises(ValidationError):
+        CanonicalReportRefV1(
+            competition_id=bundle.ref.competition_id,
+            report_version=bundle.ref.report_version,
+            assembly_material_fingerprint="not-a-sha256",
+            wire_fingerprint=bundle.ref.wire_fingerprint,
+        )
+
+    with pytest.raises(ValidationError):
+        CanonicalReportRefV1(
+            competition_id=bundle.ref.competition_id,
+            report_version=bundle.ref.report_version,
+            assembly_material_fingerprint=bundle.ref.assembly_material_fingerprint,
+            wire_fingerprint="ABC",
+        )
