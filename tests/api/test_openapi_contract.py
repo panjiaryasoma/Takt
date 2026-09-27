@@ -43,3 +43,16 @@ def test_product_openapi_error_schemas_match_runtime_envelope() -> None:
         operation = document["paths"][path]["post"]
         for status_code in (400, 413, 415, 422, 500, 502, 503, 504):
             _assert_error_schema(operation, status_code)
+
+
+def test_reevaluate_openapi_declares_specialized_success_and_error_contracts() -> None:
+    document = TestClient(app).get("/openapi.json").json()
+    operation = document["paths"]["/api/v1/plans/re-evaluate"]["post"]
+
+    success_schema = operation["responses"]["200"]["content"]["application/json"]["schema"]
+    assert success_schema["$ref"].endswith("/PlanReevaluateResponseV1")
+
+    for status_code in (409, 422, 500, 503):
+        response = operation["responses"][str(status_code)]
+        schema = response["content"]["application/json"]["schema"]
+        assert schema["$ref"].endswith("/PlanReevaluateErrorResponseV1")
