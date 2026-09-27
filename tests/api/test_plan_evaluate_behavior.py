@@ -13,6 +13,7 @@ from fastapi.testclient import TestClient
 import apps.api.routes.plans as plans_route
 import apps.api.services.plan_evaluation as plan_evaluation_service
 import apps.api.services.reevaluation as reevaluation_service
+import engine.feasibility.service as feasibility_service
 from apps.api.canonical_json import jcs_sha256
 from apps.api.contracts import (
     CanonicalReportBundleV1,
@@ -38,7 +39,6 @@ from apps.api.services.reevaluation import (
     ReevaluationExecutionFailure,
     reevaluate_plan,
 )
-import engine.feasibility.service as feasibility_service
 from engine.feasibility.service import FeasibilityExecutionError
 from engine.scheduler.models import SolverResult, SolverRunStatus
 from packages.contracts import (
