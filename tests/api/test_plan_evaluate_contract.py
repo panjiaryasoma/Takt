@@ -152,10 +152,13 @@ def test_api_validation_error_uses_stable_envelope_and_json_pointer() -> None:
     body = response.json()
     assert body["error"]["code"] == "VALIDATION_ERROR"
     assert body["error"]["stage"] == "validation"
-    assert any(
-        item["path"] == "/readiness_context/evaluated_at"
+    detail = next(
+        item
         for item in body["error"]["details"]
+        if item["path"] == "/readiness_context/evaluated_at"
     )
+    assert detail["code"] == "UNKNOWN_FIELD"
+    assert "type" not in detail
     assert "input" not in json.dumps(body).lower()
 
 
@@ -221,9 +224,10 @@ def test_jcs_number_serialization_matches_rfc8785_examples() -> None:
     assert jcs_dumps(value) == "[333333333.3333333,1e+30,4.5,0.002,1e-27]"
 
 
-def test_jcs_rejects_integer_outside_exact_ieee754_range() -> None:
-    with pytest.raises(CanonicalJsonError, match="safe-integer"):
-        jcs_dumps({"value": (1 << 53)})
+def test_jcs_projects_large_int_and_float_to_same_number_semantics() -> None:
+    value = 295147905179352830000
+
+    assert jcs_dumps(value) == jcs_dumps(float(value))
 
 
 def test_report_ref_rejects_malformed_sha256_fields() -> None:
