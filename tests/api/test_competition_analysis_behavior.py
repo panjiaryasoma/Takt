@@ -13,8 +13,10 @@ import apps.api.routes.competitions as competitions_route
 from apps.api.contracts import (
     CompetitionAnalyzePdfMetadataV1,
     CompetitionAnalyzeUrlRequestV1,
+    SourceAnalysisArtifactV1,
     SourceMetadataV1,
 )
+from apps.api.fingerprints import report_wire_fingerprint, source_set_fingerprint
 from apps.api.main import app
 from apps.api.services.competition_analysis import analyze_pdf, analyze_url
 from engine.extraction import OCRTextBlock, SourceFetchError
@@ -305,6 +307,112 @@ def test_incomplete_analysis_continuation_is_public_422(
         warnings=False,
     )
     payload["prior_source_artifacts"] = []
+
+    response = TestClient(app).post(
+        "/api/v1/competitions/analyze/url",
+        json=payload,
+    )
+
+    assert response.status_code == 422
+    body = response.json()
+    assert body["error"]["code"] == "ANALYSIS_CONTEXT_INVALID"
+    assert body["error"]["stage"] == "analysis"
+
+
+def test_tampered_prior_artifact_is_rejected_even_when_source_ids_match(
+    monkeypatch,
+) -> None:
+    html = b"<html><body>Team size: 1 to 4 members</body></html>"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/html"},
+            content=html,
+            request=request,
+        )
+
+    monkeypatch.setattr(
+        "engine.extraction.native.validate_public_http_target",
+        lambda _url: None,
+    )
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        first = analyze_url(_url_request(), client=client)
+
+    artifact_payload = first.source_artifacts[0].model_dump(mode="json")
+    changed = False
+    for report in artifact_payload["candidate_reports"]:
+        for field in report["fields"]:
+            if field["field_name"] == "team_size":
+                field["normalized_value"] = {"min": 1, "max": 5}
+                changed = True
+    assert changed
+    tampered = SourceAnalysisArtifactV1.model_validate(artifact_payload)
+
+    request = CompetitionAnalyzeUrlRequestV1(
+        competition_id="cmp-analysis",
+        url="https://example.test/next",
+        source=_source("src-next"),
+        previous_report_bundle=first.report_bundle,
+        prior_source_artifacts=(tampered,),
+    )
+
+    with pytest.raises(
+        ValueError,
+        match="source-set fingerprint",
+    ):
+        analyze_url(request)
+
+
+def test_invalid_prior_source_metadata_is_client_error_not_reconciliation_500(
+    monkeypatch,
+) -> None:
+    html = b"<html><body>Team size: 1 to 4 members</body></html>"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/html"},
+            content=html,
+            request=request,
+        )
+
+    monkeypatch.setattr(
+        "engine.extraction.native.validate_public_http_target",
+        lambda _url: None,
+    )
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        first = analyze_url(_url_request(), client=client)
+
+    artifact_payload = first.source_artifacts[0].model_dump(mode="json")
+    artifact_payload["source"]["authority_rank"] = {
+        "basis": "secondary",
+        "tier": 1,
+    }
+    invalid_artifact = SourceAnalysisArtifactV1.model_validate(artifact_payload)
+
+    source_fp = source_set_fingerprint((invalid_artifact,))
+    ref = first.report_bundle.ref.model_copy(
+        update={
+            "source_set_fingerprint": source_fp,
+            "wire_fingerprint": "0" * 64,
+        }
+    )
+    ref = ref.model_copy(
+        update={
+            "wire_fingerprint": report_wire_fingerprint(
+                first.report_bundle.report,
+                ref,
+            )
+        }
+    )
+    bundle = first.report_bundle.model_copy(update={"ref": ref})
+
+    payload = _url_request().model_dump(mode="json")
+    payload["previous_report_bundle"] = bundle.model_dump(mode="json")
+    payload["prior_source_artifacts"] = [
+        invalid_artifact.model_dump(mode="json")
+    ]
 
     response = TestClient(app).post(
         "/api/v1/competitions/analyze/url",
