@@ -553,15 +553,20 @@ def evaluate_plan(
             "report or readiness context could not be evaluated"
         ) from exc
 
-    readiness_basis = ReadinessBasisV1(
-        basis_fingerprint=_readiness_basis_fingerprint(
-            readiness_request,
-            resolved_scope,
-            context.selected_scope,
-        ),
-        rule_version=readiness.rule_version,
-    )
-    report_basis = _report_basis(clean.report_bundle)
+    try:
+        readiness_basis = ReadinessBasisV1(
+            basis_fingerprint=_readiness_basis_fingerprint(
+                readiness_request,
+                resolved_scope,
+                context.selected_scope,
+            ),
+            rule_version=readiness.rule_version,
+        )
+        report_basis = _report_basis(clean.report_bundle)
+    except (ValidationError, ValueError) as exc:
+        raise PlanEvaluationInvariantError(
+            "readiness/report basis projection violated the public contract"
+        ) from exc
 
     if readiness.status is not ReadinessStatus.READY_TO_EVALUATE:
         basis = _evaluation_basis(
