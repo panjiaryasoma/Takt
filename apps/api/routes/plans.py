@@ -10,6 +10,7 @@ from engine.integration.plan_evaluation import (
     PlanEvaluationInvariantError,
     PlanEvaluationExecutionError,
     ReportBundleError,
+    UnsupportedReportContractError,
     evaluate_plan,
 )
 
@@ -20,6 +21,13 @@ router = APIRouter(tags=["plans"])
 def evaluate_plan_route(request: PlanEvaluateRequestV1) -> PlanEvaluateResponseV1:
     try:
         return evaluate_plan(request)
+    except UnsupportedReportContractError as exc:
+        raise ApiContractError(
+            status_code=422,
+            code="UNSUPPORTED_REPORT_CONTRACT",
+            message="Canonical report contract or policy version is not supported.",
+            stage="report",
+        ) from exc
     except ReportBundleError as exc:
         raise ApiContractError(
             status_code=422,

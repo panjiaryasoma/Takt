@@ -39,3 +39,17 @@ __all__ += [
     "planning_cutoff",
     "verify_report_bundle",
 ]
+
+from engine.integration.competition_api import (
+    AnalysisInvariantError,
+    AnalysisReconciliationError,
+    analyze_pdf,
+    analyze_url,
+)
+
+__all__ += [
+    "AnalysisInvariantError",
+    "AnalysisReconciliationError",
+    "analyze_pdf",
+    "analyze_url",
+]

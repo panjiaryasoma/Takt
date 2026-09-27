@@ -59,7 +59,6 @@ from engine.triage.scope import ResolvedEligibilityScope
 from engine.triage.service import evaluate_readiness
 from packages.contracts import (
     AvailabilityInput,
-    FeasibilityStatus,
     PlanningWorkWindow,
     ReadinessStatus,
     WorkloadInput,
@@ -72,6 +71,10 @@ EvaluationIdFactory = Callable[[], UUID]
 
 class ReportBundleError(ValueError):
     """The report bundle is not self-consistent at the public wire boundary."""
+
+
+class UnsupportedReportContractError(ReportBundleError):
+    """The client supplied a report contract version this API does not support."""
 
 
 class PlanEvaluationInputError(ValueError):
@@ -105,11 +108,47 @@ def planning_cutoff(evaluated_at: datetime) -> datetime:
     return value.replace(second=0, microsecond=0) + timedelta(minutes=1)
 
 
+def _valid_sha256(value: str) -> bool:
+    if not isinstance(value, str) or len(value) != 64:
+        return False
+    try:
+        int(value, 16)
+    except ValueError:
+        return False
+    return value == value.lower()
+
+
 def verify_report_bundle(bundle: CanonicalReportBundleV1) -> None:
-    """Verify JSON-wire self-consistency without recomputing lossy assembly material."""
+    """Verify supported version metadata and JSON-wire self-consistency."""
+
+    ref = bundle.ref
+    supported = {
+        "domain_schema_version": "3.0.0",
+        "reconciliation_policy_version": "reconciliation-v1",
+        "assembly_policy_version": "canonical-v1",
+        "wire_fingerprint_version": "report-wire-jcs-sha256-v1",
+    }
+    actual = {
+        "domain_schema_version": ref.domain_schema_version,
+        "reconciliation_policy_version": ref.reconciliation_policy_version,
+        "assembly_policy_version": ref.assembly_policy_version,
+        "wire_fingerprint_version": ref.wire_fingerprint_version,
+    }
+    if actual != supported:
+        raise UnsupportedReportContractError(
+            "report bundle uses an unsupported contract or policy version"
+        )
+    if ref.competition_id != bundle.report.competition_id:
+        raise ReportBundleError("report ref competition_id does not match report")
+    if ref.report_version != bundle.report.report_version:
+        raise ReportBundleError("report ref report_version does not match report")
+    if not _valid_sha256(ref.assembly_material_fingerprint):
+        raise ReportBundleError("assembly material fingerprint is invalid")
+    if not _valid_sha256(ref.wire_fingerprint):
+        raise ReportBundleError("wire fingerprint is invalid")
 
     try:
-        expected = report_wire_fingerprint(bundle.report, bundle.ref)
+        expected = report_wire_fingerprint(bundle.report, ref)
     except CanonicalJsonError as exc:
         raise ReportBundleError("report bundle cannot be canonicalized") from exc
     if not hmac.compare_digest(expected, bundle.ref.wire_fingerprint):
@@ -437,7 +476,7 @@ def evaluate_plan(
     try:
         readiness_request = build_readiness_request(
             canonical_report=clean.report_bundle.report,
-            user=context.user,
+            user=context.user.to_domain(),
             selected_scope=context.selected_scope,
             evaluated_at=evaluated_at,
             require_technology_information=context.require_technology_information,

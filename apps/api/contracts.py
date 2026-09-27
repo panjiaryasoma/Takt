@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 from uuid import UUID
 
 from pydantic import (
@@ -24,6 +24,10 @@ from packages.contracts import (
     ReadinessTriage,
     Recommendation,
     RecommendationAction,
+    SourceRecord,
+    SourceType,
+    EvidenceSpan,
+    ExtractionPath,
     UserContext,
     WorkloadInput,
 )
@@ -59,28 +63,29 @@ class CanonicalReportRefV1(ApiModel):
     domain_schema_version: Literal["3.0.0"] = DOMAIN_SCHEMA_VERSION
     competition_id: NonEmptyStr
     report_version: StrictInt = Field(ge=1)
-    reconciliation_policy_version: Literal["reconciliation-v1"] = (
-        RECONCILIATION_POLICY_VERSION
-    )
-    assembly_policy_version: Literal["canonical-v1"] = ASSEMBLY_POLICY_VERSION
-    assembly_material_fingerprint: Sha256Hex
-    wire_fingerprint_version: Literal["report-wire-jcs-sha256-v1"] = (
-        REPORT_WIRE_FINGERPRINT_VERSION
-    )
-    wire_fingerprint: Sha256Hex
+    reconciliation_policy_version: NonEmptyStr = RECONCILIATION_POLICY_VERSION
+    assembly_policy_version: NonEmptyStr = ASSEMBLY_POLICY_VERSION
+    assembly_material_fingerprint: NonEmptyStr
+    wire_fingerprint_version: NonEmptyStr = REPORT_WIRE_FINGERPRINT_VERSION
+    wire_fingerprint: NonEmptyStr
 
 
 class CanonicalReportBundleV1(ApiModel):
     report: CanonicalCompetitionReport
     ref: CanonicalReportRefV1
 
-    @model_validator(mode="after")
-    def validate_reference_identity(self) -> CanonicalReportBundleV1:
-        if self.ref.competition_id != self.report.competition_id:
-            raise ValueError("report ref competition_id must match report")
-        if self.ref.report_version != self.report.report_version:
-            raise ValueError("report ref report_version must match report")
-        return self
+
+class ReadinessUserContextV1(ApiModel):
+    age: StrictInt | None = Field(default=None, ge=0)
+    student_status: StrictBool | None = None
+    country: NonEmptyStr | None = None
+
+    def to_domain(self) -> UserContext:
+        return UserContext(
+            age=self.age,
+            student_status=self.student_status,
+            country=self.country,
+        )
 
 
 class ReadinessContextV1(ApiModel):
@@ -90,7 +95,7 @@ class ReadinessContextV1(ApiModel):
     clock sample so deadline truth cannot be overridden by the client.
     """
 
-    user: UserContext
+    user: ReadinessUserContextV1
     selected_scope: NonEmptyStr | None = None
     require_technology_information: StrictBool = False
 
@@ -223,3 +228,51 @@ class ApiErrorBodyV1(ApiModel):
 
 class ApiErrorResponseV1(ApiModel):
     error: ApiErrorBodyV1
+
+
+class SourceMetadataV1(ApiModel):
+    source_id: NonEmptyStr
+    source_type: SourceType
+    authority_rank: Any
+    scope: Any
+    freshness_metadata: Any
+
+    @model_validator(mode="after")
+    def validate_explicit_metadata(self) -> SourceMetadataV1:
+        for field_name in ("authority_rank", "scope", "freshness_metadata"):
+            if getattr(self, field_name) is None:
+                raise ValueError(f"{field_name} must be explicit and non-null")
+        return self
+
+
+class CompetitionAnalyzeUrlRequestV1(ApiModel):
+    competition_id: NonEmptyStr
+    url: NonEmptyStr
+    source: SourceMetadataV1
+    previous_report_bundle: CanonicalReportBundleV1 | None = None
+
+
+class CompetitionAnalyzePdfMetadataV1(ApiModel):
+    competition_id: NonEmptyStr
+    document_id: NonEmptyStr
+    source: SourceMetadataV1
+    previous_report_bundle: CanonicalReportBundleV1 | None = None
+
+
+class ExtractionRunAuditV1(ApiModel):
+    source_id: NonEmptyStr
+    snapshot_id: NonEmptyStr
+    extraction_path: ExtractionPath
+    extractor_version: NonEmptyStr
+
+
+class AnalysisProvenanceV1(ApiModel):
+    sources: tuple[SourceRecord, ...]
+    extraction_runs: tuple[ExtractionRunAuditV1, ...]
+    evidence: tuple[EvidenceSpan, ...]
+
+
+class CompetitionAnalyzeResponseV1(ApiModel):
+    report_bundle: CanonicalReportBundleV1
+    provenance: AnalysisProvenanceV1
+    report_changed: StrictBool

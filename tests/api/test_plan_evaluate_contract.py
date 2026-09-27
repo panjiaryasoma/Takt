@@ -16,10 +16,16 @@ from apps.api.contracts import (
     PlanEvaluatePlanningV1,
     PlanEvaluateRequestV1,
     ReadinessContextV1,
+    ReadinessUserContextV1,
 )
 from apps.api.fingerprints import jcs_dumps, report_wire_fingerprint
 from apps.api.main import app
-from engine.integration.plan_evaluation import evaluate_plan, verify_report_bundle
+from engine.integration.plan_evaluation import (
+    ReportBundleError,
+    UnsupportedReportContractError,
+    evaluate_plan,
+    verify_report_bundle,
+)
 from packages.contracts import (
     AvailabilityInput,
     CanonicalCompetitionReport,
@@ -29,7 +35,6 @@ from packages.contracts import (
     PlanningPreferences,
     PlanningWorkWindow,
     ReadinessStatus,
-    UserContext,
     WorkloadInput,
 )
 from packages.contracts.source import CORE_CANONICAL_FIELDS
@@ -88,7 +93,7 @@ def _request() -> PlanEvaluateRequestV1:
     return PlanEvaluateRequestV1(
         report_bundle=_bundle(),
         readiness_context=ReadinessContextV1(
-            user=UserContext(),
+            user=ReadinessUserContextV1(),
             selected_scope=None,
             require_technology_information=False,
         ),
@@ -151,3 +156,34 @@ def test_api_validation_error_uses_stable_envelope_and_json_pointer() -> None:
         for item in body["error"]["details"]
     )
     assert "input" not in json.dumps(body).lower()
+
+
+def test_nested_user_context_is_strict() -> None:
+    payload = _request().model_dump(mode="json")
+    payload["readiness_context"]["user"]["mystery"] = True
+
+    with pytest.raises(ValidationError):
+        PlanEvaluateRequestV1.model_validate(payload)
+
+
+def test_unsupported_report_contract_is_distinct_from_bundle_mismatch() -> None:
+    bundle = _bundle()
+    unsupported = bundle.model_copy(
+        update={
+            "ref": bundle.ref.model_copy(
+                update={"domain_schema_version": "99.0.0"}
+            )
+        }
+    )
+    with pytest.raises(UnsupportedReportContractError):
+        verify_report_bundle(unsupported)
+
+    mismatched = bundle.model_copy(
+        update={
+            "ref": bundle.ref.model_copy(
+                update={"competition_id": "cmp-other"}
+            )
+        }
+    )
+    with pytest.raises(ReportBundleError):
+        verify_report_bundle(mismatched)
