@@ -53,6 +53,10 @@ class AnalysisInputError(ValueError):
     """Client-owned analysis metadata is inconsistent before extraction."""
 
 
+class AnalysisContinuationError(ValueError):
+    """Previous report and source-set continuation material disagree."""
+
+
 class AnalysisReconciliationError(RuntimeError):
     """Server-produced extraction material could not be reconciled."""
 
@@ -108,7 +112,7 @@ def _previous_report(
 ) -> _PreviousReport:
     if bundle is None:
         if prior_source_artifacts:
-            raise AnalysisInputError(
+            raise AnalysisContinuationError(
                 "prior source artifacts require previous_report_bundle"
             )
         return _PreviousReport(None)
@@ -123,10 +127,12 @@ def _previous_report(
         sorted(artifact.source.source_id for artifact in prior_source_artifacts)
     )
     if len(set(prior_ids)) != len(prior_ids):
-        raise AnalysisInputError("prior source artifact IDs must be unique")
+        raise AnalysisContinuationError(
+            "prior source artifact IDs must be unique"
+        )
     report_ids = tuple(sorted(bundle.report.source_ids))
     if prior_ids != report_ids:
-        raise AnalysisInputError(
+        raise AnalysisContinuationError(
             "prior source artifacts must exactly cover previous report source_ids"
         )
     return _PreviousReport(bundle)
@@ -368,6 +374,7 @@ def analyze_pdf(
 
 
 __all__ = [
+    "AnalysisContinuationError",
     "AnalysisInputError",
     "AnalysisInvariantError",
     "AnalysisReconciliationError",
