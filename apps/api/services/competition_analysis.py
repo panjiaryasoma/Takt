@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hmac
 from collections.abc import Iterable
 from dataclasses import dataclass
 
@@ -19,7 +20,7 @@ from apps.api.contracts import (
     SourceAnalysisArtifactV1,
     SourceMetadataV1,
 )
-from apps.api.fingerprints import report_wire_fingerprint
+from apps.api.fingerprints import report_wire_fingerprint, source_set_fingerprint
 from engine.extraction import (
     OCRProvider,
     SnapshotExtractionResult,
@@ -134,6 +135,34 @@ def _previous_report(
     if prior_ids != report_ids:
         raise AnalysisContinuationError(
             "prior source artifacts must exactly cover previous report source_ids"
+        )
+
+    if bundle.ref.source_set_fingerprint is None:
+        raise AnalysisContinuationError(
+            "previous report bundle is not bound to a source artifact set"
+        )
+    try:
+        expected_source_set_fingerprint = source_set_fingerprint(
+            prior_source_artifacts
+        )
+        for artifact in prior_source_artifacts:
+            validate_source_policy_metadata(
+                source_type=artifact.source.source_type,
+                authority_rank=artifact.source.authority_rank,
+                scope=artifact.source.scope,
+                freshness_metadata=artifact.source.freshness_metadata,
+            )
+    except (ReconciliationInputError, TypeError, ValueError) as exc:
+        raise AnalysisContinuationError(
+            "prior source artifacts failed continuation validation"
+        ) from exc
+
+    if not hmac.compare_digest(
+        expected_source_set_fingerprint,
+        bundle.ref.source_set_fingerprint,
+    ):
+        raise AnalysisContinuationError(
+            "prior source artifacts do not match previous report source-set fingerprint"
         )
     return _PreviousReport(bundle)
 
@@ -268,13 +297,17 @@ def _assert_canonical_evidence_resolves(
         )
 
 
-def _report_bundle(assembly) -> CanonicalReportBundleV1:
+def _report_bundle(
+    assembly,
+    artifacts: tuple[SourceAnalysisArtifactV1, ...],
+) -> CanonicalReportBundleV1:
     initial_ref = CanonicalReportRefV1(
         competition_id=assembly.report.competition_id,
         report_version=assembly.report.report_version,
         reconciliation_policy_version=RECONCILIATION_POLICY_VERSION,
         assembly_policy_version=assembly.assembly_policy_version,
         assembly_material_fingerprint=assembly.material_fingerprint,
+        source_set_fingerprint=source_set_fingerprint(artifacts),
         wire_fingerprint_version="report-wire-jcs-sha256-v1",
         wire_fingerprint="0" * 64,
     )
@@ -315,7 +348,7 @@ def _response(
         evidence=evidence,
     )
     return CompetitionAnalyzeResponseV1(
-        report_bundle=_report_bundle(assembly),
+        report_bundle=_report_bundle(assembly, artifacts),
         source_artifacts=artifacts,
         provenance=provenance,
         report_changed=assembly.report_changed,
