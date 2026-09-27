@@ -21,7 +21,9 @@ from pydantic_core import PydanticCustomError
 
 from apps.api.canonical_json import CanonicalJsonError, jcs_sha256
 from packages.contracts import (
+    AllocationBlock,
     AvailabilityInput,
+    CandidateExtractionReport,
     CanonicalCompetitionReport,
     FeasibilityStatus,
     ReadinessStatus,
@@ -263,15 +265,33 @@ class RecommendationV1(ApiModel):
     assumptions: tuple[RecommendationAssumptionV1, ...]
 
 
+class PublicCandidateV1(ApiModel):
+    ref: CandidateRefV1
+    work_blocks: tuple[AllocationBlock, ...]
+    buffer_minutes: StrictInt = Field(ge=0)
+    assumptions: tuple[NonEmptyStr, ...] = ()
+
+
+class RecommendationTraceV1(ApiModel):
+    competition_id: NonEmptyStr
+    report_version: StrictInt = Field(ge=1)
+    assembly_material_fingerprint: Sha256Hex
+    evaluation_basis_fingerprint: Sha256Hex
+    planning_basis_fingerprint: Sha256Hex
+    planning_policy_version: Literal["planning-policy-v1"] = PLANNING_POLICY_VERSION
+
+
 class RecommendationSetV1(ApiModel):
     primary_candidate: CandidateRefV1
     alternative_candidates: tuple[CandidateRefV1, ...] = ()
     recommendation: RecommendationV1
-    allowed_actions: tuple[RecommendationAction, ...]
+    trace: RecommendationTraceV1
 
     @model_validator(mode="after")
     def validate_candidate_refs(self) -> RecommendationSetV1:
-        alternative_ids = tuple(item.candidate_id for item in self.alternative_candidates)
+        alternative_ids = tuple(
+            item.candidate_id for item in self.alternative_candidates
+        )
         if len(set(alternative_ids)) != len(alternative_ids):
             raise ValueError("alternative candidate references must be unique")
         if self.primary_candidate.candidate_id in alternative_ids:
@@ -280,7 +300,9 @@ class RecommendationSetV1(ApiModel):
             item.evaluation_id != self.primary_candidate.evaluation_id
             for item in self.alternative_candidates
         ):
-            raise ValueError("all public candidate references must share one evaluation_id")
+            raise ValueError(
+                "all public candidate references must share one evaluation_id"
+            )
         if (
             self.recommendation.recommended_candidate_id
             != self.primary_candidate.candidate_id
@@ -300,21 +322,79 @@ class RecommendationSetV1(ApiModel):
 
 class PlanningDecisionV1(ApiModel):
     feasibility: FeasibilityStatus
+    candidates: tuple[PublicCandidateV1, ...]
+    allowed_actions: tuple[RecommendationAction, ...]
     reason_codes: tuple[NonEmptyStr, ...] = ()
     tradeoff_codes: tuple[NonEmptyStr, ...] = ()
     sensitivity_codes: tuple[NonEmptyStr, ...] = ()
     recommendation: RecommendationSetV1 | None
 
     @model_validator(mode="after")
-    def validate_recommendation_presence(self) -> PlanningDecisionV1:
+    def validate_public_decision(self) -> PlanningDecisionV1:
+        candidate_ids = tuple(item.ref.candidate_id for item in self.candidates)
+        if len(set(candidate_ids)) != len(candidate_ids):
+            raise ValueError("public candidate IDs must be unique within one evaluation")
+        if len(set(self.allowed_actions)) != len(self.allowed_actions):
+            raise ValueError("allowed_actions must not contain duplicates")
+
         is_infeasible = (
             self.feasibility
             is FeasibilityStatus.NOT_FEASIBLE_UNDER_CURRENT_CONSTRAINTS
         )
-        if is_infeasible and self.recommendation is not None:
-            raise ValueError("infeasible planning decision must not contain recommendation")
-        if not is_infeasible and self.recommendation is None:
+        no_recommendation_actions = (
+            RecommendationAction.EDIT_CONSTRAINTS,
+            RecommendationAction.IGNORE,
+        )
+        if is_infeasible:
+            if self.candidates:
+                raise ValueError("infeasible planning decision must not expose candidates")
+            if self.recommendation is not None:
+                raise ValueError(
+                    "infeasible planning decision must not contain recommendation"
+                )
+            if self.allowed_actions != no_recommendation_actions:
+                raise ValueError(
+                    "infeasible planning actions must be EDIT_CONSTRAINTS then IGNORE"
+                )
+            return self
+
+        if not self.candidates:
+            raise ValueError("recommendable planning decision requires candidates")
+        if self.recommendation is None:
             raise ValueError("recommendable planning decision requires recommendation")
+
+        evaluation_ids = {item.ref.evaluation_id for item in self.candidates}
+        if len(evaluation_ids) != 1:
+            raise ValueError("all public candidates must share one evaluation_id")
+
+        by_id = {item.ref.candidate_id: item for item in self.candidates}
+        refs = (
+            self.recommendation.primary_candidate,
+            *self.recommendation.alternative_candidates,
+        )
+        referenced_ids = tuple(item.candidate_id for item in refs)
+        if referenced_ids != candidate_ids:
+            raise ValueError(
+                "recommendation candidate references must resolve to the public "
+                "candidate pool in canonical order"
+            )
+        if any(item.candidate_id not in by_id for item in refs):
+            raise ValueError("recommendation references an unknown public candidate")
+
+        expected_actions = (
+            RecommendationAction.ACCEPT,
+            *(
+                (RecommendationAction.CHOOSE_ALTERNATIVE,)
+                if self.recommendation.alternative_candidates
+                else ()
+            ),
+            RecommendationAction.EDIT_CONSTRAINTS,
+            RecommendationAction.IGNORE,
+        )
+        if self.allowed_actions != expected_actions:
+            raise ValueError(
+                "recommendable planning actions must match alternative availability"
+            )
         return self
 
 
@@ -379,6 +459,7 @@ class CompetitionAnalyzeUrlRequestV1(ApiModel):
     url: NonEmptyStr
     source: SourceMetadataV1
     previous_report_bundle: CanonicalReportBundleV1 | None = None
+    prior_source_artifacts: tuple[SourceAnalysisArtifactV1, ...] = ()
 
 
 class CompetitionAnalyzePdfMetadataV1(ApiModel):
@@ -386,6 +467,7 @@ class CompetitionAnalyzePdfMetadataV1(ApiModel):
     document_id: NonEmptyStr
     source: SourceMetadataV1
     previous_report_bundle: CanonicalReportBundleV1 | None = None
+    prior_source_artifacts: tuple[SourceAnalysisArtifactV1, ...] = ()
 
 
 class ExtractionRunAuditV1(ApiModel):
@@ -393,6 +475,25 @@ class ExtractionRunAuditV1(ApiModel):
     snapshot_id: NonEmptyStr
     extraction_path: ExtractionPath
     extractor_version: NonEmptyStr
+
+
+class SourceAnalysisArtifactV1(ApiModel):
+    source: SourceRecord
+    candidate_reports: tuple[CandidateExtractionReport, ...] = Field(min_length=1)
+    extraction_runs: tuple[ExtractionRunAuditV1, ...] = Field(min_length=1)
+
+    @model_validator(mode="after")
+    def validate_source_continuity(self) -> SourceAnalysisArtifactV1:
+        source_id = self.source.source_id
+        if any(item.source_id != source_id for item in self.candidate_reports):
+            raise ValueError(
+                "candidate report source_id must match source artifact source_id"
+            )
+        if any(item.source_id != source_id for item in self.extraction_runs):
+            raise ValueError(
+                "extraction run source_id must match source artifact source_id"
+            )
+        return self
 
 
 class AnalysisProvenanceV1(ApiModel):
@@ -403,5 +504,6 @@ class AnalysisProvenanceV1(ApiModel):
 
 class CompetitionAnalyzeResponseV1(ApiModel):
     report_bundle: CanonicalReportBundleV1
+    source_artifacts: tuple[SourceAnalysisArtifactV1, ...]
     provenance: AnalysisProvenanceV1
     report_changed: StrictBool
