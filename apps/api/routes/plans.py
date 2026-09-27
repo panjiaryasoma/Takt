@@ -10,6 +10,7 @@ from apps.api.contracts import (
 from apps.api.errors import ApiContractError
 from apps.api.services.plan_evaluation import (
     PlanEvaluationAvailabilityError,
+    PlanEvaluationExecutionError,
     PlanEvaluationIndeterminateError,
     PlanEvaluationInputError,
     PlanEvaluationInvariantError,
@@ -84,6 +85,13 @@ def evaluate_plan_route(request: PlanEvaluateRequestV1) -> PlanEvaluateResponseV
             status_code=500,
             code="PLANNING_RUNTIME_UNAVAILABLE",
             message="A required planning runtime dependency is unavailable.",
+            stage="planning",
+        ) from exc
+    except PlanEvaluationExecutionError as exc:
+        raise ApiContractError(
+            status_code=500,
+            code="PLANNING_EXECUTION_FAILED",
+            message="The planning pipeline could not complete execution.",
             stage="planning",
         ) from exc
     except PlanEvaluationInvariantError as exc:
