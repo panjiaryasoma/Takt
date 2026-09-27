@@ -8,6 +8,7 @@ from typing import Annotated
 from fastapi import APIRouter, File, Form, Request, UploadFile
 from pydantic import ValidationError
 from apps.api.contracts import (
+    ApiErrorResponseV1,
     CompetitionAnalyzePdfMetadataV1,
     CompetitionAnalyzeResponseV1,
     CompetitionAnalyzeUrlRequestV1,
@@ -46,6 +47,17 @@ from apps.api.services.plan_evaluation import (
 )
 
 router = APIRouter(tags=["competitions"])
+
+_ANALYSIS_ERROR_RESPONSES = {
+    400: {"model": ApiErrorResponseV1},
+    413: {"model": ApiErrorResponseV1},
+    415: {"model": ApiErrorResponseV1},
+    422: {"model": ApiErrorResponseV1},
+    500: {"model": ApiErrorResponseV1},
+    502: {"model": ApiErrorResponseV1},
+    503: {"model": ApiErrorResponseV1},
+    504: {"model": ApiErrorResponseV1},
+}
 
 
 def _raise_analysis_error(exc: Exception) -> None:
@@ -181,6 +193,7 @@ def _raise_analysis_error(exc: Exception) -> None:
 @router.post(
     "/competitions/analyze/url",
     response_model=CompetitionAnalyzeResponseV1,
+    responses=_ANALYSIS_ERROR_RESPONSES,
 )
 def analyze_url_route(
     request: CompetitionAnalyzeUrlRequestV1,
@@ -195,6 +208,7 @@ def analyze_url_route(
 @router.post(
     "/competitions/analyze/pdf",
     response_model=CompetitionAnalyzeResponseV1,
+    responses=_ANALYSIS_ERROR_RESPONSES,
 )
 async def analyze_pdf_route(
     request: Request,
