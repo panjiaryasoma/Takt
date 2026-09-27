@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
 from collections.abc import Iterable
+from datetime import UTC, datetime
 from typing import Any
 
 from apps.api.canonical_json import jcs_sha256
@@ -49,7 +49,7 @@ def source_set_fingerprint(artifacts: Iterable[Any]) -> str:
         dumped = artifact.model_dump(mode="json", warnings=False)
         source = dumped.get("source")
         if not isinstance(source, dict) or not isinstance(source.get("source_id"), str):
-            raise ValueError("source artifact must expose source.source_id")
+            raise TypeError("source artifact must expose source.source_id")
         material.append(dumped)
 
     material.sort(key=lambda item: item["source"]["source_id"])
