@@ -16,7 +16,6 @@ from pydantic import (
     StringConstraints,
     model_validator,
 )
-
 from pydantic_core import PydanticCustomError
 
 from apps.api.canonical_json import CanonicalJsonError, jcs_sha256
@@ -30,14 +29,14 @@ from packages.contracts import (
     AvailabilityInput,
     CandidateExtractionReport,
     CanonicalCompetitionReport,
+    EvidenceSpan,
+    ExtractionPath,
     FeasibilityStatus,
     ReadinessStatus,
     ReadinessTriage,
     RecommendationAction,
     SourceRecord,
     SourceType,
-    EvidenceSpan,
-    ExtractionPath,
     UserContext,
     WorkloadInput,
 )
