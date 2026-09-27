@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Iterable
 
 from fastapi import Request
+from fastapi.encoders import jsonable_encoder
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
 
@@ -159,6 +160,12 @@ async def request_validation_error_handler(
     request: Request,
     exc: RequestValidationError,
 ) -> JSONResponse:
+    if request.url.path == "/api/v1/triage":
+        return JSONResponse(
+            status_code=422,
+            content=jsonable_encoder({"detail": exc.errors()}),
+        )
+
     errors = tuple(exc.errors())
     code, message, stage = validation_contract(
         errors,
