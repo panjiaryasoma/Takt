@@ -33,6 +33,7 @@ from engine.extraction import (
     UnsupportedMediaTypeError,
 )
 from apps.api.services.competition_analysis import (
+    AnalysisContinuationError,
     AnalysisInputError,
     AnalysisInvariantError,
     AnalysisReconciliationError,
@@ -54,6 +55,13 @@ def _raise_analysis_error(exc: Exception) -> None:
             code="SOURCE_METADATA_INVALID",
             message="Source metadata validation failed.",
             stage="ingestion",
+        ) from exc
+    if isinstance(exc, AnalysisContinuationError):
+        raise ApiContractError(
+            status_code=422,
+            code="ANALYSIS_CONTEXT_INVALID",
+            message="Previous report and source analysis context are inconsistent.",
+            stage="analysis",
         ) from exc
     if isinstance(exc, UnsupportedReportContractError):
         raise ApiContractError(
