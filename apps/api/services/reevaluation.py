@@ -28,7 +28,6 @@ from apps.api.services.plan_evaluation import (
     EvaluationIdFactory,
     PlanEvaluationInvariantError,
     PreparedEvaluation,
-    ReadinessExecution,
     execute_prepared_evaluation,
     execute_readiness_stage,
     finalize_evaluation_basis,
