@@ -4,11 +4,13 @@ from __future__ import annotations
 
 import json
 from datetime import UTC, datetime
+from importlib.metadata import PackageNotFoundError
 from uuid import UUID
 
 from fastapi.testclient import TestClient
 
 import apps.api.routes.plans as plans_route
+import apps.api.services.plan_evaluation as plan_evaluation_service
 import engine.feasibility.service as feasibility_service
 from apps.api.contracts import (
     CanonicalReportBundleV1,
@@ -22,6 +24,7 @@ from apps.api.fingerprints import report_wire_fingerprint
 from apps.api.main import app
 from apps.api.services.plan_evaluation import (
     PlanEvaluationIndeterminateError,
+    PlanEvaluationInvariantError,
     evaluate_plan,
     planning_cutoff,
     verify_report_bundle,
@@ -42,6 +45,7 @@ from packages.contracts import (
     Task,
     WorkloadInput,
 )
+from engine.feasibility.service import FeasibilityExecutionError
 from engine.scheduler.models import SolverResult, SolverRunStatus
 from packages.contracts.source import CORE_CANONICAL_FIELDS
 
@@ -605,3 +609,109 @@ def test_readiness_fingerprint_stops_after_first_eligibility_blocker() -> None:
         first.basis.readiness.basis_fingerprint
         == second.basis.readiness.basis_fingerprint
     )
+
+
+def _route_with_fixed_clock(request: PlanEvaluateRequestV1):
+    return plan_evaluation_service.evaluate_plan(
+        request,
+        clock=_clock,
+        evaluation_id_factory=_id_one,
+    )
+
+
+def test_availability_execution_failure_has_availability_error_stage(
+    monkeypatch,
+) -> None:
+    def fail_availability(_value):
+        raise RuntimeError("private availability detail")
+
+    monkeypatch.setattr(
+        plan_evaluation_service,
+        "build_availability",
+        fail_availability,
+    )
+    monkeypatch.setattr(plans_route, "evaluate_plan", _route_with_fixed_clock)
+
+    response = TestClient(app).post(
+        "/api/v1/plans/evaluate",
+        json=_request(effort_minutes=60).model_dump(mode="json"),
+    )
+
+    assert response.status_code == 500
+    body = response.json()
+    assert body["error"]["code"] == "AVAILABILITY_EXECUTION_FAILED"
+    assert body["error"]["stage"] == "availability"
+    assert "private availability detail" not in json.dumps(body)
+
+
+def test_planning_runtime_metadata_failure_is_not_mislabeled_solver(
+    monkeypatch,
+) -> None:
+    def missing_package(_name: str):
+        raise PackageNotFoundError("ortools")
+
+    monkeypatch.setattr(
+        plan_evaluation_service,
+        "package_version",
+        missing_package,
+    )
+    monkeypatch.setattr(plans_route, "evaluate_plan", _route_with_fixed_clock)
+
+    response = TestClient(app).post(
+        "/api/v1/plans/evaluate",
+        json=_request(effort_minutes=60).model_dump(mode="json"),
+    )
+
+    assert response.status_code == 500
+    body = response.json()
+    assert body["error"]["code"] == "PLANNING_RUNTIME_UNAVAILABLE"
+    assert body["error"]["stage"] == "planning"
+
+
+def test_solver_execution_failure_keeps_solver_error_stage(
+    monkeypatch,
+) -> None:
+    def fail_solver(*_args, **_kwargs):
+        raise FeasibilityExecutionError("private solver failure")
+
+    monkeypatch.setattr(
+        plan_evaluation_service,
+        "assess_feasibility_run",
+        fail_solver,
+    )
+    monkeypatch.setattr(plans_route, "evaluate_plan", _route_with_fixed_clock)
+
+    response = TestClient(app).post(
+        "/api/v1/plans/evaluate",
+        json=_request(effort_minutes=60).model_dump(mode="json"),
+    )
+
+    assert response.status_code == 500
+    body = response.json()
+    assert body["error"]["code"] == "SOLVER_EXECUTION_FAILED"
+    assert body["error"]["stage"] == "solver"
+
+
+def test_server_produced_public_model_failure_normalizes_to_invariant_error(
+    monkeypatch,
+) -> None:
+    def broken_planning_decision(**_kwargs):
+        raise ValueError("private public-model invariant detail")
+
+    monkeypatch.setattr(
+        plan_evaluation_service,
+        "PlanningDecisionV1",
+        broken_planning_decision,
+    )
+    monkeypatch.setattr(plans_route, "evaluate_plan", _route_with_fixed_clock)
+
+    response = TestClient(app).post(
+        "/api/v1/plans/evaluate",
+        json=_request(effort_minutes=60).model_dump(mode="json"),
+    )
+
+    assert response.status_code == 500
+    body = response.json()
+    assert body["error"]["code"] == "EVALUATION_INVARIANT_FAILED"
+    assert body["error"]["stage"] == "evaluation"
+    assert "private public-model invariant detail" not in json.dumps(body)
