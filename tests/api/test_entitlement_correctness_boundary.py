@@ -11,6 +11,8 @@ from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from apps.api.contracts import (
+    CanonicalReportBundleV1,
+    CanonicalReportRefV1,
     CompetitionAnalyzePdfMetadataV1,
     CompetitionAnalyzeUrlRequestV1,
     EvaluationBasisV1,
@@ -29,6 +31,7 @@ from apps.api.contracts import (
 from apps.api.fingerprints import report_wire_fingerprint
 from apps.api.main import app
 from apps.api.policy_versions import PLANNING_POLICY
+from apps.api.services.plan_evaluation import evaluate_plan
 from engine.feasibility.service import assess_feasibility_run
 from engine.integration.competition_analysis import build_readiness_request
 from engine.recommendation.service import build_recommendation
@@ -144,9 +147,7 @@ def _canonical_field(
     )
 
 
-def _report_bundle(report: CanonicalCompetitionReport):
-    from apps.api.contracts import CanonicalReportBundleV1, CanonicalReportRefV1
-
+def _report_bundle(report: CanonicalCompetitionReport) -> CanonicalReportBundleV1:
     initial = CanonicalReportRefV1(
         competition_id=report.competition_id,
         report_version=report.report_version,
