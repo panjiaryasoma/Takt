@@ -9,6 +9,7 @@ from uuid import UUID
 from pydantic import (
     AwareDatetime,
     BaseModel,
+    BeforeValidator,
     ConfigDict,
     Field,
     StrictBool,
@@ -60,6 +61,19 @@ NonEmptyStr = Annotated[
 Sha256Hex = Annotated[
     str,
     StringConstraints(pattern=r"^[0-9a-f]{64}$", strict=True),
+]
+
+
+def _preserve_nonblank_string(value: Any) -> Any:
+    if isinstance(value, str) and not value.strip():
+        raise ValueError("string must contain non-whitespace characters")
+    return value
+
+
+ExactNonBlankStr = Annotated[
+    str,
+    BeforeValidator(_preserve_nonblank_string),
+    StringConstraints(min_length=1, strict=True),
 ]
 
 
@@ -473,6 +487,167 @@ class PlanEvaluateResponseV1(ApiModel):
         return self
 
 
+class PriorReportBasisSnapshotV1(ApiModel):
+    competition_id: ExactNonBlankStr
+    report_version: StrictInt = Field(ge=1)
+    reconciliation_policy_version: ExactNonBlankStr
+    assembly_policy_version: ExactNonBlankStr
+    assembly_material_fingerprint: Sha256Hex
+
+
+class PriorReadinessBasisSnapshotV1(ApiModel):
+    basis_version: Literal["readiness-basis-v1"]
+    basis_fingerprint: Sha256Hex
+    projection_version: ExactNonBlankStr
+    rule_version: ExactNonBlankStr
+
+
+class PriorPlanningBasisSnapshotV1(ApiModel):
+    basis_version: Literal["planning-basis-v1"]
+    basis_fingerprint: Sha256Hex
+    policy_version: ExactNonBlankStr
+    solver_backend: ExactNonBlankStr
+    solver_backend_version: ExactNonBlankStr
+
+
+class PriorEvaluationBasisSnapshotV1(ApiModel):
+    version: Literal["evaluation-basis-v1"]
+    domain_schema_version: Literal["3.0.0"]
+    fingerprint: Sha256Hex
+    report: PriorReportBasisSnapshotV1
+    readiness: PriorReadinessBasisSnapshotV1
+    planning: PriorPlanningBasisSnapshotV1 | None = None
+
+
+class PriorEvaluationV1(ApiModel):
+    evaluation_id: UUID
+    basis: PriorEvaluationBasisSnapshotV1
+
+    @model_validator(mode="after")
+    def validate_evaluation_id(self) -> PriorEvaluationV1:
+        if self.evaluation_id.version != 4:
+            raise ValueError("prior evaluation_id must be UUIDv4")
+        return self
+
+
+class PlanReevaluateRequestV1(ApiModel):
+    prior: PriorEvaluationV1
+    current: PlanEvaluateRequestV1
+
+    @model_validator(mode="before")
+    @classmethod
+    def classify_structural_versions(cls, value: Any) -> Any:
+        if not isinstance(value, dict):
+            return value
+        prior = value.get("prior")
+        if not isinstance(prior, dict):
+            return value
+        basis = prior.get("basis")
+        if not isinstance(basis, dict):
+            return value
+
+        markers: list[tuple[Any, str]] = [
+            (basis.get("version"), EVALUATION_BASIS_VERSION),
+            (basis.get("domain_schema_version"), DOMAIN_SCHEMA_VERSION),
+        ]
+        readiness = basis.get("readiness")
+        if isinstance(readiness, dict):
+            markers.append(
+                (readiness.get("basis_version"), READINESS_BASIS_VERSION)
+            )
+        planning = basis.get("planning")
+        if isinstance(planning, dict):
+            markers.append(
+                (planning.get("basis_version"), PLANNING_BASIS_VERSION)
+            )
+
+        for actual, supported in markers:
+            if isinstance(actual, str) and actual != supported:
+                raise PydanticCustomError(
+                    "unsupported_reevaluation_contract",
+                    "Prior evaluation basis structural version is not supported.",
+                )
+        return value
+
+
+ReevaluationKindV1 = Literal["UNCHANGED", "SUPERSEDED"]
+EvaluationFreshnessV1 = Literal["CURRENT", "STALE"]
+ReevaluationChangeReasonV1 = Literal[
+    "REPORT_BASIS_CHANGED",
+    "READINESS_BASIS_CHANGED",
+    "PLANNING_BASIS_CHANGED",
+]
+
+
+class ReevaluationTransitionV1(ApiModel):
+    kind: ReevaluationKindV1
+    prior_evaluation_id: UUID
+    prior_basis_fingerprint: Sha256Hex
+    current_basis_fingerprint: Sha256Hex | None
+    prior_evaluation_freshness: EvaluationFreshnessV1
+    change_reasons: tuple[ReevaluationChangeReasonV1, ...] = ()
+
+    @model_validator(mode="after")
+    def validate_transition(self) -> ReevaluationTransitionV1:
+        if self.prior_evaluation_id.version != 4:
+            raise ValueError("prior_evaluation_id must be UUIDv4")
+        canonical = (
+            "REPORT_BASIS_CHANGED",
+            "READINESS_BASIS_CHANGED",
+            "PLANNING_BASIS_CHANGED",
+        )
+        ordered = tuple(reason for reason in canonical if reason in self.change_reasons)
+        if ordered != self.change_reasons or len(set(self.change_reasons)) != len(
+            self.change_reasons
+        ):
+            raise ValueError("change_reasons must be unique and canonically ordered")
+
+        if self.kind == "UNCHANGED":
+            if self.prior_evaluation_freshness != "CURRENT":
+                raise ValueError("UNCHANGED transition must keep prior CURRENT")
+            if self.change_reasons:
+                raise ValueError("UNCHANGED transition must not have change reasons")
+            if self.current_basis_fingerprint != self.prior_basis_fingerprint:
+                raise ValueError(
+                    "UNCHANGED transition requires equal basis fingerprints"
+                )
+            return self
+
+        if self.prior_evaluation_freshness != "STALE":
+            raise ValueError("SUPERSEDED transition must mark prior STALE")
+        if not self.change_reasons:
+            raise ValueError("SUPERSEDED transition requires change reasons")
+        if (
+            self.current_basis_fingerprint is not None
+            and self.current_basis_fingerprint == self.prior_basis_fingerprint
+        ):
+            raise ValueError(
+                "SUPERSEDED transition with current basis requires different fingerprint"
+            )
+        return self
+
+
+class PlanReevaluateResponseV1(ApiModel):
+    transition: ReevaluationTransitionV1
+    evaluation: PlanEvaluateResponseV1 | None
+
+    @model_validator(mode="after")
+    def validate_result_shape(self) -> PlanReevaluateResponseV1:
+        if self.transition.kind == "UNCHANGED":
+            if self.evaluation is not None:
+                raise ValueError("UNCHANGED re-evaluation must not emit evaluation")
+            return self
+        if self.evaluation is None:
+            raise ValueError("successful SUPERSEDED re-evaluation requires evaluation")
+        if self.transition.current_basis_fingerprint != self.evaluation.basis.fingerprint:
+            raise ValueError(
+                "SUPERSEDED transition must reference emitted evaluation basis"
+            )
+        if self.evaluation.evaluation_id == self.transition.prior_evaluation_id:
+            raise ValueError("fresh evaluation_id must differ from prior evaluation_id")
+        return self
+
+
 class ApiErrorDetailV1(ApiModel):
     path: NonEmptyStr
     message: NonEmptyStr
@@ -488,6 +663,11 @@ class ApiErrorBodyV1(ApiModel):
 
 class ApiErrorResponseV1(ApiModel):
     error: ApiErrorBodyV1
+
+
+class PlanReevaluateErrorResponseV1(ApiModel):
+    error: ApiErrorBodyV1
+    transition: ReevaluationTransitionV1 | None
 
 
 class SourceMetadataV1(ApiModel):
