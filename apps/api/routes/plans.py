@@ -1,4 +1,4 @@
-"""Product plan-evaluation API route."""
+"""Product plan-evaluation and re-evaluation API routes."""
 
 from fastapi import APIRouter
 
@@ -6,19 +6,20 @@ from apps.api.contracts import (
     ApiErrorResponseV1,
     PlanEvaluateRequestV1,
     PlanEvaluateResponseV1,
+    PlanReevaluateErrorResponseV1,
+    PlanReevaluateRequestV1,
+    PlanReevaluateResponseV1,
 )
-from apps.api.errors import ApiContractError
-from apps.api.services.plan_evaluation import (
-    PlanEvaluationAvailabilityError,
-    PlanEvaluationExecutionError,
-    PlanEvaluationIndeterminateError,
-    PlanEvaluationInputError,
-    PlanEvaluationInvariantError,
-    PlanEvaluationRuntimeError,
-    PlanEvaluationSolverExecutionError,
-    ReportBundleError,
-    UnsupportedReportContractError,
-    evaluate_plan,
+from apps.api.errors import (
+    ApiContractError,
+    PlanReevaluateContractError,
+    classify_plan_failure,
+)
+from apps.api.services.plan_evaluation import evaluate_plan
+from apps.api.services.reevaluation import (
+    ReevaluationContextInvalid,
+    ReevaluationExecutionFailure,
+    reevaluate_plan,
 )
 
 router = APIRouter(tags=["plans"])
@@ -27,6 +28,13 @@ _PLAN_ERROR_RESPONSES = {
     422: {"model": ApiErrorResponseV1},
     500: {"model": ApiErrorResponseV1},
     503: {"model": ApiErrorResponseV1},
+}
+
+_REEVALUATE_ERROR_RESPONSES = {
+    409: {"model": PlanReevaluateErrorResponseV1},
+    422: {"model": PlanReevaluateErrorResponseV1},
+    500: {"model": PlanReevaluateErrorResponseV1},
+    503: {"model": PlanReevaluateErrorResponseV1},
 }
 
 
@@ -38,66 +46,40 @@ _PLAN_ERROR_RESPONSES = {
 def evaluate_plan_route(request: PlanEvaluateRequestV1) -> PlanEvaluateResponseV1:
     try:
         return evaluate_plan(request)
-    except UnsupportedReportContractError as exc:
+    except Exception as exc:
+        contract = classify_plan_failure(exc)
         raise ApiContractError(
-            status_code=422,
-            code="UNSUPPORTED_REPORT_CONTRACT",
-            message="Canonical report contract or policy version is not supported.",
-            stage="report",
+            status_code=contract.status_code,
+            code=contract.code,
+            message=contract.message,
+            stage=contract.stage,
         ) from exc
-    except ReportBundleError as exc:
-        raise ApiContractError(
-            status_code=422,
-            code="REPORT_BUNDLE_INVALID",
-            message="Canonical report bundle failed integrity validation.",
-            stage="report",
+
+
+@router.post(
+    "/plans/re-evaluate",
+    response_model=PlanReevaluateResponseV1,
+    responses=_REEVALUATE_ERROR_RESPONSES,
+)
+def reevaluate_plan_route(
+    request: PlanReevaluateRequestV1,
+) -> PlanReevaluateResponseV1:
+    try:
+        return reevaluate_plan(request)
+    except ReevaluationContextInvalid as exc:
+        raise PlanReevaluateContractError(
+            status_code=409,
+            code="REEVALUATION_CONTEXT_INVALID",
+            message="Prior and current evaluation context cannot be compared safely.",
+            stage="reevaluation",
+            transition=None,
         ) from exc
-    except PlanEvaluationInputError as exc:
-        raise ApiContractError(
-            status_code=422,
-            code="PLANNING_INPUT_INVALID",
-            message="Evaluation input cannot be used by the planning pipeline.",
-            stage="evaluation",
-        ) from exc
-    except PlanEvaluationIndeterminateError as exc:
-        raise ApiContractError(
-            status_code=503,
-            code="SOLVER_INDETERMINATE",
-            message="The solver could not determine a planning result.",
-            stage="solver",
-        ) from exc
-    except PlanEvaluationAvailabilityError as exc:
-        raise ApiContractError(
-            status_code=500,
-            code="AVAILABILITY_EXECUTION_FAILED",
-            message="Availability preparation could not complete.",
-            stage="availability",
-        ) from exc
-    except PlanEvaluationSolverExecutionError as exc:
-        raise ApiContractError(
-            status_code=500,
-            code="SOLVER_EXECUTION_FAILED",
-            message="The solver could not complete execution.",
-            stage="solver",
-        ) from exc
-    except PlanEvaluationRuntimeError as exc:
-        raise ApiContractError(
-            status_code=500,
-            code="PLANNING_RUNTIME_UNAVAILABLE",
-            message="A required planning runtime dependency is unavailable.",
-            stage="planning",
-        ) from exc
-    except PlanEvaluationExecutionError as exc:
-        raise ApiContractError(
-            status_code=500,
-            code="PLANNING_EXECUTION_FAILED",
-            message="The planning pipeline could not complete execution.",
-            stage="planning",
-        ) from exc
-    except PlanEvaluationInvariantError as exc:
-        raise ApiContractError(
-            status_code=500,
-            code="EVALUATION_INVARIANT_FAILED",
-            message="The server produced inconsistent evaluation artifacts.",
-            stage="evaluation",
+    except ReevaluationExecutionFailure as exc:
+        contract = classify_plan_failure(exc.cause)
+        raise PlanReevaluateContractError(
+            status_code=contract.status_code,
+            code=contract.code,
+            message=contract.message,
+            stage=contract.stage,
+            transition=exc.transition,
         ) from exc
