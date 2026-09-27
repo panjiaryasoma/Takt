@@ -16,6 +16,10 @@ from uuid import UUID, uuid4
 from pydantic import ValidationError
 
 from apps.api.contracts import (
+    ASSEMBLY_POLICY_VERSION,
+    DOMAIN_SCHEMA_VERSION,
+    RECONCILIATION_POLICY_VERSION,
+    REPORT_WIRE_FINGERPRINT_VERSION,
     CandidateRefV1,
     CanonicalReportBundleV1,
     EvaluationBasisV1,
@@ -121,10 +125,10 @@ def verify_report_bundle(bundle: CanonicalReportBundleV1) -> None:
 
     ref = bundle.ref
     supported = {
-        "domain_schema_version": "3.0.0",
-        "reconciliation_policy_version": "reconciliation-v1",
-        "assembly_policy_version": "canonical-v1",
-        "wire_fingerprint_version": "report-wire-jcs-sha256-v1",
+        "domain_schema_version": DOMAIN_SCHEMA_VERSION,
+        "reconciliation_policy_version": RECONCILIATION_POLICY_VERSION,
+        "assembly_policy_version": ASSEMBLY_POLICY_VERSION,
+        "wire_fingerprint_version": REPORT_WIRE_FINGERPRINT_VERSION,
     }
     actual = {
         "domain_schema_version": ref.domain_schema_version,
