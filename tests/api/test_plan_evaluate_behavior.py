@@ -1584,3 +1584,85 @@ def test_unhandled_route_error_still_uses_reevaluate_error_envelope(
     assert body["error"]["code"] == "INTERNAL_ERROR"
     assert body["transition"] is None
     assert "route-level surprise" not in json.dumps(body)
+
+
+@pytest.mark.parametrize(
+    ("path", "value"),
+    [
+        (("prior", "basis", "version"), "evaluation-basis-v2"),
+        (("prior", "basis", "domain_schema_version"), "4.0.0"),
+        (
+            ("prior", "basis", "readiness", "basis_version"),
+            "readiness-basis-v2",
+        ),
+    ],
+)
+def test_unknown_structural_markers_are_unsupported_contract(
+    path,
+    value: str,
+) -> None:
+    request, _ = _prior_request()
+    payload = request.model_dump(mode="json", warnings=False)
+    target = payload
+    for key in path[:-1]:
+        target = target[key]
+    target[path[-1]] = value
+
+    response = TestClient(app).post(
+        "/api/v1/plans/re-evaluate",
+        json=payload,
+    )
+
+    assert response.status_code == 422
+    body = response.json()
+    assert body["error"]["code"] == "UNSUPPORTED_REEVALUATION_CONTRACT"
+    assert body["transition"] is None
+
+
+def test_old_readiness_rule_version_is_valid_semantic_difference() -> None:
+    request, _ = _prior_request()
+    changed = _rewrite_prior_basis(
+        request,
+        lambda basis: basis["readiness"].update(
+            {"rule_version": "0.9"}
+        ),
+    )
+
+    result = reevaluate_plan(
+        changed,
+        clock=_clock,
+        evaluation_id_factory=_id_two,
+    )
+
+    assert result.transition.kind == "SUPERSEDED"
+    assert result.transition.change_reasons == ("READINESS_BASIS_CHANGED",)
+
+
+def test_same_report_version_with_different_material_is_context_invalid() -> None:
+    base = _request(effort_minutes=60)
+    ref = base.report_bundle.ref.model_copy(
+        update={
+            "assembly_material_fingerprint": "c" * 64,
+            "wire_fingerprint": "0" * 64,
+        }
+    )
+    ref = ref.model_copy(
+        update={
+            "wire_fingerprint": report_wire_fingerprint(
+                base.report_bundle.report,
+                ref,
+            )
+        }
+    )
+    current = base.model_copy(
+        update={
+            "report_bundle": CanonicalReportBundleV1(
+                report=base.report_bundle.report,
+                ref=ref,
+            )
+        }
+    )
+    request, _ = _prior_request(current=current)
+
+    with pytest.raises(ReevaluationContextInvalid):
+        reevaluate_plan(request, clock=_clock)
