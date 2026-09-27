@@ -57,9 +57,14 @@ class JadwalTabs extends StatelessWidget {
 
 /// JadwalHarianScreen — Figma node 11:1331 (tab Jadwal Harian).
 class JadwalHarianScreen extends StatelessWidget {
-  const JadwalHarianScreen({super.key, required this.onSwitchTab});
+  const JadwalHarianScreen({
+    super.key,
+    required this.onSwitchTab,
+    this.onAdd,
+  });
 
   final ValueChanged<int> onSwitchTab;
+  final VoidCallback? onAdd;
 
   static const _dayHeaders = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
   static const _firstOffset = 1; // 1 Sept 2026 = Selasa
@@ -99,7 +104,10 @@ class JadwalHarianScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const AppHeader(title: 'Jadwal Saya'),
+          AppHeader(
+            title: 'Jadwal Saya',
+            trailing: AddButton(onTap: onAdd),
+          ),
           const HeaderDivider(),
           const SizedBox(height: 16),
 
@@ -212,8 +220,7 @@ class JadwalHarianScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
-          const SectionHeading(
-              title: 'Sabtu, 27 September', action: 'Tambah'),
+          const SectionHeading(title: 'Sabtu, 27 September'),
           const SizedBox(height: 16),
 
           // Activity timeline

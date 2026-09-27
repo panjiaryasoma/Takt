@@ -6,7 +6,6 @@ import 'screens/jadwal_harian_screen.dart';
 import 'screens/jadwal_ringkasan_screen.dart';
 import 'screens/progres_analisis_screen.dart';
 import 'screens/review_brief_screen.dart';
-import 'screens/tambah_jadwal_screen.dart';
 import 'theme/app_theme.dart';
 import 'widgets/common.dart';
 
@@ -39,23 +38,14 @@ class RootShell extends StatefulWidget {
 class _RootShellState extends State<RootShell> {
   int _navIndex = 0; // 0 beranda, 1 jadwal, 2 analisis, 3 rencana
   int _jadwalTab = 0; // 0 harian, 1 ringkasan
-  bool _showTambahJadwal = false; // overlay form Tambah Jadwal
   int _analisisStep = 0; // 0 kompetisi(form), 1 progres, 2 review brief
 
   Widget _body() {
     switch (_navIndex) {
       case 1:
-        if (_showTambahJadwal) {
-          return TambahJadwalScreen(
-            onBack: () => setState(() => _showTambahJadwal = false),
-            onSave: () => setState(() => _showTambahJadwal = false),
-          );
-        }
         return _jadwalTab == 0
             ? JadwalHarianScreen(
-                onSwitchTab: (i) => setState(() => _jadwalTab = i),
-                onAdd: () => setState(() => _showTambahJadwal = true),
-              )
+                onSwitchTab: (i) => setState(() => _jadwalTab = i))
             : JadwalRingkasanScreen(
                 onSwitchTab: (i) => setState(() => _jadwalTab = i));
       case 2:

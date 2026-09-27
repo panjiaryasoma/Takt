@@ -35,11 +35,12 @@ class StatusBarMock extends StatelessWidget {
   }
 }
 
-/// Header dengan logo "Tk" + judul.
+/// Header dengan logo "Tk" + judul + trailing opsional (mis. tombol Tambah).
 class AppHeader extends StatelessWidget {
-  const AppHeader({super.key, required this.title});
+  const AppHeader({super.key, required this.title, this.trailing});
 
   final String title;
+  final Widget? trailing;
 
   @override
   Widget build(BuildContext context) {
@@ -69,7 +70,48 @@ class AppHeader extends StatelessWidget {
             title,
             style: const TextStyle(color: C.white, fontSize: 20),
           ),
+          if (trailing != null) ...[
+            const Spacer(),
+            trailing!,
+          ],
         ],
+      ),
+    );
+  }
+}
+
+/// Tombol "Tambah" pill kecil (accent) untuk header.
+class AddButton extends StatelessWidget {
+  const AddButton({super.key, this.onTap, this.label = 'Tambah'});
+
+  final VoidCallback? onTap;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: C.accent,
+          borderRadius: BorderRadius.circular(999),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.add, color: C.bg, size: 16),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: const TextStyle(
+                color: C.bg,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -131,4 +173,59 @@ class SectionHeading extends StatelessWidget {
       ),
     );
   }
+}
+
+/// Kotak dengan garis putus-putus (dashed) — untuk dropzone upload.
+class DottedBorderBox extends StatelessWidget {
+  const DottedBorderBox({super.key, required this.child, this.radius = 14});
+
+  final Widget child;
+  final double radius;
+
+  @override
+  Widget build(BuildContext context) {
+    return CustomPaint(
+      painter: _DashedBorderPainter(radius: radius),
+      child: Padding(
+        padding: const EdgeInsets.all(4),
+        child: child,
+      ),
+    );
+  }
+}
+
+class _DashedBorderPainter extends CustomPainter {
+  _DashedBorderPainter({required this.radius});
+
+  final double radius;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = C.navInactive
+      ..strokeWidth = 1.2
+      ..style = PaintingStyle.stroke;
+
+    final rrect = RRect.fromRectAndRadius(
+      Offset.zero & size,
+      Radius.circular(radius),
+    );
+    final path = Path()..addRRect(rrect);
+
+    const dash = 6.0;
+    const gap = 5.0;
+    for (final metric in path.computeMetrics()) {
+      var distance = 0.0;
+      while (distance < metric.length) {
+        canvas.drawPath(
+          metric.extractPath(distance, distance + dash),
+          paint,
+        );
+        distance += dash + gap;
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant _DashedBorderPainter oldDelegate) => false;
 }
