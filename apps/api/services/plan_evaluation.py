@@ -197,49 +197,6 @@ def _normalized_regions(values: list[str]) -> tuple[str, ...]:
     return tuple(sorted(normalized))
 
 
-def _eligibility_predicates(request: ReadinessRequest) -> dict[str, object]:
-    rules = request.eligibility
-    user = request.user
-    predicates: dict[str, object] = {}
-
-    if rules.minimum_age is not None:
-        if user.age is None:
-            state = "UNKNOWN"
-        elif user.age >= rules.minimum_age:
-            state = "MET"
-        else:
-            state = "NOT_MET"
-        predicates["minimum_age"] = {
-            "required": rules.minimum_age,
-            "state": state,
-        }
-
-    if rules.requires_student:
-        if user.student_status is None:
-            state = "UNKNOWN"
-        elif user.student_status:
-            state = "MET"
-        else:
-            state = "NOT_MET"
-        predicates["student_status"] = {"state": state}
-
-    regions = _normalized_regions(rules.allowed_regions)
-    if regions and regions != ("global",):
-        country = user.country.strip().lower() if user.country else None
-        if country is None:
-            state = "UNKNOWN"
-        elif country in regions:
-            state = "MET"
-        else:
-            state = "NOT_MET"
-        predicates["region"] = {
-            "allowed_regions": list(regions),
-            "state": state,
-        }
-
-    return predicates
-
-
 def _deadline_state(request: ReadinessRequest) -> str:
     if request.submission_deadline is None:
         return "UNAVAILABLE"
