@@ -14,6 +14,7 @@ import apps.api.routes.plans as plans_route
 import apps.api.services.plan_evaluation as plan_evaluation_service
 import apps.api.services.reevaluation as reevaluation_service
 import engine.feasibility.service as feasibility_service
+from apps.api.canonical_json import jcs_sha256
 from apps.api.contracts import (
     CanonicalReportBundleV1,
     CanonicalReportRefV1,
@@ -995,3 +996,250 @@ def test_reevaluation_uses_one_server_clock_sample() -> None:
 
     assert result.transition.kind == "UNCHANGED"
     assert calls == 1
+
+
+def _rewrite_prior_basis(
+    request: PlanReevaluateRequestV1,
+    mutate,
+) -> PlanReevaluateRequestV1:
+    payload = request.model_dump(mode="json", warnings=False)
+    basis = payload["prior"]["basis"]
+    mutate(basis)
+    basis["fingerprint"] = jcs_sha256(
+        {
+            "version": basis["version"],
+            "domain_schema_version": basis["domain_schema_version"],
+            "report": basis["report"],
+            "readiness": basis["readiness"],
+            "planning": basis["planning"],
+        }
+    )
+    return PlanReevaluateRequestV1.model_validate(payload)
+
+
+def test_old_behavior_policy_version_is_parseable_and_becomes_stale() -> None:
+    request, _ = _prior_request()
+    changed = _rewrite_prior_basis(
+        request,
+        lambda basis: basis["planning"].update(
+            {"policy_version": "planning-policy-v0"}
+        ),
+    )
+
+    result = reevaluate_plan(
+        changed,
+        clock=_clock,
+        evaluation_id_factory=_id_two,
+    )
+
+    assert result.transition.kind == "SUPERSEDED"
+    assert result.transition.change_reasons == ("PLANNING_BASIS_CHANGED",)
+
+
+def test_prior_strings_are_not_stripped_before_fingerprint_verification() -> None:
+    request, _ = _prior_request()
+    changed = _rewrite_prior_basis(
+        request,
+        lambda basis: basis["report"].update(
+            {"reconciliation_policy_version": " reconciliation-v1 "}
+        ),
+    )
+
+    assert (
+        changed.prior.basis.report.reconciliation_policy_version
+        == " reconciliation-v1 "
+    )
+    result = reevaluate_plan(
+        changed,
+        clock=_clock,
+        evaluation_id_factory=_id_two,
+    )
+    assert result.transition.kind == "SUPERSEDED"
+    assert result.transition.change_reasons[0] == "REPORT_BASIS_CHANGED"
+
+
+def test_static_planning_policy_witness_survives_availability_failure(
+    monkeypatch,
+) -> None:
+    request, _ = _prior_request()
+    changed = _rewrite_prior_basis(
+        request,
+        lambda basis: basis["planning"].update(
+            {"policy_version": "planning-policy-v0"}
+        ),
+    )
+
+    def fail_availability(_value):
+        raise RuntimeError("availability failure")
+
+    monkeypatch.setattr(
+        plan_evaluation_service,
+        "build_availability",
+        fail_availability,
+    )
+
+    with pytest.raises(ReevaluationExecutionFailure) as captured:
+        reevaluate_plan(changed, clock=_clock)
+
+    transition = captured.value.transition
+    assert transition is not None
+    assert transition.change_reasons == ("PLANNING_BASIS_CHANGED",)
+    assert transition.current_basis_fingerprint is None
+
+
+def test_effective_planning_witness_survives_runtime_metadata_failure(
+    monkeypatch,
+) -> None:
+    base = _request(effort_minutes=60)
+    availability = base.planning.availability.model_copy(
+        update={
+            "work_windows": (
+                PlanningWorkWindow(
+                    start=datetime(2026, 9, 27, 12, 0, tzinfo=UTC),
+                    end=datetime(2026, 9, 27, 14, 30, tzinfo=UTC),
+                ),
+            )
+        }
+    )
+    current = base.model_copy(
+        update={
+            "planning": base.planning.model_copy(
+                update={"availability": availability}
+            )
+        }
+    )
+    request, _ = _prior_request(current=current)
+
+    def missing_package(_name: str):
+        raise PackageNotFoundError("ortools")
+
+    monkeypatch.setattr(
+        plan_evaluation_service,
+        "package_version",
+        missing_package,
+    )
+
+    with pytest.raises(ReevaluationExecutionFailure) as captured:
+        reevaluate_plan(request, clock=_clock)
+
+    transition = captured.value.transition
+    assert transition is not None
+    assert transition.change_reasons == ("PLANNING_BASIS_CHANGED",)
+    assert transition.current_basis_fingerprint is None
+
+
+def test_solver_backend_version_only_change_is_planning_change() -> None:
+    request, _ = _prior_request()
+    changed = _rewrite_prior_basis(
+        request,
+        lambda basis: basis["planning"].update(
+            {"solver_backend_version": "0.0-old"}
+        ),
+    )
+
+    result = reevaluate_plan(
+        changed,
+        clock=_clock,
+        evaluation_id_factory=_id_two,
+    )
+
+    assert result.transition.kind == "SUPERSEDED"
+    assert result.transition.change_reasons == ("PLANNING_BASIS_CHANGED",)
+
+
+def test_readiness_rule_version_invariant_preserves_existing_report_witness(
+    monkeypatch,
+) -> None:
+    base = _request(effort_minutes=60)
+    newer_report = base.report_bundle.report.model_copy(
+        update={"report_version": base.report_bundle.report.report_version + 1}
+    )
+    current = base.model_copy(update={"report_bundle": _bundle(newer_report)})
+    request, _ = _prior_request(current=current)
+
+    real_readiness = plan_evaluation_service.evaluate_readiness
+
+    def wrong_rule(value):
+        result = real_readiness(value)
+        return result.model_copy(update={"rule_version": "wrong-version"})
+
+    monkeypatch.setattr(
+        plan_evaluation_service,
+        "evaluate_readiness",
+        wrong_rule,
+    )
+
+    with pytest.raises(ReevaluationExecutionFailure) as captured:
+        reevaluate_plan(request, clock=_clock)
+
+    failure = captured.value
+    assert failure.transition is not None
+    assert failure.transition.change_reasons == ("REPORT_BASIS_CHANGED",)
+    assert failure.cause.__class__.__name__ == "PlanEvaluationInvariantError"
+
+
+def test_unknown_exception_after_witness_is_internal_error_with_stale_transition(
+    monkeypatch,
+) -> None:
+    base = _request(effort_minutes=60)
+    newer_report = base.report_bundle.report.model_copy(
+        update={"report_version": base.report_bundle.report.report_version + 1}
+    )
+    current = base.model_copy(update={"report_bundle": _bundle(newer_report)})
+    request, _ = _prior_request(current=current)
+
+    def explode(_readiness):
+        raise KeyError("private surprise")
+
+    monkeypatch.setattr(
+        reevaluation_service,
+        "prepare_planning_material_stage",
+        explode,
+    )
+    real_reevaluate = reevaluate_plan
+
+    def deterministic(value: PlanReevaluateRequestV1):
+        return real_reevaluate(value, clock=_clock)
+
+    monkeypatch.setattr(plans_route, "reevaluate_plan", deterministic)
+    response = TestClient(app).post(
+        "/api/v1/plans/re-evaluate",
+        json=request.model_dump(mode="json", warnings=False),
+    )
+
+    assert response.status_code == 500
+    body = response.json()
+    assert body["error"]["code"] == "INTERNAL_ERROR"
+    assert body["transition"]["kind"] == "SUPERSEDED"
+    assert "private surprise" not in json.dumps(body)
+
+
+def test_unknown_exception_before_witness_is_internal_error_without_transition(
+    monkeypatch,
+) -> None:
+    request, _ = _prior_request()
+
+    def explode(_basis):
+        raise RuntimeError("private early surprise")
+
+    monkeypatch.setattr(
+        reevaluation_service,
+        "_verify_prior_fingerprint",
+        explode,
+    )
+    real_reevaluate = reevaluate_plan
+
+    def deterministic(value: PlanReevaluateRequestV1):
+        return real_reevaluate(value, clock=_clock)
+
+    monkeypatch.setattr(plans_route, "reevaluate_plan", deterministic)
+    response = TestClient(app).post(
+        "/api/v1/plans/re-evaluate",
+        json=request.model_dump(mode="json", warnings=False),
+    )
+
+    assert response.status_code == 500
+    body = response.json()
+    assert body["error"]["code"] == "INTERNAL_ERROR"
+    assert body["transition"] is None
+    assert "private early surprise" not in json.dumps(body)
