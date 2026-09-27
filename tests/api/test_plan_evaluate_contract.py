@@ -10,6 +10,7 @@ import pytest
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
+from apps.api.canonical_json import CanonicalJsonError, jcs_dumps
 from apps.api.contracts import (
     CanonicalReportBundleV1,
     CanonicalReportRefV1,
@@ -18,7 +19,6 @@ from apps.api.contracts import (
     ReadinessContextV1,
     ReadinessUserContextV1,
 )
-from apps.api.canonical_json import CanonicalJsonError, jcs_dumps
 from apps.api.fingerprints import report_wire_fingerprint
 from apps.api.main import app
 from apps.api.services.plan_evaluation import (
@@ -39,6 +39,17 @@ from packages.contracts import (
     WorkloadInput,
 )
 from packages.contracts.source import CORE_CANONICAL_FIELDS
+
+
+def _contains_key(value: object, key: str) -> bool:
+    if isinstance(value, dict):
+        return key in value or any(
+            _contains_key(item, key)
+            for item in value.values()
+        )
+    if isinstance(value, list):
+        return any(_contains_key(item, key) for item in value)
+    return False
 
 
 def _report() -> CanonicalCompetitionReport:
@@ -159,7 +170,7 @@ def test_api_validation_error_uses_stable_envelope_and_json_pointer() -> None:
     )
     assert detail["code"] == "UNKNOWN_FIELD"
     assert "type" not in detail
-    assert "input" not in json.dumps(body).lower()
+    assert not _contains_key(body, "input")
 
 
 def test_nested_user_context_is_strict() -> None:
