@@ -20,6 +20,11 @@ from pydantic import (
 from pydantic_core import PydanticCustomError
 
 from apps.api.canonical_json import CanonicalJsonError, jcs_sha256
+from apps.api.policy_versions import (
+    PLANNING_POLICY,
+    READINESS_PROJECTION_POLICY,
+    RECONCILIATION_POLICY,
+)
 from packages.contracts import (
     AllocationBlock,
     AvailabilityInput,
@@ -38,14 +43,14 @@ from packages.contracts import (
 )
 
 DOMAIN_SCHEMA_VERSION = "3.0.0"
-RECONCILIATION_POLICY_VERSION = "reconciliation-v1"
+RECONCILIATION_POLICY_VERSION = RECONCILIATION_POLICY.version
 ASSEMBLY_POLICY_VERSION = "canonical-v1"
 REPORT_WIRE_FINGERPRINT_VERSION = "report-wire-jcs-sha256-v1"
 EVALUATION_BASIS_VERSION = "evaluation-basis-v1"
 READINESS_BASIS_VERSION = "readiness-basis-v1"
-READINESS_PROJECTION_VERSION = "readiness-projection-v1"
+READINESS_PROJECTION_VERSION = READINESS_PROJECTION_POLICY.version
 PLANNING_BASIS_VERSION = "planning-basis-v1"
-PLANNING_POLICY_VERSION = "planning-policy-v1"
+PLANNING_POLICY_VERSION = PLANNING_POLICY.version
 SOLVER_BACKEND = "ortools-cp-sat"
 
 NonEmptyStr = Annotated[
