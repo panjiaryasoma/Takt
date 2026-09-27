@@ -15,6 +15,7 @@ from apps.api.contracts import (
     CompetitionAnalyzeResponseV1,
     CompetitionAnalyzeUrlRequestV1,
     ExtractionRunAuditV1,
+    SourceAnalysisArtifactV1,
     SourceMetadataV1,
 )
 from apps.api.fingerprints import report_wire_fingerprint
@@ -27,7 +28,11 @@ from engine.extraction import (
     fetch_url_snapshot,
 )
 from engine.extraction.candidate_normalizer import extractor_fingerprint_for_document
-from engine.integration.competition_analysis import build_canonical_report
+from engine.reconciliation import (
+    CANONICAL_V1,
+    assemble_canonical_report,
+    reconcile_field,
+)
 from apps.api.services.plan_evaluation import (
     ReportBundleError,
     UnsupportedReportContractError,
@@ -35,7 +40,12 @@ from apps.api.services.plan_evaluation import (
 )
 from engine.reconciliation.models import ReconciliationInputError
 from engine.reconciliation.policy import validate_source_policy_metadata
-from packages.contracts import EvidenceSpan, ExtractionPath, SourceRecord
+from packages.contracts import (
+    CandidateExtractionReport,
+    EvidenceSpan,
+    ExtractionPath,
+    SourceRecord,
+)
 
 
 class AnalysisInputError(ValueError):
@@ -93,13 +103,30 @@ def _previous_report(
     *,
     competition_id: str,
     bundle: CanonicalReportBundleV1 | None,
+    prior_source_artifacts: tuple[SourceAnalysisArtifactV1, ...],
 ) -> _PreviousReport:
     if bundle is None:
+        if prior_source_artifacts:
+            raise AnalysisInputError(
+                "prior source artifacts require previous_report_bundle"
+            )
         return _PreviousReport(None)
+
     verify_report_bundle(bundle)
     if bundle.ref.competition_id != competition_id:
         raise ReportBundleError(
             "previous report competition_id does not match analysis request"
+        )
+
+    prior_ids = tuple(
+        sorted(artifact.source.source_id for artifact in prior_source_artifacts)
+    )
+    if len(set(prior_ids)) != len(prior_ids):
+        raise AnalysisInputError("prior source artifact IDs must be unique")
+    report_ids = tuple(sorted(bundle.report.source_ids))
+    if prior_ids != report_ids:
+        raise AnalysisInputError(
+            "prior source artifacts must exactly cover previous report source_ids"
         )
     return _PreviousReport(bundle)
 
@@ -132,28 +159,56 @@ def _extraction_runs(
     return tuple(runs)
 
 
+def _artifact_from_result(
+    result: SnapshotExtractionResult,
+) -> SourceAnalysisArtifactV1:
+    return SourceAnalysisArtifactV1(
+        source=result.snapshot.source_record,
+        candidate_reports=tuple(result.candidate_reports),
+        extraction_runs=_extraction_runs(result),
+    )
+
+
+def _merge_source_artifacts(
+    prior: tuple[SourceAnalysisArtifactV1, ...],
+    current: SourceAnalysisArtifactV1,
+) -> tuple[SourceAnalysisArtifactV1, ...]:
+    by_id = {artifact.source.source_id: artifact for artifact in prior}
+    by_id[current.source.source_id] = current
+    return tuple(by_id[source_id] for source_id in sorted(by_id))
+
+
+def _candidate_reports(
+    artifacts: Iterable[SourceAnalysisArtifactV1],
+) -> tuple[CandidateExtractionReport, ...]:
+    return tuple(
+        report
+        for artifact in artifacts
+        for report in artifact.candidate_reports
+    )
+
+
 def _evidence(
-    results: Iterable[SnapshotExtractionResult],
+    artifacts: Iterable[SourceAnalysisArtifactV1],
 ) -> tuple[EvidenceSpan, ...]:
     by_id: dict[str, EvidenceSpan] = {}
-    for result in results:
-        for report in result.candidate_reports:
-            for evidence in report.evidence:
-                existing = by_id.get(evidence.evidence_id)
-                if existing is not None and existing != evidence:
-                    raise AnalysisInvariantError(
-                        "duplicate evidence ID maps to conflicting evidence"
-                    )
-                by_id[evidence.evidence_id] = evidence
+    for report in _candidate_reports(artifacts):
+        for evidence in report.evidence:
+            existing = by_id.get(evidence.evidence_id)
+            if existing is not None and existing != evidence:
+                raise AnalysisInvariantError(
+                    "duplicate evidence ID maps to conflicting evidence"
+                )
+            by_id[evidence.evidence_id] = evidence
     return tuple(by_id[key] for key in sorted(by_id))
 
 
 def _sources(
-    results: Iterable[SnapshotExtractionResult],
+    artifacts: Iterable[SourceAnalysisArtifactV1],
 ) -> tuple[SourceRecord, ...]:
     by_id: dict[str, SourceRecord] = {}
-    for result in results:
-        record = result.snapshot.source_record
+    for artifact in artifacts:
+        record = artifact.source
         existing = by_id.get(record.source_id)
         if existing is not None and existing != record:
             raise AnalysisInvariantError(
@@ -161,6 +216,32 @@ def _sources(
             )
         by_id[record.source_id] = record
     return tuple(by_id[key] for key in sorted(by_id))
+
+
+def _build_canonical_from_artifacts(
+    *,
+    competition_id: str,
+    artifacts: tuple[SourceAnalysisArtifactV1, ...],
+    previous: _PreviousReport,
+):
+    reports = _candidate_reports(artifacts)
+    sources = _sources(artifacts)
+    field_results = tuple(
+        reconcile_field(
+            field_name,
+            reports=reports,
+            sources=sources,
+        )
+        for field_name in CANONICAL_V1.core_fields
+    )
+    return assemble_canonical_report(
+        competition_id=competition_id,
+        field_results=field_results,
+        snapshot_source_ids=tuple(item.source_id for item in sources),
+        previous_report=previous.report,
+        previous_material_fingerprint=previous.material_fingerprint,
+        policy=CANONICAL_V1,
+    )
 
 
 def _assert_canonical_evidence_resolves(
@@ -198,34 +279,37 @@ def _report_bundle(assembly) -> CanonicalReportBundleV1:
 def _response(
     *,
     competition_id: str,
-    results: tuple[SnapshotExtractionResult, ...],
+    result: SnapshotExtractionResult,
+    prior_source_artifacts: tuple[SourceAnalysisArtifactV1, ...],
     previous: _PreviousReport,
 ) -> CompetitionAnalyzeResponseV1:
+    current = _artifact_from_result(result)
+    artifacts = _merge_source_artifacts(prior_source_artifacts, current)
     try:
-        assembly = build_canonical_report(
+        assembly = _build_canonical_from_artifacts(
             competition_id=competition_id,
-            snapshot_results=results,
-            previous_report=previous.report,
-            previous_material_fingerprint=previous.material_fingerprint,
+            artifacts=artifacts,
+            previous=previous,
         )
     except ReconciliationInputError as exc:
         raise AnalysisReconciliationError(
-            "server-produced extraction material failed reconciliation"
+            "source-set material failed reconciliation"
         ) from exc
 
-    evidence = _evidence(results)
+    evidence = _evidence(artifacts)
     _assert_canonical_evidence_resolves(assembly.report, evidence)
     provenance = AnalysisProvenanceV1(
-        sources=_sources(results),
+        sources=_sources(artifacts),
         extraction_runs=tuple(
             run
-            for result in results
-            for run in _extraction_runs(result)
+            for artifact in artifacts
+            for run in artifact.extraction_runs
         ),
         evidence=evidence,
     )
     return CompetitionAnalyzeResponseV1(
         report_bundle=_report_bundle(assembly),
+        source_artifacts=artifacts,
         provenance=provenance,
         report_changed=assembly.report_changed,
     )
@@ -240,6 +324,7 @@ def analyze_url(
     previous = _previous_report(
         competition_id=request.competition_id,
         bundle=request.previous_report_bundle,
+        prior_source_artifacts=request.prior_source_artifacts,
     )
     snapshot = fetch_url_snapshot(
         request.url,
@@ -249,7 +334,8 @@ def analyze_url(
     result = extract_snapshot(snapshot)
     return _response(
         competition_id=request.competition_id,
-        results=(result,),
+        result=result,
+        prior_source_artifacts=request.prior_source_artifacts,
         previous=previous,
     )
 
@@ -264,6 +350,7 @@ def analyze_pdf(
     previous = _previous_report(
         competition_id=metadata.competition_id,
         bundle=metadata.previous_report_bundle,
+        prior_source_artifacts=metadata.prior_source_artifacts,
     )
     snapshot = create_pdf_snapshot(
         metadata.document_id,
@@ -273,7 +360,8 @@ def analyze_pdf(
     result = extract_snapshot(snapshot, ocr_provider=ocr_provider)
     return _response(
         competition_id=metadata.competition_id,
-        results=(result,),
+        result=result,
+        prior_source_artifacts=metadata.prior_source_artifacts,
         previous=previous,
     )
 
