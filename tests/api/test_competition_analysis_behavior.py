@@ -277,3 +277,41 @@ def test_previous_report_requires_complete_prior_source_artifacts(
             match="prior source artifacts must exactly cover",
         ):
             analyze_url(invalid, client=client)
+
+
+def test_incomplete_analysis_continuation_is_public_422(
+    monkeypatch,
+) -> None:
+    html = b"<html><body>Team size: 1 to 4 members</body></html>"
+
+    def handler(request: httpx.Request) -> httpx.Response:
+        return httpx.Response(
+            200,
+            headers={"content-type": "text/html"},
+            content=html,
+            request=request,
+        )
+
+    monkeypatch.setattr(
+        "engine.extraction.native.validate_public_http_target",
+        lambda _url: None,
+    )
+    with httpx.Client(transport=httpx.MockTransport(handler)) as client:
+        first = analyze_url(_url_request(), client=client)
+
+    payload = _url_request().model_dump(mode="json")
+    payload["previous_report_bundle"] = first.report_bundle.model_dump(
+        mode="json",
+        warnings=False,
+    )
+    payload["prior_source_artifacts"] = []
+
+    response = TestClient(app).post(
+        "/api/v1/competitions/analyze/url",
+        json=payload,
+    )
+
+    assert response.status_code == 422
+    body = response.json()
+    assert body["error"]["code"] == "ANALYSIS_CONTEXT_INVALID"
+    assert body["error"]["stage"] == "analysis"
