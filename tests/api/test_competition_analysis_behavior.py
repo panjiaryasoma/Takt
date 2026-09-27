@@ -6,6 +6,7 @@ import json
 
 import httpx
 import pymupdf
+import pytest
 from fastapi.testclient import TestClient
 
 import apps.api.routes.competitions as competitions_route
@@ -218,12 +219,17 @@ def test_sequential_analysis_preserves_full_multi_source_reconciliation(
     )
     with httpx.Client(transport=httpx.MockTransport(handler)) as client:
         first = analyze_url(first_request, client=client)
-        second_request = CompetitionAnalyzeUrlRequestV1(
-            competition_id="cmp-multi",
-            url="https://example.test/b",
-            source=_source("src-b"),
-            previous_report_bundle=first.report_bundle,
-            prior_source_artifacts=first.source_artifacts,
+        first_wire = json.loads(
+            json.dumps(first.model_dump(mode="json", warnings=False))
+        )
+        second_request = CompetitionAnalyzeUrlRequestV1.model_validate(
+            {
+                "competition_id": "cmp-multi",
+                "url": "https://example.test/b",
+                "source": _source("src-b").model_dump(mode="json"),
+                "previous_report_bundle": first_wire["report_bundle"],
+                "prior_source_artifacts": first_wire["source_artifacts"],
+            }
         )
         second = analyze_url(second_request, client=client)
 
@@ -266,8 +272,6 @@ def test_previous_report_requires_complete_prior_source_artifacts(
             previous_report_bundle=first.report_bundle,
             prior_source_artifacts=(),
         )
-        import pytest
-
         with pytest.raises(
             ValueError,
             match="prior source artifacts must exactly cover",
