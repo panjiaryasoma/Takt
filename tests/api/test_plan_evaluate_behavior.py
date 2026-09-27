@@ -1368,3 +1368,178 @@ def test_missing_structural_marker_is_validation_error() -> None:
     body = response.json()
     assert body["error"]["code"] == "VALIDATION_ERROR"
     assert body["transition"] is None
+
+
+def test_changed_solver_unknown_does_not_generate_new_evaluation_id(
+    monkeypatch,
+) -> None:
+    base = _request(effort_minutes=60)
+    task = base.planning.workload.tasks[0].model_copy(
+        update={
+            "effort_min_minutes": 61,
+            "effort_likely_minutes": 61,
+            "effort_max_minutes": 61,
+        }
+    )
+    current = base.model_copy(
+        update={
+            "planning": base.planning.model_copy(
+                update={"workload": WorkloadInput(tasks=(task,))}
+            )
+        }
+    )
+    request, _ = _prior_request(current=current)
+    calls = 0
+
+    def unknown_solver(*_args, **_kwargs):
+        return SolverResult(
+            status=SolverRunStatus.UNKNOWN,
+            candidate_allocations=(),
+            reason_codes=("CP_SAT_UNKNOWN",),
+        )
+
+    def forbidden_uuid():
+        nonlocal calls
+        calls += 1
+        raise AssertionError("UUID must not be generated when fresh evaluation fails")
+
+    monkeypatch.setattr(
+        feasibility_service,
+        "solve_candidate_allocations",
+        unknown_solver,
+    )
+
+    with pytest.raises(ReevaluationExecutionFailure):
+        reevaluate_plan(
+            request,
+            clock=_clock,
+            evaluation_id_factory=forbidden_uuid,
+        )
+
+    assert calls == 0
+
+
+def test_unchanged_re_evaluation_builds_availability_once(monkeypatch) -> None:
+    request, _ = _prior_request()
+    real_build = plan_evaluation_service.build_availability
+    calls = 0
+
+    def counting_build(value):
+        nonlocal calls
+        calls += 1
+        return real_build(value)
+
+    monkeypatch.setattr(
+        plan_evaluation_service,
+        "build_availability",
+        counting_build,
+    )
+    result = reevaluate_plan(request, clock=_clock)
+
+    assert result.transition.kind == "UNCHANGED"
+    assert calls == 1
+
+
+def test_changed_fingerprint_without_reason_is_invariant_with_null_transition(
+    monkeypatch,
+) -> None:
+    base = _request(effort_minutes=60)
+    availability = base.planning.availability.model_copy(
+        update={
+            "work_windows": (
+                PlanningWorkWindow(
+                    start=datetime(2026, 9, 27, 12, 0, tzinfo=UTC),
+                    end=datetime(2026, 9, 27, 14, 30, tzinfo=UTC),
+                ),
+            )
+        }
+    )
+    current = base.model_copy(
+        update={
+            "planning": base.planning.model_copy(
+                update={"availability": availability}
+            )
+        }
+    )
+    request, _ = _prior_request(current=current)
+
+    monkeypatch.setattr(
+        reevaluation_service,
+        "_compare_static_planning",
+        lambda *_args: None,
+    )
+    monkeypatch.setattr(
+        reevaluation_service,
+        "_compare_planning_fingerprint",
+        lambda *_args: None,
+    )
+    monkeypatch.setattr(
+        reevaluation_service,
+        "_compare_full_planning",
+        lambda *_args: None,
+    )
+
+    real_reevaluate = reevaluate_plan
+
+    def deterministic(value: PlanReevaluateRequestV1):
+        return real_reevaluate(value, clock=_clock)
+
+    monkeypatch.setattr(plans_route, "reevaluate_plan", deterministic)
+    response = TestClient(app).post(
+        "/api/v1/plans/re-evaluate",
+        json=request.model_dump(mode="json", warnings=False),
+    )
+
+    assert response.status_code == 500
+    body = response.json()
+    assert body["error"]["code"] == "EVALUATION_INVARIANT_FAILED"
+    assert body["transition"] is None
+
+
+def test_reevaluate_keeps_current_unsupported_report_error_code() -> None:
+    request, _ = _prior_request()
+    payload = request.model_dump(mode="json", warnings=False)
+    payload["current"]["report_bundle"]["ref"]["domain_schema_version"] = "99.0.0"
+
+    response = TestClient(app).post(
+        "/api/v1/plans/re-evaluate",
+        json=payload,
+    )
+
+    assert response.status_code == 422
+    body = response.json()
+    assert body["error"]["code"] == "UNSUPPORTED_REPORT_CONTRACT"
+    assert body["transition"] is None
+
+
+def test_reevaluate_keeps_current_invalid_report_bundle_error_code() -> None:
+    request, _ = _prior_request()
+    payload = request.model_dump(mode="json", warnings=False)
+    payload["current"]["report_bundle"]["ref"]["wire_fingerprint"] = "0" * 64
+
+    response = TestClient(app).post(
+        "/api/v1/plans/re-evaluate",
+        json=payload,
+    )
+
+    assert response.status_code == 422
+    body = response.json()
+    assert body["error"]["code"] == "REPORT_BUNDLE_INVALID"
+    assert body["transition"] is None
+
+
+def test_malformed_whole_request_never_uses_changed_current_subtree_for_stale() -> None:
+    request, _ = _prior_request()
+    payload = request.model_dump(mode="json", warnings=False)
+    del payload["prior"]["evaluation_id"]
+    payload["current"]["report_bundle"]["report"]["report_version"] += 1
+
+    response = TestClient(app).post(
+        "/api/v1/plans/re-evaluate",
+        json=payload,
+    )
+
+    assert response.status_code == 422
+    body = response.json()
+    assert body["error"]["code"] == "VALIDATION_ERROR"
+    assert body["transition"] is None
