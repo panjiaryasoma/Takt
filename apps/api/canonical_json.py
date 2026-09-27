@@ -23,7 +23,7 @@ def _serialize_string(value: str) -> str:
     return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
 
 
-def _serialize_number(value: int | float) -> str:
+def _serialize_number(value: float) -> str:
     if isinstance(value, bool):
         raise TypeError("bool is not a numeric JCS value")
 
