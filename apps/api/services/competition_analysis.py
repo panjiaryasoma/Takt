@@ -34,6 +34,7 @@ from apps.api.services.plan_evaluation import (
     verify_report_bundle,
 )
 from engine.reconciliation.models import ReconciliationInputError
+from engine.reconciliation.policy import validate_source_policy_metadata
 from packages.contracts import EvidenceSpan, ExtractionPath, SourceRecord
 
 
@@ -62,6 +63,20 @@ class _PreviousReport:
         if self.bundle is None:
             return None
         return self.bundle.ref.assembly_material_fingerprint
+
+
+def _validate_source_metadata(source: SourceMetadataV1) -> None:
+    try:
+        validate_source_policy_metadata(
+            source_type=source.source_type,
+            authority_rank=source.authority_rank,
+            scope=source.scope,
+            freshness_metadata=source.freshness_metadata,
+        )
+    except ReconciliationInputError as exc:
+        raise AnalysisInputError(
+            "source policy metadata failed domain validation"
+        ) from exc
 
 
 def _source_context(source: SourceMetadataV1) -> SourceContext:
@@ -221,6 +236,7 @@ def analyze_url(
     *,
     client: httpx.Client | None = None,
 ) -> CompetitionAnalyzeResponseV1:
+    _validate_source_metadata(request.source)
     previous = _previous_report(
         competition_id=request.competition_id,
         bundle=request.previous_report_bundle,
@@ -244,6 +260,7 @@ def analyze_pdf(
     *,
     ocr_provider: OCRProvider | None = None,
 ) -> CompetitionAnalyzeResponseV1:
+    _validate_source_metadata(metadata.source)
     previous = _previous_report(
         competition_id=metadata.competition_id,
         bundle=metadata.previous_report_bundle,

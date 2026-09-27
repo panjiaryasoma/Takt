@@ -8,9 +8,6 @@ from decimal import Decimal
 from hashlib import sha256
 from typing import Any
 
-_IJSON_SAFE_INTEGER = 9_007_199_254_740_991
-
-
 class CanonicalJsonError(ValueError):
     """Raised when material cannot be represented by the supported JCS/I-JSON subset."""
 
@@ -30,9 +27,12 @@ def _serialize_number(value: int | float) -> str:
         raise TypeError("bool is not a numeric JCS value")
 
     if isinstance(value, int):
-        if abs(value) > _IJSON_SAFE_INTEGER:
-            raise CanonicalJsonError("integer exceeds the I-JSON interoperable range")
-        return str(value)
+        try:
+            value = float(value)
+        except OverflowError as exc:
+            raise CanonicalJsonError(
+                "integer cannot be represented as an IEEE 754 double"
+            ) from exc
 
     if not math.isfinite(value):
         raise CanonicalJsonError("non-finite float is not valid JSON")

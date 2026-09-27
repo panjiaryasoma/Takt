@@ -34,6 +34,7 @@ from engine.extraction import (
     UnsupportedMediaTypeError,
 )
 from apps.api.services.competition_analysis import (
+    AnalysisInputError,
     AnalysisInvariantError,
     AnalysisReconciliationError,
     analyze_pdf,
@@ -48,6 +49,13 @@ router = APIRouter(tags=["competitions"])
 
 
 def _raise_analysis_error(exc: Exception) -> None:
+    if isinstance(exc, AnalysisInputError):
+        raise ApiContractError(
+            status_code=422,
+            code="SOURCE_METADATA_INVALID",
+            message="Source metadata validation failed.",
+            stage="ingestion",
+        ) from exc
     if isinstance(exc, UnsupportedReportContractError):
         raise ApiContractError(
             status_code=422,
