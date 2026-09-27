@@ -68,9 +68,9 @@ class CanonicalReportRefV1(ApiModel):
     report_version: StrictInt = Field(ge=1)
     reconciliation_policy_version: NonEmptyStr = RECONCILIATION_POLICY_VERSION
     assembly_policy_version: NonEmptyStr = ASSEMBLY_POLICY_VERSION
-    assembly_material_fingerprint: NonEmptyStr
+    assembly_material_fingerprint: Sha256Hex
     wire_fingerprint_version: NonEmptyStr = REPORT_WIRE_FINGERPRINT_VERSION
-    wire_fingerprint: NonEmptyStr
+    wire_fingerprint: Sha256Hex
 
 
 class CanonicalReportBundleV1(ApiModel):
