@@ -415,7 +415,6 @@ def reevaluate_plan(
                 evaluation=None,
             )
         return _execute_success(
-            request,
             prepared,
             transition,
             evaluation_id_factory=evaluation_id_factory,
