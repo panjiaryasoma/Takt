@@ -551,3 +551,57 @@ def test_real_solver_unknown_pipeline_maps_to_503(monkeypatch) -> None:
 
     assert response.status_code == 503
     assert response.json()["error"]["code"] == "SOLVER_INDETERMINATE"
+
+
+def test_readiness_fingerprint_stops_after_first_eligibility_blocker() -> None:
+    report = _ready_report(
+        deadline=datetime(2026, 9, 30, 23, 45, tzinfo=UTC)
+    )
+    fields = dict(report.canonical_fields)
+    fields["eligibility"] = _candidate_field(
+        "eligibility",
+        value="21+ students in Indonesia",
+        normalized={
+            "minimum_age": 21,
+            "requires_student": True,
+            "allowed_regions": ["indonesia"],
+        },
+    )
+    report = report.model_copy(update={"canonical_fields": fields})
+
+    first_request = _request_for_report(
+        report,
+        user=ReadinessUserContextV1(
+            age=18,
+            student_status=True,
+            country="Indonesia",
+        ),
+    )
+    second_request = _request_for_report(
+        report,
+        user=ReadinessUserContextV1(
+            age=18,
+            student_status=False,
+            country="Singapore",
+        ),
+    )
+
+    first = evaluate_plan(
+        first_request,
+        clock=_clock,
+        evaluation_id_factory=_id_one,
+    )
+    second = evaluate_plan(
+        second_request,
+        clock=_clock,
+        evaluation_id_factory=_id_two,
+    )
+
+    assert first.readiness.status is ReadinessStatus.ELIGIBILITY_BLOCKED
+    assert second.readiness.status is ReadinessStatus.ELIGIBILITY_BLOCKED
+    assert first.readiness.blocking_reasons == ["minimum_age_not_met"]
+    assert second.readiness.blocking_reasons == ["minimum_age_not_met"]
+    assert (
+        first.basis.readiness.basis_fingerprint
+        == second.basis.readiness.basis_fingerprint
+    )
