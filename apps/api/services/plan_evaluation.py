@@ -1,17 +1,19 @@
 """Product-level Issue 4A plan evaluation orchestration.
 
-The service keeps FastAPI stateless: one valid request produces one evaluation
-result identity, while semantic equality/staleness is explained by versioned
-basis fingerprints rather than server-side lifecycle state.
+Preparation and execution are deliberately separate. Re-evaluation can compare
+authoritative semantic stages without running the solver, while a fresh result
+executes the exact prepared artifacts that were compared.
 """
 
 from __future__ import annotations
 
 import hmac
 from collections.abc import Callable
+from dataclasses import dataclass
 from datetime import UTC, datetime, timedelta
 from importlib.metadata import PackageNotFoundError
 from importlib.metadata import version as package_version
+from typing import Any
 from uuid import UUID, uuid4
 
 from pydantic import ValidationError
@@ -60,11 +62,12 @@ from engine.recommendation import (
 )
 from engine.scheduler import SolverConfig
 from engine.triage.scope import ResolvedEligibilityScope
-from engine.triage.service import evaluate_readiness
+from engine.triage.service import READINESS_RULE_VERSION, evaluate_readiness
 from packages.contracts import (
     AvailabilityInput,
     PlanningWorkWindow,
     ReadinessStatus,
+    ReadinessTriage,
     WorkloadInput,
 )
 from packages.contracts.triage import ReadinessRequest
@@ -109,8 +112,71 @@ class PlanEvaluationInvariantError(RuntimeError):
     """Server-produced artifacts contradict a frozen invariant."""
 
 
+@dataclass(frozen=True, slots=True)
+class ReportPreparation:
+    request: PlanEvaluateRequestV1
+    report_basis: ReportBasisV1
+
+
+@dataclass(frozen=True, slots=True)
+class ReadinessBasisPreparation:
+    request: PlanEvaluateRequestV1
+    evaluated_at: datetime
+    report_basis: ReportBasisV1
+    readiness_request: ReadinessRequest
+    resolved_scope: ResolvedEligibilityScope | None
+    readiness_basis: ReadinessBasisV1
+
+
+@dataclass(frozen=True, slots=True)
+class ReadinessExecution:
+    preparation: ReadinessBasisPreparation
+    readiness: ReadinessTriage
+
+
+@dataclass(frozen=True, slots=True)
+class PlanningMaterialPreparation:
+    readiness_execution: ReadinessExecution
+    cutoff: datetime
+    availability_input: AvailabilityInput
+    availability: Any
+    solver_config: SolverConfig
+    basis_fingerprint: str
+
+
+@dataclass(frozen=True, slots=True)
+class PlanningPreparation:
+    material: PlanningMaterialPreparation
+    planning_basis: PlanningBasisV1
+
+
+@dataclass(frozen=True, slots=True)
+class PreparedEvaluation:
+    request: PlanEvaluateRequestV1
+    evaluated_at: datetime
+    report_basis: ReportBasisV1
+    readiness_request: ReadinessRequest
+    readiness_basis: ReadinessBasisV1
+    readiness: ReadinessTriage
+    planning: PlanningPreparation | None
+    basis: EvaluationBasisV1
+
+
 def _utc_now() -> datetime:
     return datetime.now(UTC)
+
+
+def sample_server_clock(clock: Clock = _utc_now) -> datetime:
+    value = clock()
+    if (
+        not isinstance(value, datetime)
+        or value.tzinfo is None
+        or value.utcoffset() is None
+    ):
+        raise PlanEvaluationInvariantError(
+            "server clock must return a timezone-aware datetime"
+        )
+    return value.astimezone(UTC)
 
 
 def planning_cutoff(evaluated_at: datetime) -> datetime:
@@ -173,6 +239,17 @@ def verify_report_bundle(bundle: CanonicalReportBundleV1) -> None:
         raise ReportBundleError("report bundle wire fingerprint does not match payload")
 
 
+def validate_evaluation_request(request: PlanEvaluateRequestV1) -> PlanEvaluateRequestV1:
+    try:
+        clean = PlanEvaluateRequestV1.model_validate(
+            request.model_dump(mode="json", warnings=False)
+        )
+    except (AttributeError, TypeError, ValueError, ValidationError) as exc:
+        raise PlanEvaluationInputError("invalid plan evaluation request") from exc
+    verify_report_bundle(clean.report_bundle)
+    return clean
+
+
 def _canonical_scope_material(
     resolved: ResolvedEligibilityScope | None,
     selected_scope: str | None,
@@ -224,17 +301,12 @@ def _deadline_state(request: ReadinessRequest) -> str:
     return "OPEN"
 
 
-def _readiness_basis_fingerprint(
+def readiness_basis_fingerprint(
     request: ReadinessRequest,
     resolved_scope: ResolvedEligibilityScope | None,
     selected_scope: str | None,
 ) -> str:
-    """Hash only readiness inputs actually consulted by triage-v1.
-
-    The projection mirrors evaluate_readiness() short-circuit order so a field
-    that cannot affect the current readiness result does not create stale/dedupe
-    noise for Block 2.
-    """
+    """Hash only readiness inputs actually consulted by triage-v1."""
 
     material: dict[str, object] = {
         "projected_unresolved_fields": sorted(request.unresolved_critical_fields),
@@ -367,7 +439,7 @@ def _clip_planning_input(
         ) from exc
 
 
-def _availability_material(availability) -> dict[str, object]:
+def availability_material(availability: Any) -> dict[str, object]:
     available = sorted(
         availability.available_blocks,
         key=lambda item: (
@@ -402,7 +474,7 @@ def _availability_material(availability) -> dict[str, object]:
     }
 
 
-def _workload_material(workload: WorkloadInput) -> dict[str, object]:
+def workload_material(workload: WorkloadInput) -> dict[str, object]:
     tasks = sorted(workload.tasks, key=lambda item: item.task_id)
     assumptions = sorted(
         workload.assumptions,
@@ -432,7 +504,7 @@ def _workload_material(workload: WorkloadInput) -> dict[str, object]:
     }
 
 
-def _solver_material(config: SolverConfig) -> dict[str, object]:
+def solver_material(config: SolverConfig) -> dict[str, object]:
     return {
         "submission_deadline": canonical_utc(config.submission_deadline),
         "buffer_target_minutes": config.buffer_target_minutes,
@@ -440,7 +512,7 @@ def _solver_material(config: SolverConfig) -> dict[str, object]:
     }
 
 
-def _solver_backend_version() -> str:
+def solver_backend_version() -> str:
     try:
         return package_version("ortools")
     except PackageNotFoundError as exc:
@@ -449,7 +521,7 @@ def _solver_backend_version() -> str:
         ) from exc
 
 
-def _report_basis(bundle: CanonicalReportBundleV1) -> ReportBasisV1:
+def report_basis(bundle: CanonicalReportBundleV1) -> ReportBasisV1:
     return ReportBasisV1(
         competition_id=bundle.ref.competition_id,
         report_version=bundle.ref.report_version,
@@ -459,7 +531,7 @@ def _report_basis(bundle: CanonicalReportBundleV1) -> ReportBasisV1:
     )
 
 
-def _evaluation_basis(
+def evaluation_basis(
     *,
     report: ReportBasisV1,
     readiness: ReadinessBasisV1,
@@ -489,117 +561,93 @@ def _evaluation_basis(
         ) from exc
 
 
-def _new_evaluation_id(factory: EvaluationIdFactory) -> UUID:
-    value = factory()
-    if not isinstance(value, UUID) or value.version != 4:
-        raise PlanEvaluationInvariantError(
-            "evaluation ID factory must return a UUIDv4"
-        )
-    return value
-
-
-def _assert_public_candidate_cutoff(feasibility_run, cutoff: datetime) -> None:
-    for candidate in feasibility_run.likely_solver_result.candidate_allocations:
-        for block in candidate.work_blocks:
-            if block.start.astimezone(UTC) < cutoff:
-                raise PlanEvaluationInvariantError(
-                    "LIKELY candidate starts before server planning cutoff"
-                )
-
-
-def evaluate_plan(
-    request: PlanEvaluateRequestV1,
-    *,
-    clock: Clock = _utc_now,
-    evaluation_id_factory: EvaluationIdFactory = uuid4,
-) -> PlanEvaluateResponseV1:
-    """Run one stateless product evaluation over a validated report snapshot."""
-
+def prepare_report_stage(request: PlanEvaluateRequestV1) -> ReportPreparation:
+    clean = validate_evaluation_request(request)
     try:
-        clean = PlanEvaluateRequestV1.model_validate(
-            request.model_dump(mode="json", warnings=False)
-        )
-    except (AttributeError, TypeError, ValueError, ValidationError) as exc:
-        raise PlanEvaluationInputError("invalid plan evaluation request") from exc
-
-    verify_report_bundle(clean.report_bundle)
-
-    evaluated_at = clock()
-    if (
-        not isinstance(evaluated_at, datetime)
-        or evaluated_at.tzinfo is None
-        or evaluated_at.utcoffset() is None
-    ):
+        basis = report_basis(clean.report_bundle)
+    except (ValidationError, ValueError) as exc:
         raise PlanEvaluationInvariantError(
-            "server clock must return a timezone-aware datetime"
-        )
-    evaluated_at = evaluated_at.astimezone(UTC)
+            "report basis projection violated the public contract"
+        ) from exc
+    return ReportPreparation(request=clean, report_basis=basis)
 
-    context = clean.readiness_context
+
+def prepare_readiness_basis_stage(
+    report: ReportPreparation,
+    evaluated_at: datetime,
+) -> ReadinessBasisPreparation:
+    context = report.request.readiness_context
     try:
         readiness_request = build_readiness_request(
-            canonical_report=clean.report_bundle.report,
+            canonical_report=report.request.report_bundle.report,
             user=context.user.to_domain(),
             selected_scope=context.selected_scope,
             evaluated_at=evaluated_at,
             require_technology_information=context.require_technology_information,
         )
         resolved_scope = resolve_eligibility_scope(
-            canonical_report=clean.report_bundle.report,
+            canonical_report=report.request.report_bundle.report,
             selected_scope=context.selected_scope,
         )
-        readiness = evaluate_readiness(readiness_request)
+        basis = ReadinessBasisV1(
+            basis_fingerprint=readiness_basis_fingerprint(
+                readiness_request,
+                resolved_scope,
+                context.selected_scope,
+            ),
+            rule_version=READINESS_RULE_VERSION,
+        )
+    except PlanEvaluationInvariantError:
+        raise
     except (TypeError, ValueError, ValidationError) as exc:
         raise PlanEvaluationInputError(
             "report or readiness context could not be evaluated"
         ) from exc
 
+    return ReadinessBasisPreparation(
+        request=report.request,
+        evaluated_at=evaluated_at,
+        report_basis=report.report_basis,
+        readiness_request=readiness_request,
+        resolved_scope=resolved_scope,
+        readiness_basis=basis,
+    )
+
+
+def execute_readiness_stage(
+    preparation: ReadinessBasisPreparation,
+) -> ReadinessExecution:
     try:
-        readiness_basis = ReadinessBasisV1(
-            basis_fingerprint=_readiness_basis_fingerprint(
-                readiness_request,
-                resolved_scope,
-                context.selected_scope,
-            ),
-            rule_version=readiness.rule_version,
-        )
-        report_basis = _report_basis(clean.report_bundle)
-    except (ValidationError, ValueError) as exc:
-        raise PlanEvaluationInvariantError(
-            "readiness/report basis projection violated the public contract"
+        readiness = evaluate_readiness(preparation.readiness_request)
+    except (TypeError, ValueError, ValidationError) as exc:
+        raise PlanEvaluationInputError(
+            "readiness engine rejected prepared readiness input"
         ) from exc
-
-    if readiness.status is not ReadinessStatus.READY_TO_EVALUATE:
-        basis = _evaluation_basis(
-            report=report_basis,
-            readiness=readiness_basis,
-            planning=None,
+    if readiness.rule_version != READINESS_RULE_VERSION:
+        raise PlanEvaluationInvariantError(
+            "readiness engine rule version does not match authority"
         )
-        evaluation_id = _new_evaluation_id(evaluation_id_factory)
-        try:
-            return PlanEvaluateResponseV1(
-                evaluation_id=evaluation_id,
-                evaluated_at=evaluated_at,
-                basis=basis,
-                readiness=readiness,
-                planning=None,
-            )
-        except (ValidationError, ValueError) as exc:
-            raise PlanEvaluationInvariantError(
-                "blocked evaluation response violated the public contract"
-            ) from exc
+    return ReadinessExecution(preparation=preparation, readiness=readiness)
 
+
+def prepare_planning_material_stage(
+    readiness: ReadinessExecution,
+) -> PlanningMaterialPreparation:
+    if readiness.readiness.status is not ReadinessStatus.READY_TO_EVALUATE:
+        raise PlanEvaluationInvariantError(
+            "planning preparation requires READY_TO_EVALUATE"
+        )
+    readiness_request = readiness.preparation.readiness_request
     if readiness_request.submission_deadline is None:
         raise PlanEvaluationInvariantError(
             "ready readiness result requires submission deadline"
         )
 
-    cutoff = planning_cutoff(evaluated_at)
+    cutoff = planning_cutoff(readiness.preparation.evaluated_at)
     availability_input = _clip_planning_input(
-        clean.planning.availability,
+        readiness.preparation.request.planning.availability,
         cutoff,
     )
-
     try:
         availability = build_availability(availability_input)
         config = SolverConfig(
@@ -616,17 +664,30 @@ def evaluate_plan(
             "availability preparation failed"
         ) from exc
 
-    planning_fingerprint = jcs_sha256(
+    fingerprint = jcs_sha256(
         {
-            "availability": _availability_material(availability),
-            "workload": _workload_material(clean.planning.workload),
-            "solver_config": _solver_material(config),
+            "availability": availability_material(availability),
+            "workload": workload_material(readiness.preparation.request.planning.workload),
+            "solver_config": solver_material(config),
         }
     )
+    return PlanningMaterialPreparation(
+        readiness_execution=readiness,
+        cutoff=cutoff,
+        availability_input=availability_input,
+        availability=availability,
+        solver_config=config,
+        basis_fingerprint=fingerprint,
+    )
+
+
+def finalize_planning_stage(
+    material: PlanningMaterialPreparation,
+) -> PlanningPreparation:
     try:
-        planning_basis = PlanningBasisV1(
-            basis_fingerprint=planning_fingerprint,
-            solver_backend_version=_solver_backend_version(),
+        basis = PlanningBasisV1(
+            basis_fingerprint=material.basis_fingerprint,
+            solver_backend_version=solver_backend_version(),
         )
     except PlanEvaluationExecutionError:
         raise
@@ -634,12 +695,97 @@ def evaluate_plan(
         raise PlanEvaluationInvariantError(
             "planning basis projection violated the public contract"
         ) from exc
+    return PlanningPreparation(material=material, planning_basis=basis)
+
+
+def finalize_evaluation_basis(
+    readiness: ReadinessExecution,
+    planning: PlanningPreparation | None,
+) -> PreparedEvaluation:
+    basis = evaluation_basis(
+        report=readiness.preparation.report_basis,
+        readiness=readiness.preparation.readiness_basis,
+        planning=planning.planning_basis if planning is not None else None,
+    )
+    return PreparedEvaluation(
+        request=readiness.preparation.request,
+        evaluated_at=readiness.preparation.evaluated_at,
+        report_basis=readiness.preparation.report_basis,
+        readiness_request=readiness.preparation.readiness_request,
+        readiness_basis=readiness.preparation.readiness_basis,
+        readiness=readiness.readiness,
+        planning=planning,
+        basis=basis,
+    )
+
+
+def prepare_evaluation(
+    request: PlanEvaluateRequestV1,
+    *,
+    clock: Clock = _utc_now,
+) -> PreparedEvaluation:
+    report = prepare_report_stage(request)
+    evaluated_at = sample_server_clock(clock)
+    readiness_basis = prepare_readiness_basis_stage(report, evaluated_at)
+    readiness = execute_readiness_stage(readiness_basis)
+    if readiness.readiness.status is not ReadinessStatus.READY_TO_EVALUATE:
+        return finalize_evaluation_basis(readiness, None)
+    planning_material = prepare_planning_material_stage(readiness)
+    planning = finalize_planning_stage(planning_material)
+    return finalize_evaluation_basis(readiness, planning)
+
+
+def _new_evaluation_id(factory: EvaluationIdFactory) -> UUID:
+    value = factory()
+    if not isinstance(value, UUID) or value.version != 4:
+        raise PlanEvaluationInvariantError(
+            "evaluation ID factory must return a UUIDv4"
+        )
+    return value
+
+
+def _assert_public_candidate_cutoff(feasibility_run: Any, cutoff: datetime) -> None:
+    for candidate in feasibility_run.likely_solver_result.candidate_allocations:
+        for block in candidate.work_blocks:
+            if block.start.astimezone(UTC) < cutoff:
+                raise PlanEvaluationInvariantError(
+                    "LIKELY candidate starts before server planning cutoff"
+                )
+
+
+def execute_prepared_evaluation(
+    prepared: PreparedEvaluation,
+    *,
+    evaluation_id_factory: EvaluationIdFactory = uuid4,
+) -> PlanEvaluateResponseV1:
+    """Execute an already prepared evaluation without recomputing its basis."""
+
+    if prepared.readiness.status is not ReadinessStatus.READY_TO_EVALUATE:
+        evaluation_id = _new_evaluation_id(evaluation_id_factory)
+        try:
+            return PlanEvaluateResponseV1(
+                evaluation_id=evaluation_id,
+                evaluated_at=prepared.evaluated_at,
+                basis=prepared.basis,
+                readiness=prepared.readiness,
+                planning=None,
+            )
+        except (ValidationError, ValueError) as exc:
+            raise PlanEvaluationInvariantError(
+                "blocked evaluation response violated the public contract"
+            ) from exc
+
+    if prepared.planning is None:
+        raise PlanEvaluationInvariantError(
+            "ready prepared evaluation requires planning artifacts"
+        )
+    material = prepared.planning.material
 
     try:
         feasibility_run = assess_feasibility_run(
-            availability,
-            clean.planning.workload,
-            config,
+            material.availability,
+            prepared.request.planning.workload,
+            material.solver_config,
         )
     except FeasibilityInputError as exc:
         raise PlanEvaluationInputError(
@@ -658,14 +804,14 @@ def evaluate_plan(
             "feasibility artifacts violate planning invariants"
         ) from exc
 
-    _assert_public_candidate_cutoff(feasibility_run, cutoff)
+    _assert_public_candidate_cutoff(feasibility_run, material.cutoff)
 
     try:
         assembly = build_recommendation(
             RecommendationBuildInput(
                 feasibility_run=feasibility_run,
                 trace_context=RecommendationTraceContext.from_canonical_report(
-                    clean.report_bundle.report
+                    prepared.request.report_bundle.report
                 ),
             )
         )
@@ -681,20 +827,14 @@ def evaluate_plan(
         ) from exc
 
     if (
-        assembly.source_competition_id != report_basis.competition_id
-        or assembly.source_report_version != report_basis.report_version
+        assembly.source_competition_id != prepared.report_basis.competition_id
+        or assembly.source_report_version != prepared.report_basis.report_version
     ):
         raise PlanEvaluationInvariantError(
             "recommendation trace does not match evaluation report basis"
         )
 
-    basis = _evaluation_basis(
-        report=report_basis,
-        readiness=readiness_basis,
-        planning=planning_basis,
-    )
     evaluation_id = _new_evaluation_id(evaluation_id_factory)
-
     likely_candidates = feasibility_run.likely_solver_result.candidate_allocations
     candidate_by_id = {
         candidate.candidate_id: candidate
@@ -751,13 +891,15 @@ def evaluate_plan(
                 ),
                 recommendation=recommendation,
                 trace=RecommendationTraceV1(
-                    competition_id=report_basis.competition_id,
-                    report_version=report_basis.report_version,
+                    competition_id=prepared.report_basis.competition_id,
+                    report_version=prepared.report_basis.report_version,
                     assembly_material_fingerprint=(
-                        report_basis.assembly_material_fingerprint
+                        prepared.report_basis.assembly_material_fingerprint
                     ),
-                    evaluation_basis_fingerprint=basis.fingerprint,
-                    planning_basis_fingerprint=planning_basis.basis_fingerprint,
+                    evaluation_basis_fingerprint=prepared.basis.fingerprint,
+                    planning_basis_fingerprint=(
+                        prepared.planning.planning_basis.basis_fingerprint
+                    ),
                 ),
             )
         except (KeyError, RecommendationInputError, ValidationError, ValueError) as exc:
@@ -782,12 +924,27 @@ def evaluate_plan(
         )
         return PlanEvaluateResponseV1(
             evaluation_id=evaluation_id,
-            evaluated_at=evaluated_at,
-            basis=basis,
-            readiness=readiness,
+            evaluated_at=prepared.evaluated_at,
+            basis=prepared.basis,
+            readiness=prepared.readiness,
             planning=planning,
         )
     except (ValidationError, ValueError) as exc:
         raise PlanEvaluationInvariantError(
             "public planning response violated the evaluation contract"
         ) from exc
+
+
+def evaluate_plan(
+    request: PlanEvaluateRequestV1,
+    *,
+    clock: Clock = _utc_now,
+    evaluation_id_factory: EvaluationIdFactory = uuid4,
+) -> PlanEvaluateResponseV1:
+    """Run one stateless product evaluation over a validated report snapshot."""
+
+    prepared = prepare_evaluation(request, clock=clock)
+    return execute_prepared_evaluation(
+        prepared,
+        evaluation_id_factory=evaluation_id_factory,
+    )
