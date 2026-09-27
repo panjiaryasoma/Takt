@@ -7,16 +7,21 @@ from datetime import UTC, datetime
 from importlib.metadata import PackageNotFoundError
 from uuid import UUID
 
+import pytest
 from fastapi.testclient import TestClient
 
 import apps.api.routes.plans as plans_route
 import apps.api.services.plan_evaluation as plan_evaluation_service
+import apps.api.services.reevaluation as reevaluation_service
 import engine.feasibility.service as feasibility_service
 from apps.api.contracts import (
     CanonicalReportBundleV1,
     CanonicalReportRefV1,
     PlanEvaluatePlanningV1,
     PlanEvaluateRequestV1,
+    PlanReevaluateRequestV1,
+    PriorEvaluationBasisSnapshotV1,
+    PriorEvaluationV1,
     ReadinessContextV1,
     ReadinessUserContextV1,
 )
@@ -27,6 +32,11 @@ from apps.api.services.plan_evaluation import (
     evaluate_plan,
     planning_cutoff,
     verify_report_bundle,
+)
+from apps.api.services.reevaluation import (
+    ReevaluationContextInvalid,
+    ReevaluationExecutionFailure,
+    reevaluate_plan,
 )
 from engine.feasibility.service import FeasibilityExecutionError
 from engine.scheduler.models import SolverResult, SolverRunStatus
@@ -714,3 +724,274 @@ def test_server_produced_public_model_failure_normalizes_to_invariant_error(
     assert body["error"]["code"] == "EVALUATION_INVARIANT_FAILED"
     assert body["error"]["stage"] == "evaluation"
     assert "private public-model invariant detail" not in json.dumps(body)
+
+
+def _prior_request(
+    *,
+    current: PlanEvaluateRequestV1 | None = None,
+) -> tuple[PlanReevaluateRequestV1, object]:
+    base_request = _request(effort_minutes=60)
+    prior_result = evaluate_plan(
+        base_request,
+        clock=_clock,
+        evaluation_id_factory=_id_one,
+    )
+    prior_basis = PriorEvaluationBasisSnapshotV1.model_validate(
+        prior_result.basis.model_dump(mode="json", warnings=False)
+    )
+    request = PlanReevaluateRequestV1(
+        prior=PriorEvaluationV1(
+            evaluation_id=prior_result.evaluation_id,
+            basis=prior_basis,
+        ),
+        current=current or base_request,
+    )
+    return request, prior_result
+
+
+def test_reevaluate_same_basis_is_noop_without_solver_or_uuid(monkeypatch) -> None:
+    request, prior_result = _prior_request()
+
+    def forbidden_solver(*_args, **_kwargs):
+        raise AssertionError("solver must not run for UNCHANGED")
+
+    def forbidden_uuid():
+        raise AssertionError("UUID must not be generated for UNCHANGED")
+
+    monkeypatch.setattr(
+        plan_evaluation_service,
+        "assess_feasibility_run",
+        forbidden_solver,
+    )
+    result = reevaluate_plan(
+        request,
+        clock=_clock,
+        evaluation_id_factory=forbidden_uuid,
+    )
+
+    assert result.transition.kind == "UNCHANGED"
+    assert result.transition.prior_evaluation_freshness == "CURRENT"
+    assert result.transition.change_reasons == ()
+    assert result.transition.current_basis_fingerprint == prior_result.basis.fingerprint
+    assert result.evaluation is None
+
+
+def test_material_schedule_change_supersedes_and_emits_fresh_evaluation() -> None:
+    base = _request(effort_minutes=60)
+    availability = base.planning.availability.model_copy(
+        update={
+            "work_windows": (
+                PlanningWorkWindow(
+                    start=datetime(2026, 9, 27, 12, 0, tzinfo=UTC),
+                    end=datetime(2026, 9, 27, 14, 30, tzinfo=UTC),
+                ),
+            )
+        }
+    )
+    current = base.model_copy(
+        update={
+            "planning": base.planning.model_copy(
+                update={"availability": availability}
+            )
+        }
+    )
+    request, prior_result = _prior_request(current=current)
+
+    result = reevaluate_plan(
+        request,
+        clock=_clock,
+        evaluation_id_factory=_id_two,
+    )
+
+    assert result.transition.kind == "SUPERSEDED"
+    assert result.transition.prior_evaluation_freshness == "STALE"
+    assert result.transition.change_reasons == ("PLANNING_BASIS_CHANGED",)
+    assert result.evaluation is not None
+    assert result.evaluation.evaluation_id == _id_two()
+    assert result.evaluation.evaluation_id != prior_result.evaluation_id
+    assert (
+        result.transition.current_basis_fingerprint
+        == result.evaluation.basis.fingerprint
+    )
+
+
+def test_newer_report_version_establishes_stale_before_availability_failure(
+    monkeypatch,
+) -> None:
+    base = _request(effort_minutes=60)
+    newer_report = base.report_bundle.report.model_copy(
+        update={"report_version": base.report_bundle.report.report_version + 1}
+    )
+    current = base.model_copy(update={"report_bundle": _bundle(newer_report)})
+    request, _ = _prior_request(current=current)
+
+    def fail_availability(_value):
+        raise RuntimeError("availability exploded")
+
+    monkeypatch.setattr(
+        plan_evaluation_service,
+        "build_availability",
+        fail_availability,
+    )
+
+    with pytest.raises(ReevaluationExecutionFailure) as captured:
+        reevaluate_plan(request, clock=_clock)
+
+    failure = captured.value
+    assert failure.transition is not None
+    assert failure.transition.kind == "SUPERSEDED"
+    assert failure.transition.prior_evaluation_freshness == "STALE"
+    assert failure.transition.current_basis_fingerprint is None
+    assert failure.transition.change_reasons == ("REPORT_BASIS_CHANGED",)
+
+
+def test_same_context_availability_failure_has_no_stale_transition(
+    monkeypatch,
+) -> None:
+    request, _ = _prior_request()
+
+    def fail_availability(_value):
+        raise RuntimeError("availability exploded")
+
+    monkeypatch.setattr(
+        plan_evaluation_service,
+        "build_availability",
+        fail_availability,
+    )
+
+    with pytest.raises(ReevaluationExecutionFailure) as captured:
+        reevaluate_plan(request, clock=_clock)
+
+    assert captured.value.transition is None
+
+
+def test_report_lineage_regression_is_context_invalid() -> None:
+    base = _request(effort_minutes=60)
+    older_report = base.report_bundle.report.model_copy(
+        update={"report_version": base.report_bundle.report.report_version - 1}
+    )
+    current = base.model_copy(update={"report_bundle": _bundle(older_report)})
+    request, _ = _prior_request(current=current)
+
+    with pytest.raises(ReevaluationContextInvalid):
+        reevaluate_plan(request, clock=_clock)
+
+
+def test_reevaluate_http_preserves_stale_transition_on_solver_unknown(
+    monkeypatch,
+) -> None:
+    base = _request(effort_minutes=60)
+    task = base.planning.workload.tasks[0].model_copy(
+        update={
+            "effort_min_minutes": 61,
+            "effort_likely_minutes": 61,
+            "effort_max_minutes": 61,
+        }
+    )
+    current = base.model_copy(
+        update={
+            "planning": base.planning.model_copy(
+                update={"workload": WorkloadInput(tasks=(task,))}
+            )
+        }
+    )
+    request, _ = _prior_request(current=current)
+
+    def unknown_solver(*_args, **_kwargs):
+        return SolverResult(
+            status=SolverRunStatus.UNKNOWN,
+            candidate_allocations=(),
+            reason_codes=("CP_SAT_UNKNOWN",),
+        )
+
+    monkeypatch.setattr(
+        feasibility_service,
+        "solve_candidate_allocations",
+        unknown_solver,
+    )
+
+    real_reevaluate = reevaluate_plan
+
+    def deterministic(value: PlanReevaluateRequestV1):
+        return real_reevaluate(
+            value,
+            clock=_clock,
+            evaluation_id_factory=_id_two,
+        )
+
+    monkeypatch.setattr(plans_route, "reevaluate_plan", deterministic)
+    response = TestClient(app).post(
+        "/api/v1/plans/re-evaluate",
+        json=request.model_dump(mode="json", warnings=False),
+    )
+
+    assert response.status_code == 503
+    body = response.json()
+    assert body["error"]["code"] == "SOLVER_INDETERMINATE"
+    assert body["transition"]["kind"] == "SUPERSEDED"
+    assert body["transition"]["prior_evaluation_freshness"] == "STALE"
+    assert body["transition"]["current_basis_fingerprint"] is not None
+
+
+def test_unknown_structural_prior_version_is_specialized_422() -> None:
+    request, _ = _prior_request()
+    payload = request.model_dump(mode="json", warnings=False)
+    payload["prior"]["basis"]["planning"]["basis_version"] = "planning-basis-v2"
+    payload["prior"]["basis"]["planning"]["future_field"] = "v2-only"
+
+    response = TestClient(app).post(
+        "/api/v1/plans/re-evaluate",
+        json=payload,
+    )
+
+    assert response.status_code == 422
+    body = response.json()
+    assert body["error"]["code"] == "UNSUPPORTED_REEVALUATION_CONTRACT"
+    assert body["transition"] is None
+
+
+def test_valid_shape_wrong_prior_digest_is_context_invalid_409() -> None:
+    request, _ = _prior_request()
+    payload = request.model_dump(mode="json", warnings=False)
+    payload["prior"]["basis"]["fingerprint"] = "f" * 64
+
+    response = TestClient(app).post(
+        "/api/v1/plans/re-evaluate",
+        json=payload,
+    )
+
+    assert response.status_code == 409
+    body = response.json()
+    assert body["error"]["code"] == "REEVALUATION_CONTEXT_INVALID"
+    assert body["transition"] is None
+
+
+def test_malformed_prior_digest_is_validation_error() -> None:
+    request, _ = _prior_request()
+    payload = request.model_dump(mode="json", warnings=False)
+    payload["prior"]["basis"]["fingerprint"] = "not-a-sha"
+
+    response = TestClient(app).post(
+        "/api/v1/plans/re-evaluate",
+        json=payload,
+    )
+
+    assert response.status_code == 422
+    body = response.json()
+    assert body["error"]["code"] == "VALIDATION_ERROR"
+    assert body["transition"] is None
+
+
+def test_reevaluation_uses_one_server_clock_sample() -> None:
+    request, _ = _prior_request()
+    calls = 0
+
+    def counting_clock() -> datetime:
+        nonlocal calls
+        calls += 1
+        return _clock()
+
+    result = reevaluate_plan(request, clock=counting_clock)
+
+    assert result.transition.kind == "UNCHANGED"
+    assert calls == 1
