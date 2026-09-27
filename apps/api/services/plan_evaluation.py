@@ -250,25 +250,108 @@ def _readiness_basis_fingerprint(
     resolved_scope: ResolvedEligibilityScope | None,
     selected_scope: str | None,
 ) -> str:
-    rules = request.eligibility
-    material = {
+    """Hash only readiness inputs actually consulted by triage-v1.
+
+    The projection mirrors evaluate_readiness() short-circuit order so a field
+    that cannot affect the current readiness result does not create stale/dedupe
+    noise for Block 2.
+    """
+
+    material: dict[str, object] = {
         "projected_unresolved_fields": sorted(request.unresolved_critical_fields),
-        "deadline_decision_state": _deadline_state(request),
-        "mandatory_information_decision_state": (
-            "COMPLETE" if request.mandatory_information_complete else "INCOMPLETE"
-        ),
+        "deadline": {"state": "NOT_EVALUATED"},
+        "mandatory_information": {"state": "NOT_EVALUATED"},
+        "eligibility": {"state": "NOT_EVALUATED"},
+    }
+
+    if request.unresolved_critical_fields:
+        return jcs_sha256(material)
+
+    deadline_state = _deadline_state(request)
+    material["deadline"] = {
+        "state": deadline_state,
+        "deadline_extension_applicable": False,
+    }
+    if deadline_state != "OPEN":
+        return jcs_sha256(material)
+
+    mandatory_state = (
+        "COMPLETE" if request.mandatory_information_complete else "INCOMPLETE"
+    )
+    material["mandatory_information"] = {"state": mandatory_state}
+    if mandatory_state != "COMPLETE":
+        return jcs_sha256(material)
+
+    rules = request.eligibility
+    user = request.user
+    eligibility_material: dict[str, object] = {
+        "state": "EVALUATING",
         "canonical_effective_scope": _canonical_scope_material(
             resolved_scope,
             selected_scope,
         ),
-        "effective_eligibility_rule": {
-            "minimum_age": rules.minimum_age,
-            "requires_student": rules.requires_student,
-            "allowed_regions": list(_normalized_regions(rules.allowed_regions)),
-        },
-        "eligibility_predicates": _eligibility_predicates(request),
-        "deadline_extension_applicable": False,
+        "consulted_predicates": [],
     }
+    consulted: list[dict[str, object]] = eligibility_material["consulted_predicates"]  # type: ignore[assignment]
+
+    if rules.minimum_age is not None:
+        if user.age is None:
+            state = "UNKNOWN"
+        elif user.age >= rules.minimum_age:
+            state = "MET"
+        else:
+            state = "NOT_MET"
+        consulted.append(
+            {
+                "predicate": "minimum_age",
+                "required": rules.minimum_age,
+                "state": state,
+            }
+        )
+        if state != "MET":
+            material["eligibility"] = eligibility_material
+            return jcs_sha256(material)
+
+    if rules.requires_student:
+        if user.student_status is None:
+            state = "UNKNOWN"
+        elif user.student_status:
+            state = "MET"
+        else:
+            state = "NOT_MET"
+        consulted.append(
+            {
+                "predicate": "student_status",
+                "required": True,
+                "state": state,
+            }
+        )
+        if state != "MET":
+            material["eligibility"] = eligibility_material
+            return jcs_sha256(material)
+
+    regions = _normalized_regions(rules.allowed_regions)
+    if regions and regions != ("global",):
+        country = user.country.strip().lower() if user.country else None
+        if country is None:
+            state = "UNKNOWN"
+        elif country in regions:
+            state = "MET"
+        else:
+            state = "NOT_MET"
+        consulted.append(
+            {
+                "predicate": "region",
+                "allowed_regions": list(regions),
+                "state": state,
+            }
+        )
+        if state != "MET":
+            material["eligibility"] = eligibility_material
+            return jcs_sha256(material)
+
+    eligibility_material["state"] = "COMPLETE"
+    material["eligibility"] = eligibility_material
     return jcs_sha256(material)
 
 
