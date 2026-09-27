@@ -281,6 +281,20 @@ class RecommendationSetV1(ApiModel):
             for item in self.alternative_candidates
         ):
             raise ValueError("all public candidate references must share one evaluation_id")
+        if (
+            self.recommendation.recommended_candidate_id
+            != self.primary_candidate.candidate_id
+        ):
+            raise ValueError(
+                "recommendation primary candidate ID must match public candidate reference"
+            )
+        payload_alternative_ids = tuple(
+            item.candidate_id for item in self.recommendation.alternatives
+        )
+        if payload_alternative_ids != alternative_ids:
+            raise ValueError(
+                "recommendation alternative IDs must match public candidate references"
+            )
         return self
 
 

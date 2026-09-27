@@ -235,6 +235,17 @@ def test_identical_semantic_inputs_are_deterministic_except_execution_identity()
         == second_set.primary_candidate.candidate_id
     )
     assert first_set.recommendation == second_set.recommendation
+    assert (
+        first_set.recommendation.recommended_candidate_id
+        == first_set.primary_candidate.candidate_id
+    )
+    assert tuple(
+        item.candidate_id for item in first_set.recommendation.alternatives
+    ) == tuple(
+        item.candidate_id for item in first_set.alternative_candidates
+    )
+    assert first.basis.report.competition_id == request.report_bundle.ref.competition_id
+    assert first.basis.report.report_version == request.report_bundle.ref.report_version
 
 
 def test_aware_datetime_inside_any_survives_report_wire_round_trip() -> None:

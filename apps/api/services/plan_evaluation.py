@@ -596,6 +596,14 @@ def evaluate_plan(
             "recommendation assembly failed over server-produced artifacts"
         ) from exc
 
+    if (
+        assembly.source_competition_id != report_basis.competition_id
+        or assembly.source_report_version != report_basis.report_version
+    ):
+        raise PlanEvaluationInvariantError(
+            "recommendation trace does not match evaluation report basis"
+        )
+
     evaluation_id = _new_evaluation_id(evaluation_id_factory)
     recommendation_set = None
     if assembly.recommendation_payload is not None:

@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 import json
+from typing import Annotated
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, File, Form, Request, UploadFile
 from pydantic import ValidationError
-from starlette.datastructures import UploadFile
-
 from apps.api.contracts import (
     CompetitionAnalyzePdfMetadataV1,
     CompetitionAnalyzeResponseV1,
@@ -189,9 +188,14 @@ def analyze_url_route(
     "/competitions/analyze/pdf",
     response_model=CompetitionAnalyzeResponseV1,
 )
-async def analyze_pdf_route(request: Request) -> CompetitionAnalyzeResponseV1:
+async def analyze_pdf_route(
+    request: Request,
+    metadata: Annotated[str, Form(...)],
+    file: Annotated[UploadFile, File(...)],
+) -> CompetitionAnalyzeResponseV1:
     form = await request.form()
-    if set(form.keys()) != {"metadata", "file"}:
+    field_names = [name for name, _value in form.multi_items()]
+    if len(field_names) != 2 or set(field_names) != {"metadata", "file"}:
         raise ApiContractError(
             status_code=422,
             code="VALIDATION_ERROR",
@@ -199,15 +203,8 @@ async def analyze_pdf_route(request: Request) -> CompetitionAnalyzeResponseV1:
             stage="validation",
         )
 
-    metadata_raw = form.get("metadata")
-    upload = form.get("file")
-    if not isinstance(metadata_raw, str) or not isinstance(upload, UploadFile):
-        raise ApiContractError(
-            status_code=422,
-            code="VALIDATION_ERROR",
-            message="PDF analysis form fields have invalid types.",
-            stage="validation",
-        )
+    metadata_raw = metadata
+    upload = file
     if upload.content_type not in {None, "application/pdf"}:
         raise ApiContractError(
             status_code=415,
