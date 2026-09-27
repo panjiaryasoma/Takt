@@ -9,9 +9,9 @@ from dataclasses import dataclass
 import httpx
 
 from apps.api.contracts import (
-    AnalysisProvenanceV1,
     RECONCILIATION_POLICY_VERSION,
     REPORT_WIRE_FINGERPRINT_VERSION,
+    AnalysisProvenanceV1,
     CanonicalReportBundleV1,
     CanonicalReportRefV1,
     CompetitionAnalyzePdfMetadataV1,
@@ -22,6 +22,11 @@ from apps.api.contracts import (
     SourceMetadataV1,
 )
 from apps.api.fingerprints import report_wire_fingerprint, source_set_fingerprint
+from apps.api.services.plan_evaluation import (
+    ReportBundleError,
+    UnsupportedReportContractError,
+    verify_report_bundle,
+)
 from engine.extraction import (
     OCRProvider,
     SnapshotExtractionResult,
@@ -35,11 +40,6 @@ from engine.reconciliation import (
     CANONICAL_V1,
     assemble_canonical_report,
     reconcile_field,
-)
-from apps.api.services.plan_evaluation import (
-    ReportBundleError,
-    UnsupportedReportContractError,
-    verify_report_bundle,
 )
 from engine.reconciliation.models import ReconciliationInputError
 from engine.reconciliation.policy import validate_source_policy_metadata
