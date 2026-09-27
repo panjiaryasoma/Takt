@@ -2,7 +2,11 @@
 
 from fastapi import APIRouter
 
-from apps.api.contracts import PlanEvaluateRequestV1, PlanEvaluateResponseV1
+from apps.api.contracts import (
+    ApiErrorResponseV1,
+    PlanEvaluateRequestV1,
+    PlanEvaluateResponseV1,
+)
 from apps.api.errors import ApiContractError
 from apps.api.services.plan_evaluation import (
     PlanEvaluationIndeterminateError,
@@ -16,8 +20,18 @@ from apps.api.services.plan_evaluation import (
 
 router = APIRouter(tags=["plans"])
 
+_PLAN_ERROR_RESPONSES = {
+    422: {"model": ApiErrorResponseV1},
+    500: {"model": ApiErrorResponseV1},
+    503: {"model": ApiErrorResponseV1},
+}
 
-@router.post("/plans/evaluate", response_model=PlanEvaluateResponseV1)
+
+@router.post(
+    "/plans/evaluate",
+    response_model=PlanEvaluateResponseV1,
+    responses=_PLAN_ERROR_RESPONSES,
+)
 def evaluate_plan_route(request: PlanEvaluateRequestV1) -> PlanEvaluateResponseV1:
     try:
         return evaluate_plan(request)
