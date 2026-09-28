@@ -23,7 +23,7 @@ class SavedPlanEntry {
   final String competitionId;
   final String title;
 
-  /// Batas waktu lomba (dipakai "Sebelum <tgl>").
+  /// Batas waktu lomba (dipakai `Sebelum <tgl>`).
   final DateTime deadline;
 
   RencanaStatus status;

@@ -55,7 +55,7 @@ class _AnalisisKompetisiScreenState extends State<AnalisisKompetisiScreen> {
                 Container(
                   width: 36,
                   height: 36,
-                  decoration: BoxDecoration(
+                  decoration: const BoxDecoration(
                     color: C.card,
                     shape: BoxShape.circle,
                   ),
@@ -178,9 +178,9 @@ class _AnalisisKompetisiScreenState extends State<AnalisisKompetisiScreen> {
                   borderRadius: BorderRadius.circular(14),
                 ),
                 alignment: Alignment.center,
-                child: Row(
+                child: const Row(
                   mainAxisAlignment: MainAxisAlignment.center,
-                  children: const [
+                  children: [
                     Icon(Icons.auto_awesome, color: C.bg, size: 18),
                     SizedBox(width: 8),
                     Text(

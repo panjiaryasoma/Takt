@@ -1,73 +1,90 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../models/enums.dart';
+import '../models/schedule_occurrence.dart';
 import '../theme/app_theme.dart';
+import '../viewmodels/jadwal_view_model.dart';
 import '../widgets/common.dart';
 import 'jadwal_harian_screen.dart' show JadwalTabs;
 
-/// Satu batang aktivitas pada Gantt chart.
 class _Task {
   const _Task(this.label, this.start, this.end, this.color);
 
   final String label;
-  final int start; // jam mulai (inklusif), skala 07–18
-  final int end; // jam selesai (eksklusif)
+  final double start;
+  final double end;
   final Color color;
 }
 
-/// JadwalRingkasanScreen — tab Ringkasan Pekan (Gantt chart mingguan).
-/// 7 hari (baris) × jam 07–17 (kolom), batang aktivitas memanjang sesuai durasi.
 class JadwalRingkasanScreen extends StatelessWidget {
   const JadwalRingkasanScreen({super.key, required this.onSwitchTab});
 
   final ValueChanged<int> onSwitchTab;
 
-  static const int _startHour = 7; // 07:00
-  static const int _endHour = 18; // 18:00 (11 slot)
+  static const int _startHour = 7;
+  static const int _endHour = 22;
   static const int _slots = _endHour - _startHour;
-
   static const _days = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
 
-  // Aktivitas per hari — batang Gantt (start, end dalam jam 24h).
-  static const _tasks = <String, List<_Task>>{
-    'Sen': [
-      _Task('Kelas', 8, 10, C.dotBlue),
-      _Task('Latihan Lomba', 13, 15, C.dotPurple),
-    ],
-    'Sel': [
-      _Task('Rapat Tim', 9, 11, C.padat),
-      _Task('Kerja Proyek', 13, 15, C.dotBlue),
-    ],
-    'Rab': [
-      _Task('Riset', 8, 10, C.dotGreen),
-      _Task('Bimbingan', 14, 16, C.sibuk),
-    ],
-    'Kam': [
-      _Task('Kelas', 8, 11, C.dotBlue),
-      _Task('Deadline', 15, 17, C.padat),
-    ],
-    'Jum': [
-      _Task('Persiapan Lomba', 8, 11, C.sibuk),
-      _Task('Review', 13, 15, C.dotPurple),
-    ],
-    'Sab': [
-      _Task('Lomba', 8, 12, C.accent),
-      _Task('Evaluasi', 13, 15, C.dotGreen),
-    ],
-    'Min': [
-      _Task('Istirahat', 10, 12, C.ringan),
-    ],
-  };
+  static Color _colorFor(ScheduleOccurrence item) {
+    if (item.commitment.source.startsWith('lomba:')) return C.accent;
+    switch (item.commitment.category?.toLowerCase()) {
+      case 'kuliah':
+        return C.dotBlue;
+      case 'tim':
+        return C.dotPurple;
+      case 'lomba':
+        return C.accent;
+      default:
+        return item.commitment.type == CommitmentType.fixed
+            ? C.sibuk
+            : C.dotGreen;
+    }
+  }
 
-  static const _legend = <(Color, String)>[
-    (C.dotBlue, 'Kelas / Kerja'),
-    (C.dotPurple, 'Latihan'),
-    (C.sibuk, 'Persiapan'),
-    (C.padat, 'Deadline'),
-    (C.accent, 'Lomba'),
-  ];
+  static Map<String, List<_Task>> _tasksForWeek(
+    List<ScheduleOccurrence> occurrences,
+  ) {
+    final result = <String, List<_Task>>{
+      for (final day in _days) day: <_Task>[],
+    };
+    for (final occurrence in occurrences) {
+      final start = occurrence.startAt;
+      final end = occurrence.endAt;
+      final startHour = start.hour + start.minute / 60.0;
+      final endHour = end.hour + end.minute / 60.0;
+      result[_days[start.weekday - 1]]!.add(
+        _Task(
+          occurrence.commitment.title,
+          startHour,
+          endHour,
+          _colorFor(occurrence),
+        ),
+      );
+    }
+    for (final tasks in result.values) {
+      tasks.sort((a, b) => a.start.compareTo(b.start));
+    }
+    return result;
+  }
 
   @override
   Widget build(BuildContext context) {
+    final vm = context.watch<JadwalViewModel>();
+    final selected = vm.selectedDate;
+    final monday = DateTime(selected.year, selected.month, selected.day)
+        .subtract(Duration(days: selected.weekday - 1));
+    final nextMonday = monday.add(const Duration(days: 7));
+    final occurrences = vm.occurrencesBetween(monday, nextMonday);
+    final tasks = _tasksForWeek(occurrences);
+    final fixedCount = occurrences
+        .where((item) => item.commitment.type == CommitmentType.fixed)
+        .length;
+    final competitionCount = occurrences
+        .where((item) => item.commitment.source.startsWith('lomba:'))
+        .length;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(10, 0, 10, 24),
       child: Column(
@@ -75,10 +92,10 @@ class JadwalRingkasanScreen extends StatelessWidget {
         children: [
           const AppHeader(title: 'Jadwal Saya'),
           const HeaderDivider(),
+          if (vm.isLoading) const LinearProgressIndicator(minHeight: 2),
           const SizedBox(height: 16),
           JadwalTabs(activeIndex: 1, onChanged: onSwitchTab),
           const SizedBox(height: 16),
-
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 20),
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
@@ -98,47 +115,31 @@ class JadwalRingkasanScreen extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(height: 10),
-
-                // Legend
-                Wrap(
+                const Wrap(
                   spacing: 10,
                   runSpacing: 6,
-                  children: _legend
-                      .map((l) => Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Container(
-                                width: 8,
-                                height: 8,
-                                decoration: BoxDecoration(
-                                  color: l.$1,
-                                  borderRadius: BorderRadius.circular(2),
-                                ),
-                              ),
-                              const SizedBox(width: 3),
-                              Text(
-                                l.$2,
-                                style: const TextStyle(
-                                    color: C.navInactive, fontSize: 9),
-                              ),
-                            ],
-                          ))
-                      .toList(),
+                  children: [
+                    _Legend(color: C.dotBlue, label: 'Kuliah'),
+                    _Legend(color: C.dotPurple, label: 'Tim'),
+                    _Legend(color: C.sibuk, label: 'Fixed'),
+                    _Legend(color: C.dotGreen, label: 'Flexible'),
+                    _Legend(color: C.accent, label: 'Lomba'),
+                  ],
                 ),
                 const SizedBox(height: 12),
-
-                // Hours header
                 Row(
                   children: [
                     const SizedBox(width: 30),
-                    ...List.generate(_slots, (i) {
-                      final h = _startHour + i;
+                    ...List.generate(_slots, (index) {
+                      final hour = _startHour + index;
                       return Expanded(
                         child: Center(
                           child: Text(
-                            h.toString().padLeft(2, '0'),
+                            hour.toString().padLeft(2, '0'),
                             style: const TextStyle(
-                                color: C.navInactive, fontSize: 8),
+                              color: C.navInactive,
+                              fontSize: 8,
+                            ),
                           ),
                         ),
                       );
@@ -146,35 +147,39 @@ class JadwalRingkasanScreen extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 4),
-
-                // Gantt rows
-                ..._days.map((day) => Padding(
-                      padding: const EdgeInsets.only(bottom: 6),
-                      child: Row(
-                        children: [
-                          SizedBox(
-                            width: 30,
-                            child: Text(
-                              day,
-                              style: TextStyle(
-                                color: day == 'Sab' ? C.accent : C.white,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w500,
-                              ),
+                ..._days.map(
+                  (day) => Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 30,
+                          child: Text(
+                            day,
+                            style: TextStyle(
+                              color: day == 'Sab' ? C.accent : C.white,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
                             ),
                           ),
-                          Expanded(
-                            child: _GanttRow(tasks: _tasks[day] ?? const []),
-                          ),
-                        ],
-                      ),
-                    )),
+                        ),
+                        Expanded(child: _GanttRow(tasks: tasks[day] ?? const [])),
+                      ],
+                    ),
+                  ),
+                ),
+                if (occurrences.isEmpty)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 8),
+                    child: Text(
+                      'Belum ada jadwal pada pekan ini.',
+                      style: TextStyle(color: C.detailMuted, fontSize: 11),
+                    ),
+                  ),
               ],
             ),
           ),
           const SizedBox(height: 16),
-
-          // Ringkasan pekan: jumlah tugas wajib & lomba
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 20),
             padding: const EdgeInsets.all(16),
@@ -197,19 +202,19 @@ class JadwalRingkasanScreen extends StatelessWidget {
                 Row(
                   children: [
                     _SummaryTile(
-                      icon: Icons.menu_book_rounded,
+                      icon: Icons.lock_clock_outlined,
                       color: C.dotBlue,
-                      value: '${_hitungWajib()}',
-                      label: 'Tugas wajib',
-                      hint: 'Kuliah, kerja, rapat',
+                      value: '$fixedCount',
+                      label: 'Jadwal fixed',
+                      hint: 'Waktu yang tidak boleh digeser',
                     ),
                     const SizedBox(width: 12),
                     _SummaryTile(
                       icon: Icons.emoji_events_rounded,
                       color: C.accent,
-                      value: '${_hitungLomba()}',
+                      value: '$competitionCount',
                       label: 'Lomba',
-                      hint: 'Dijalankan pekan ini',
+                      hint: 'Commitment lomba pekan ini',
                     ),
                   ],
                 ),
@@ -220,41 +225,37 @@ class JadwalRingkasanScreen extends StatelessWidget {
       ),
     );
   }
+}
 
-  /// Tugas wajib = aktivitas rutin non-lomba (Kelas/Kerja/Rapat/Bimbingan/
-  /// Deadline). Diidentifikasi dari label & warna.
-  static int _hitungWajib() {
-    const wajibKeywords = [
-      'kelas', 'kerja', 'rapat', 'bimbingan', 'deadline', 'kuliah', 'riset',
-    ];
-    var n = 0;
-    for (final list in _tasks.values) {
-      for (final t in list) {
-        final l = t.label.toLowerCase();
-        if (wajibKeywords.any(l.contains)) n++;
-      }
-    }
-    return n;
-  }
+class _Legend extends StatelessWidget {
+  const _Legend({required this.color, required this.label});
 
-  /// Lomba = aktivitas terkait lomba (label mengandung "lomba" atau warna
-  /// accent lomba, termasuk persiapan/latihan/review/evaluasi lomba).
-  static int _hitungLomba() {
-    const lombaKeywords = [
-      'lomba', 'latihan', 'persiapan', 'review', 'evaluasi',
-    ];
-    var n = 0;
-    for (final list in _tasks.values) {
-      for (final t in list) {
-        final l = t.label.toLowerCase();
-        if (lombaKeywords.any(l.contains)) n++;
-      }
-    }
-    return n;
+  final Color color;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(2),
+          ),
+        ),
+        const SizedBox(width: 3),
+        Text(
+          label,
+          style: const TextStyle(color: C.navInactive, fontSize: 9),
+        ),
+      ],
+    );
   }
 }
 
-/// Kotak ringkasan angka (ikon + nilai besar + label + hint).
 class _SummaryTile extends StatelessWidget {
   const _SummaryTile({
     required this.icon,
@@ -317,7 +318,6 @@ class _SummaryTile extends StatelessWidget {
   }
 }
 
-/// Satu baris Gantt: grid guide + batang aktivitas terposisi via LayoutBuilder.
 class _GanttRow extends StatelessWidget {
   const _GanttRow({required this.tasks});
 
@@ -331,17 +331,16 @@ class _GanttRow extends StatelessWidget {
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        final slotW = constraints.maxWidth / _slots;
+        final slotWidth = constraints.maxWidth / _slots;
         return SizedBox(
           height: _rowHeight,
           child: Stack(
             children: [
-              // Grid guide lines
               Row(
                 children: List.generate(
                   _slots,
-                  (i) => Container(
-                    width: slotW,
+                  (index) => Container(
+                    width: slotWidth,
                     height: _rowHeight,
                     decoration: BoxDecoration(
                       border: Border(
@@ -354,24 +353,32 @@ class _GanttRow extends StatelessWidget {
                   ),
                 ),
               ),
-              // Task bars
-              ...tasks.map((t) {
-                final left = (t.start - _startHour) * slotW;
-                final width = (t.end - t.start) * slotW;
+              ...tasks.map((task) {
+                final visibleStart = task.start.clamp(
+                  _startHour.toDouble(),
+                  (_startHour + _slots).toDouble(),
+                ).toDouble();
+                final visibleEnd = task.end.clamp(
+                  _startHour.toDouble(),
+                  (_startHour + _slots).toDouble(),
+                ).toDouble();
+                if (visibleEnd <= visibleStart) return const SizedBox.shrink();
+                final left = (visibleStart - _startHour) * slotWidth;
+                final width = (visibleEnd - visibleStart) * slotWidth;
                 return Positioned(
-                  left: left.clamp(0, constraints.maxWidth),
+                  left: left,
                   top: 4,
                   child: Container(
-                    width: width.clamp(0, constraints.maxWidth - left),
+                    width: width,
                     height: _rowHeight - 8,
                     padding: const EdgeInsets.symmetric(horizontal: 4),
                     alignment: Alignment.centerLeft,
                     decoration: BoxDecoration(
-                      color: t.color.withValues(alpha: 0.9),
+                      color: task.color.withValues(alpha: 0.9),
                       borderRadius: BorderRadius.circular(5),
                     ),
                     child: Text(
-                      t.label,
+                      task.label,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: C.white,

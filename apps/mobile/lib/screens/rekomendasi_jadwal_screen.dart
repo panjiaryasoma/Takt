@@ -53,7 +53,7 @@ class _RekomendasiJadwalScreenState extends State<RekomendasiJadwalScreen> {
   String _labelSlot(DateTimeRange r) {
     final s = r.start;
     final e = r.end;
-    final hh = (int v) => v.toString().padLeft(2, '0');
+    String hh(int value) => value.toString().padLeft(2, '0');
     return '${_hari[s.weekday - 1]}, ${s.day} ${_bulan[s.month - 1]} · '
         '${hh(s.hour)}.${hh(s.minute)}–${hh(e.hour)}.${hh(e.minute)}';
   }
