@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'data/database/app_database.dart';
+import 'data/repositories/drift_schedule_repository.dart';
+import 'data/repositories/schedule_repository.dart';
+import 'models/commitment.dart';
 import 'models/competition_brief.dart';
 import 'screens/analisis_kompetisi_screen.dart';
 import 'screens/home_screen.dart';
@@ -22,13 +26,21 @@ void main() {
 }
 
 class TaktApp extends StatelessWidget {
-  const TaktApp({super.key});
+  const TaktApp({super.key, this.scheduleRepository});
+
+  final ScheduleRepository? scheduleRepository;
 
   @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        ChangeNotifierProvider(create: (_) => JadwalViewModel()),
+        ChangeNotifierProvider(
+          create: (_) {
+            final repository = scheduleRepository ??
+                DriftScheduleRepository(AppDatabase.open());
+            return JadwalViewModel(repository)..initialize();
+          },
+        ),
         ChangeNotifierProvider(create: (_) => AnalisisViewModel()),
         ChangeNotifierProvider(create: (_) => RencanaViewModel()),
       ],
@@ -42,7 +54,6 @@ class TaktApp extends StatelessWidget {
   }
 }
 
-/// Shell dengan bottom navigation (Beranda / Jadwal / Analisis / Rencana).
 class RootShell extends StatefulWidget {
   const RootShell({super.key});
 
@@ -51,11 +62,12 @@ class RootShell extends StatefulWidget {
 }
 
 class _RootShellState extends State<RootShell> {
-  int _navIndex = 0; // 0 beranda, 1 jadwal, 2 analisis, 3 rencana
-  int _jadwalTab = 0; // 0 harian, 1 ringkasan
-  bool _showTambahJadwal = false; // overlay form Tambah Jadwal
-  int _analisisStep = 0; // 0 kompetisi(form), 1 progres, 2 review brief
-  bool _showRekomendasi = false; // overlay rekomendasi jadwal dari lomba
+  int _navIndex = 0;
+  int _jadwalTab = 0;
+  bool _showTambahJadwal = false;
+  Commitment? _editingCommitment;
+  int _analisisStep = 0;
+  bool _showRekomendasi = false;
   CompetitionBrief? _briefAktif;
 
   CompetitionBrief get _brief => _briefAktif ??= CompetitionBrief.demo();
@@ -64,26 +76,45 @@ class _RootShellState extends State<RootShell> {
     switch (_navIndex) {
       case 1:
         if (_showTambahJadwal) {
+          final editing = _editingCommitment;
+          final recurrence = editing == null
+              ? null
+              : context.read<JadwalViewModel>().recurrenceFor(editing.id);
           return TambahJadwalScreen(
-            onBack: () => setState(() => _showTambahJadwal = false),
-            onSave: () => setState(() => _showTambahJadwal = false),
+            commitment: editing,
+            recurrenceRule: recurrence,
+            onBack: () => setState(() {
+              _showTambahJadwal = false;
+              _editingCommitment = null;
+            }),
+            onSave: () => setState(() {
+              _showTambahJadwal = false;
+              _editingCommitment = null;
+            }),
           );
         }
         return _jadwalTab == 0
             ? JadwalHarianScreen(
-                onSwitchTab: (i) => setState(() => _jadwalTab = i),
-                onAdd: () => setState(() => _showTambahJadwal = true),
+                onSwitchTab: (index) => setState(() => _jadwalTab = index),
+                onAdd: () => setState(() {
+                  _editingCommitment = null;
+                  _showTambahJadwal = true;
+                }),
+                onEdit: (commitment) => setState(() {
+                  _editingCommitment = commitment;
+                  _showTambahJadwal = true;
+                }),
                 onBack: () => setState(() => _navIndex = 0),
               )
             : JadwalRingkasanScreen(
-                onSwitchTab: (i) => setState(() => _jadwalTab = i));
+                onSwitchTab: (index) => setState(() => _jadwalTab = index),
+              );
       case 2:
         if (_showRekomendasi) {
           return RekomendasiJadwalScreen(
             brief: _brief,
             onBack: () => setState(() => _showRekomendasi = false),
             onSubmitDone: () => setState(() {
-              // Setelah submit rekomendasi: masuk kalender & buka tab Jadwal.
               _showRekomendasi = false;
               _analisisStep = 0;
               _navIndex = 1;
@@ -94,52 +125,50 @@ class _RootShellState extends State<RootShell> {
         switch (_analisisStep) {
           case 1:
             return ProgresAnalisisScreen(
-                onReadResult: () => setState(() => _analisisStep = 2));
+              onReadResult: () => setState(() => _analisisStep = 2),
+            );
           case 2:
             return ReviewBriefScreen(
-                brief: _brief,
-                onBack: () => setState(() => _analisisStep = 1),
-                // Tambah Jadwal: buka layar rekomendasi (judul+deskripsi
-                // otomatis, slot dari jadwal kosong).
-                onTambahJadwal: () =>
-                    setState(() => _showRekomendasi = true),
-                // Simpan: masukkan ke daftar Rencana tersimpan, lalu buka tab.
-                onSimpan: () {
-                  context.read<RencanaViewModel>().simpan(
-                        competitionId: _brief.competitionId,
-                        title: _brief.nama,
-                        deadline: _brief.deadline,
-                      );
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(
-                      content: Text('"${_brief.nama}" disimpan ke Rencana'),
-                      duration: const Duration(seconds: 2),
-                    ),
-                  );
-                  setState(() {
-                    _analisisStep = 0;
-                    _navIndex = 3;
-                  });
+              brief: _brief,
+              onBack: () => setState(() => _analisisStep = 1),
+              onTambahJadwal: () => setState(() => _showRekomendasi = true),
+              onSimpan: () {
+                context.read<RencanaViewModel>().simpan(
+                      competitionId: _brief.competitionId,
+                      title: _brief.nama,
+                      deadline: _brief.deadline,
+                    );
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('"${_brief.nama}" disimpan ke Rencana'),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+                setState(() {
+                  _analisisStep = 0;
+                  _navIndex = 3;
                 });
+              },
+            );
           case 0:
           default:
             return AnalisisKompetisiScreen(
-                onSubmit: () => setState(() => _analisisStep = 1));
+              onSubmit: () => setState(() => _analisisStep = 1),
+            );
         }
       case 3:
         return RencanaScreen(
           onTinjau: (entry) => setState(() {
-            // Tinjau: kembali membaca hasil analisis (Review Brief).
             _navIndex = 2;
             _analisisStep = 2;
           }),
           onCekJadwal: (entry) {
-            // Cek Jadwal: buka tab Jadwal & fokus ke tanggal lomba.
             context.read<JadwalViewModel>().fokusKompetisi(entry.competitionId);
             setState(() {
               _navIndex = 1;
               _jadwalTab = 0;
               _showTambahJadwal = false;
+              _editingCommitment = null;
             });
           },
         );
@@ -150,6 +179,7 @@ class _RootShellState extends State<RootShell> {
             _navIndex = 1;
             _jadwalTab = 0;
             _showTambahJadwal = false;
+            _editingCommitment = null;
           }),
         );
     }
@@ -170,11 +200,12 @@ class _RootShellState extends State<RootShell> {
       ),
       bottomNavigationBar: _BottomNav(
         activeIndex: _navIndex,
-        onTap: (i) => setState(() {
-          _navIndex = i;
-          // Setiap masuk tab Jadwal, selalu mulai dari daftar jadwal —
-          // jangan langsung ke form Tambah Jadwal.
-          if (i == 1) _showTambahJadwal = false;
+        onTap: (index) => setState(() {
+          _navIndex = index;
+          if (index == 1) {
+            _showTambahJadwal = false;
+            _editingCommitment = null;
+          }
         }),
       ),
     );
@@ -205,23 +236,23 @@ class _BottomNav extends StatelessWidget {
         right: 10,
       ),
       child: Row(
-        children: List.generate(_items.length, (i) {
-          final active = i == activeIndex;
+        children: List.generate(_items.length, (index) {
+          final active = index == activeIndex;
           return Expanded(
             child: GestureDetector(
               behavior: HitTestBehavior.opaque,
-              onTap: () => onTap(i),
+              onTap: () => onTap(index),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    _items[i].$1,
+                    _items[index].$1,
                     size: 20,
                     color: active ? C.accent : C.navInactive,
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    _items[i].$2,
+                    _items[index].$2,
                     style: TextStyle(
                       fontSize: 10,
                       fontWeight: FontWeight.w600,

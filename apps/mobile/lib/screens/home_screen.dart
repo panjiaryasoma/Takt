@@ -6,42 +6,39 @@ import '../viewmodels/jadwal_view_model.dart';
 import '../widgets/common.dart';
 
 /// HomeScreen — Figma node 11:1262 ("Home").
-/// Kapasitas pekan ini dihitung dari data jadwal ([JadwalViewModel]).
+/// Kapasitas pekan ini dihitung dari jadwal + PlanningPreferences lokal.
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key, this.onLihatJadwal});
 
-  /// Dipanggil saat "Lihat jadwal" ditekan (pindah ke tab Jadwal).
   final VoidCallback? onLihatJadwal;
 
-  /// Menit terjadwal pada 7 hari pekan berjalan (Senin–Minggu).
   static int _scheduledThisWeek(JadwalViewModel vm) {
     final now = DateTime.now();
     final monday = DateTime(now.year, now.month, now.day)
         .subtract(Duration(days: now.weekday - 1));
     var total = 0;
-    for (var i = 0; i < 7; i++) {
-      total += vm.scheduledMinutesOn(monday.add(Duration(days: i)));
+    for (var index = 0; index < 7; index++) {
+      total += vm.scheduledMinutesOn(monday.add(Duration(days: index)));
     }
     return total;
   }
 
   static String _jam(int menit) {
-    final j = menit / 60.0;
-    final s = j.toStringAsFixed(1).replaceAll('.', ',');
-    return '$s jam';
+    final jam = menit / 60.0;
+    final text = jam.toStringAsFixed(1).replaceAll('.', ',');
+    return '$text jam';
   }
 
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<JadwalViewModel>();
     final terjadwalMenit = _scheduledThisWeek(vm);
-    // Kapasitas mingguan = 7 hari x preferensi (default 120 menit/hari fokus).
-    const kapasitasMenit = 7 * 120;
+    final kapasitasMenit = vm.preferences.maxProjectMinutesPerDay * 7;
     final tersediaMenit =
-        (kapasitasMenit - terjadwalMenit).clamp(0, kapasitasMenit);
+        (kapasitasMenit - terjadwalMenit).clamp(0, kapasitasMenit).toInt();
     final rasio = kapasitasMenit == 0
         ? 0.0
-        : (terjadwalMenit / kapasitasMenit).clamp(0.0, 1.0);
+        : (terjadwalMenit / kapasitasMenit).clamp(0.0, 1.0).toDouble();
     final adaJadwal = vm.all.isNotEmpty;
 
     return SingleChildScrollView(
@@ -49,7 +46,6 @@ class HomeScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Header: logo Tk + welcome
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
             child: Row(
@@ -88,13 +84,13 @@ class HomeScreen extends StatelessWidget {
             ),
           ),
           const HeaderDivider(),
+          if (vm.isLoading) const LinearProgressIndicator(minHeight: 2),
           const SizedBox(height: 16),
-
-          // Kapasitas pekan ini — dihitung dari data jadwal
           SectionHeading(
-              title: 'Kapasitas pekan ini',
-              action: 'Lihat jadwal',
-              onAction: onLihatJadwal),
+            title: 'Kapasitas pekan ini',
+            action: 'Lihat jadwal',
+            onAction: onLihatJadwal,
+          ),
           const SizedBox(height: 16),
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -108,14 +104,16 @@ class HomeScreen extends StatelessWidget {
                 Row(
                   children: [
                     _Metric(
-                        label: 'Terjadwal',
-                        value: _jam(terjadwalMenit),
-                        color: C.accent),
+                      label: 'Terjadwal',
+                      value: _jam(terjadwalMenit),
+                      color: C.accent,
+                    ),
                     const SizedBox(width: 16),
                     _Metric(
-                        label: 'Tersedia',
-                        value: _jam(tersediaMenit),
-                        color: C.white),
+                      label: 'Tersedia',
+                      value: _jam(tersediaMenit),
+                      color: C.white,
+                    ),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -125,16 +123,35 @@ class HomeScreen extends StatelessWidget {
                     value: rasio,
                     minHeight: 8,
                     backgroundColor: C.white,
-                    valueColor:
-                        const AlwaysStoppedAnimation<Color>(C.accent),
+                    valueColor: const AlwaysStoppedAnimation<Color>(C.accent),
                   ),
                 ),
               ],
             ),
           ),
+          if (vm.errorMessage != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: C.card,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      vm.errorMessage!,
+                      style: const TextStyle(color: C.detailMuted, fontSize: 12),
+                    ),
+                  ),
+                  TextButton(onPressed: vm.retry, child: const Text('Coba lagi')),
+                ],
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
-
-          // Lomba Minggu ini — belum ada domain kompetisi, tampil empty-state
           const SectionHeading(title: 'Lomba Minggu ini'),
           const SizedBox(height: 16),
           const _EmptyCard(
@@ -142,8 +159,6 @@ class HomeScreen extends StatelessWidget {
             text: 'Belum ada lomba. Tambahkan dari tab Analisis.',
           ),
           const SizedBox(height: 16),
-
-          // Rencana Tersimpan — empty-state sampai ada rencana tersimpan
           const SectionHeading(title: 'Rencana Tersimpan'),
           const SizedBox(height: 16),
           _EmptyCard(
@@ -158,7 +173,6 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-/// Kartu empty-state generik (ikon + teks abu).
 class _EmptyCard extends StatelessWidget {
   const _EmptyCard({required this.icon, required this.text});
 
@@ -217,7 +231,10 @@ class _Metric extends StatelessWidget {
           Text(
             value,
             style: TextStyle(
-                color: color, fontSize: 20, fontWeight: FontWeight.w700),
+              color: color,
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ],
       ),

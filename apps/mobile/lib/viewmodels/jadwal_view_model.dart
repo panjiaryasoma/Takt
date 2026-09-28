@@ -1,75 +1,228 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../data/repositories/schedule_repository.dart';
 import '../models/commitment.dart';
 import '../models/enums.dart';
+import '../models/planning_preferences.dart';
+import '../models/recurrence_exception.dart';
+import '../models/recurrence_rule.dart';
+import '../models/schedule_occurrence.dart';
 
-/// ViewModel jadwal — padanan ViewModel di SwiftUI (@Published + fungsi).
+/// Presentation state for My Schedule.
 ///
-/// Menyimpan state jadwal dan menyediakan fungsi baca/tulis untuk View.
-/// SUMBER DATA SEKARANG: list di memori (belum ada database).
-/// Nanti tinggal ganti isi [_all] dengan hasil query Drift — View dan Model
-/// tidak perlu diubah. Itulah gunanya memisahkan lapisan ini.
+/// SQLite/Drift is authoritative. The in-memory state here is only a read model
+/// fed by [ScheduleRepository], so restarting the app does not erase schedules.
 class JadwalViewModel extends ChangeNotifier {
-  JadwalViewModel();
+  JadwalViewModel(this._repository);
 
-  final List<Commitment> _all = [];
+  final ScheduleRepository _repository;
 
-  /// Tanggal yang sedang dipilih di kalender. Default: hari ini.
+  ScheduleState _state = ScheduleState.empty();
+  StreamSubscription<ScheduleState>? _subscription;
   DateTime _selectedDate = _dateOnly(DateTime.now());
 
-  // ---- Getter untuk View ---------------------------------------------------
+  bool _isLoading = true;
+  bool _isSaving = false;
+  String? _errorMessage;
 
-  /// Semua komitmen (read-only bagi View).
-  List<Commitment> get all => List.unmodifiable(_all);
+  bool get isLoading => _isLoading;
+  bool get isSaving => _isSaving;
+  String? get errorMessage => _errorMessage;
 
+  List<Commitment> get all => List.unmodifiable(_state.commitments);
+  PlanningPreferences get preferences => _state.preferences;
   DateTime get selectedDate => _selectedDate;
 
-  /// Komitmen pada tanggal terpilih, terurut berdasarkan jam mulai.
-  List<Commitment> get itemsForSelectedDate {
-    final items = _all.where((c) => c.occursOn(_selectedDate)).toList()
-      ..sort((a, b) => a.startAtEpochMs.compareTo(b.startAtEpochMs));
-    return items;
+  Future<void> initialize() async {
+    if (_subscription != null) return;
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+
+    try {
+      await _repository.initialize();
+      _subscription = _repository.watchState().listen(
+        (state) {
+          _state = state;
+          _isLoading = false;
+          _errorMessage = null;
+          notifyListeners();
+        },
+        onError: (Object error, StackTrace stackTrace) {
+          _isLoading = false;
+          _errorMessage = 'Gagal membaca jadwal lokal.';
+          notifyListeners();
+        },
+      );
+    } catch (_) {
+      _isLoading = false;
+      _errorMessage = 'Gagal membuka database jadwal.';
+      notifyListeners();
+    }
   }
 
-  /// Komitmen pada [day] tertentu (dipakai Home / ringkasan).
-  List<Commitment> itemsOn(DateTime day) {
-    final items = _all.where((c) => c.occursOn(day)).toList()
-      ..sort((a, b) => a.startAtEpochMs.compareTo(b.startAtEpochMs));
-    return items;
+  Future<void> retry() async {
+    _isLoading = true;
+    _errorMessage = null;
+    notifyListeners();
+    try {
+      await _repository.refresh();
+      _isLoading = false;
+    } catch (_) {
+      _isLoading = false;
+      _errorMessage = 'Jadwal masih belum bisa dimuat.';
+    }
+    notifyListeners();
   }
 
-  /// Nomor tanggal (1..31) pada [month] yang punya komitmen — untuk dot kalender.
+  List<ScheduleOccurrence> get itemsForSelectedDate => itemsOn(_selectedDate);
+
+  List<ScheduleOccurrence> itemsOn(DateTime day) {
+    final start = _dateOnly(day);
+    final end = start.add(const Duration(days: 1));
+    return occurrencesBetween(start, end);
+  }
+
+  List<ScheduleOccurrence> occurrencesBetween(
+    DateTime startInclusive,
+    DateTime endExclusive,
+  ) {
+    final output = <ScheduleOccurrence>[];
+    final rulesByCommitment = <String, RecurrenceRule>{
+      for (final rule in _state.recurrenceRules) rule.commitmentId: rule,
+    };
+    final exceptionsByRule = <String, List<RecurrenceException>>{};
+    for (final exception in _state.recurrenceExceptions) {
+      exceptionsByRule.putIfAbsent(exception.recurrenceRuleId, () => []).add(exception);
+    }
+
+    for (final commitment in _state.commitments) {
+      final rule = rulesByCommitment[commitment.id];
+      if (rule == null) {
+        final start = commitment.startAt;
+        if (!start.isBefore(startInclusive) && start.isBefore(endExclusive)) {
+          output.add(ScheduleOccurrence(
+            commitment: commitment,
+            startAtEpochMs: commitment.startAtEpochMs,
+            endAtEpochMs: commitment.endAtEpochMs,
+            originalStartAtEpochMs: commitment.startAtEpochMs,
+          ));
+        }
+        continue;
+      }
+
+      final ruleExceptions = exceptionsByRule[rule.id] ?? const [];
+      final exceptionByOriginal = <int, RecurrenceException>{
+        for (final exception in ruleExceptions) exception.originalStartAtEpochMs: exception,
+      };
+      final weekdays = weekdaysFor(rule);
+      final durationMs = commitment.endAtEpochMs - commitment.startAtEpochMs;
+      final baseStart = commitment.startAt;
+      final activeFrom = DateTime.fromMillisecondsSinceEpoch(rule.activeFromEpochMs);
+      final activeUntil = rule.activeUntilEpochMs == null
+          ? null
+          : DateTime.fromMillisecondsSinceEpoch(rule.activeUntilEpochMs!);
+
+      var day = _dateOnly(startInclusive);
+      while (day.isBefore(endExclusive)) {
+        if (weekdays.contains(day.weekday)) {
+          final occurrenceStart = DateTime(
+            day.year,
+            day.month,
+            day.day,
+            baseStart.hour,
+            baseStart.minute,
+          );
+          final originalStartMs = _floorToMinute(occurrenceStart.millisecondsSinceEpoch);
+          final inActiveRange = !occurrenceStart.isBefore(activeFrom) &&
+              (activeUntil == null || occurrenceStart.isBefore(activeUntil));
+
+          if (inActiveRange && !exceptionByOriginal.containsKey(originalStartMs)) {
+            output.add(ScheduleOccurrence(
+              commitment: commitment,
+              startAtEpochMs: originalStartMs,
+              endAtEpochMs: originalStartMs + durationMs,
+              originalStartAtEpochMs: originalStartMs,
+              recurrenceRuleId: rule.id,
+            ));
+          }
+        }
+        day = day.add(const Duration(days: 1));
+      }
+
+      for (final exception in ruleExceptions) {
+        if (exception.action != ExceptionAction.moved) continue;
+        final replacementStartMs = exception.replacementStartAtEpochMs;
+        final replacementEndMs = exception.replacementEndAtEpochMs;
+        if (replacementStartMs == null || replacementEndMs == null) continue;
+        final replacementStart = DateTime.fromMillisecondsSinceEpoch(replacementStartMs);
+        if (!replacementStart.isBefore(startInclusive) &&
+            replacementStart.isBefore(endExclusive)) {
+          output.add(ScheduleOccurrence(
+            commitment: commitment,
+            startAtEpochMs: replacementStartMs,
+            endAtEpochMs: replacementEndMs,
+            originalStartAtEpochMs: exception.originalStartAtEpochMs,
+            recurrenceRuleId: rule.id,
+          ));
+        }
+      }
+    }
+
+    output.sort((a, b) {
+      final byStart = a.startAtEpochMs.compareTo(b.startAtEpochMs);
+      if (byStart != 0) return byStart;
+      return a.commitment.id.compareTo(b.commitment.id);
+    });
+    return output;
+  }
+
   Set<int> eventDaysOfMonth(DateTime month) {
-    return _all
-        .where((c) =>
-            c.startAt.year == month.year && c.startAt.month == month.month)
-        .map((c) => c.startAt.day)
-        .toSet();
+    final start = DateTime(month.year, month.month, 1);
+    final end = DateTime(month.year, month.month + 1, 1);
+    return occurrencesBetween(start, end).map((item) => item.startAt.day).toSet();
   }
 
-  /// Total menit terjadwal pada [day].
   int scheduledMinutesOn(DateTime day) {
-    return itemsOn(day).fold(0, (sum, c) => sum + c.durationMinutes);
+    return itemsOn(day).fold(0, (sum, item) => sum + item.durationMinutes);
   }
 
-  // ---- Aksi (dipanggil View) ----------------------------------------------
-
-  /// Pilih tanggal (mis. saat sel kalender diklik).
   void selectDate(DateTime day) {
     _selectedDate = _dateOnly(day);
     notifyListeners();
   }
 
-  /// Pilih tanggal berdasarkan nomor hari dalam bulan terpilih.
   void selectDay(int day, {DateTime? inMonth}) {
-    final m = inMonth ?? _selectedDate;
-    selectDate(DateTime(m.year, m.month, day));
+    final month = inMonth ?? _selectedDate;
+    selectDate(DateTime(month.year, month.month, day));
   }
 
-  /// Tambah komitmen baru dari form. Mengembalikan komitmen yang dibuat.
-  /// [category] dipakai menyimpan deskripsi singkat (skema commitments tidak
-  /// punya kolom deskripsi terpisah).
-  Commitment tambah({
+  RecurrenceRule? recurrenceFor(String commitmentId) {
+    for (final rule in _state.recurrenceRules) {
+      if (rule.commitmentId == commitmentId) return rule;
+    }
+    return null;
+  }
+
+  Set<int> weekdaysFor(RecurrenceRule rule) {
+    final parts = <String, String>{};
+    for (final part in rule.rrule.split(';')) {
+      final split = part.split('=');
+      if (split.length == 2) parts[split[0]] = split[1];
+    }
+    if (parts['FREQ'] != 'WEEKLY') {
+      throw StateError('Unsupported recurrence frequency: ${rule.rrule}');
+    }
+    final byDay = parts['BYDAY'];
+    if (byDay == null || byDay.isEmpty) {
+      throw StateError('Weekly recurrence requires BYDAY.');
+    }
+    return byDay.split(',').map(_weekdayFromToken).toSet();
+  }
+
+  Future<bool> tambah({
     required String title,
     String? category,
     required DateTime start,
@@ -77,10 +230,10 @@ class JadwalViewModel extends ChangeNotifier {
     CommitmentType type = CommitmentType.fixed,
     String timezone = 'Asia/Jakarta',
     String source = 'manual',
-  }) {
+  }) async {
     final now = DateTime.now().millisecondsSinceEpoch;
-    final c = Commitment(
-      id: 'cmt_${now}_${_all.length}',
+    final commitment = Commitment(
+      id: _newId('cmt'),
       title: title,
       category: category,
       type: type,
@@ -91,33 +244,178 @@ class JadwalViewModel extends ChangeNotifier {
       createdAtEpochMs: now,
       updatedAtEpochMs: now,
     );
-    _all.add(c);
-    // Loncat ke tanggal komitmen baru supaya langsung terlihat.
-    _selectedDate = _dateOnly(start);
-    notifyListeners();
-    return c;
+    final ok = await _save(() => _repository.createCommitment(commitment));
+    if (ok) {
+      _selectedDate = _dateOnly(start);
+      notifyListeners();
+    }
+    return ok;
   }
 
-  void hapus(String id) {
-    _all.removeWhere((c) => c.id == id);
-    notifyListeners();
+  Future<bool> tambahRutin({
+    required String title,
+    String? category,
+    required Set<int> weekdays,
+    required int jamMulai,
+    required int menitMulai,
+    required int jamSelesai,
+    required int menitSelesai,
+    CommitmentType type = CommitmentType.fixed,
+    DateTime? mulaiDari,
+    String timezone = 'Asia/Jakarta',
+  }) async {
+    if (weekdays.isEmpty) return false;
+    final first = _firstMatchingDay(_dateOnly(mulaiDari ?? DateTime.now()), weekdays);
+    final start = DateTime(first.year, first.month, first.day, jamMulai, menitMulai);
+    final end = DateTime(first.year, first.month, first.day, jamSelesai, menitSelesai);
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final id = _newId('cmt');
+    final commitment = Commitment(
+      id: id,
+      title: title,
+      category: category,
+      type: type,
+      startAtEpochMs: _floorToMinute(start.millisecondsSinceEpoch),
+      endAtEpochMs: _floorToMinute(end.millisecondsSinceEpoch),
+      timezone: timezone,
+      source: 'manual-rutin',
+      createdAtEpochMs: now,
+      updatedAtEpochMs: now,
+    );
+    final rule = RecurrenceRule(
+      id: 'rr_$id',
+      commitmentId: id,
+      rrule: _weeklyRrule(weekdays),
+      timezone: timezone,
+      activeFromEpochMs: commitment.startAtEpochMs,
+    );
+    final ok = await _save(
+      () => _repository.createCommitment(commitment, recurrenceRule: rule),
+    );
+    if (ok) {
+      _selectedDate = _dateOnly(first);
+      notifyListeners();
+    }
+    return ok;
   }
 
-  /// Filter komitmen milik satu lomba (source == 'lomba:<competitionId>').
-  List<Commitment> itemsForCompetition(String competitionId) =>
-      _all.where((c) => c.source == 'lomba:$competitionId').toList()
-        ..sort((a, b) => a.startAtEpochMs.compareTo(b.startAtEpochMs));
+  Future<bool> ubah({
+    required Commitment existing,
+    required String title,
+    String? category,
+    required CommitmentType type,
+    required bool recurring,
+    required Set<int> weekdays,
+    required DateTime start,
+    required DateTime end,
+    String timezone = 'Asia/Jakarta',
+  }) async {
+    final updated = Commitment(
+      id: existing.id,
+      title: title,
+      category: category,
+      type: type,
+      startAtEpochMs: _floorToMinute(start.millisecondsSinceEpoch),
+      endAtEpochMs: _floorToMinute(end.millisecondsSinceEpoch),
+      timezone: timezone,
+      source: existing.source,
+      createdAtEpochMs: existing.createdAtEpochMs,
+      updatedAtEpochMs: DateTime.now().millisecondsSinceEpoch,
+    );
+    RecurrenceRule? rule;
+    if (recurring) {
+      if (weekdays.isEmpty) return false;
+      final previous = recurrenceFor(existing.id);
+      rule = RecurrenceRule(
+        id: previous?.id ?? 'rr_${existing.id}',
+        commitmentId: existing.id,
+        rrule: _weeklyRrule(weekdays),
+        timezone: timezone,
+        activeFromEpochMs: updated.startAtEpochMs,
+        activeUntilEpochMs: previous?.activeUntilEpochMs,
+      );
+    }
+    final ok = await _save(
+      () => _repository.updateCommitment(updated, recurrenceRule: rule),
+    );
+    if (ok) {
+      _selectedDate = _dateOnly(start);
+      notifyListeners();
+    }
+    return ok;
+  }
 
-  /// Apakah tanggal [day] punya komitmen lomba [competitionId] (untuk highlight).
-  bool dayHasCompetition(DateTime day, String competitionId) => _all.any((c) =>
-      c.source == 'lomba:$competitionId' && c.occursOn(day));
+  Future<bool> hapus(String id) {
+    return _save(() => _repository.deleteCommitment(id));
+  }
 
-  /// Cari slot KOSONG untuk rekomendasi pengerjaan lomba.
-  ///
-  /// TITIK INTEGRASI AI: sekarang heuristik sederhana (cari jam kosong pada
-  /// [jamKerjaMulai]..[jamKerjaSelesai] di hari-hari antara sekarang dan
-  /// [sebelum], hindari bentrok dengan komitmen yang ada). Nanti ganti dengan
-  /// output penjadwal AI model temanmu; bentuk kembaliannya tetap sama.
+  Future<bool> cancelOccurrence(ScheduleOccurrence occurrence) async {
+    final ruleId = occurrence.recurrenceRuleId;
+    if (ruleId == null) return false;
+    final exception = RecurrenceException(
+      id: _newId('rex'),
+      recurrenceRuleId: ruleId,
+      originalStartAtEpochMs: occurrence.originalStartAtEpochMs,
+      action: ExceptionAction.cancelled,
+    );
+    return _save(() => _repository.upsertRecurrenceException(exception));
+  }
+
+  Future<bool> moveOccurrence(
+    ScheduleOccurrence occurrence,
+    DateTime replacementStart,
+    DateTime replacementEnd,
+  ) async {
+    final ruleId = occurrence.recurrenceRuleId;
+    if (ruleId == null) return false;
+    final exception = RecurrenceException(
+      id: _newId('rex'),
+      recurrenceRuleId: ruleId,
+      originalStartAtEpochMs: occurrence.originalStartAtEpochMs,
+      action: ExceptionAction.moved,
+      replacementStartAtEpochMs: _floorToMinute(replacementStart.millisecondsSinceEpoch),
+      replacementEndAtEpochMs: _floorToMinute(replacementEnd.millisecondsSinceEpoch),
+    );
+    final ok = await _save(
+      () => _repository.upsertRecurrenceException(exception),
+    );
+    if (ok) {
+      _selectedDate = _dateOnly(replacementStart);
+      notifyListeners();
+    }
+    return ok;
+  }
+
+  Future<bool> updatePlanningPreferences({
+    required int maxProjectMinutesPerDay,
+    required int preferredFocusMinutes,
+    required int bufferTargetMinutes,
+    String timezone = 'Asia/Jakarta',
+  }) {
+    final next = PlanningPreferences(
+      timezone: timezone,
+      maxProjectMinutesPerDay: maxProjectMinutesPerDay,
+      preferredFocusMinutes: preferredFocusMinutes,
+      bufferTargetMinutes: bufferTargetMinutes,
+      updatedAtEpochMs: DateTime.now().millisecondsSinceEpoch,
+    );
+    return _save(() => _repository.savePlanningPreferences(next));
+  }
+
+  List<Commitment> itemsForCompetition(String competitionId) => _state.commitments
+      .where((item) => item.source == 'lomba:$competitionId')
+      .toList()
+    ..sort((a, b) => a.startAtEpochMs.compareTo(b.startAtEpochMs));
+
+  bool dayHasCompetition(DateTime day, String competitionId) {
+    return itemsOn(day).any(
+      (item) => item.commitment.source == 'lomba:$competitionId',
+    );
+  }
+
+  /// Issue 1B intentionally does not generate solver/recommendation output in
+  /// Flutter. 3B will provide backend candidate windows to this presentation
+  /// layer instead of re-implementing the scheduling engine here.
   List<DateTimeRange> rekomendasiSlot({
     required DateTime sebelum,
     int butuhSesi = 3,
@@ -125,57 +423,29 @@ class JadwalViewModel extends ChangeNotifier {
     int jamKerjaMulai = 8,
     int jamKerjaSelesai = 21,
   }) {
-    final hasil = <DateTimeRange>[];
-    var hari = _dateOnly(DateTime.now());
-    final batas = _dateOnly(sebelum);
-
-    while (hari.isBefore(batas) && hasil.length < butuhSesi) {
-      // Coba tempatkan satu sesi di jam kerja hari ini.
-      for (var jam = jamKerjaMulai;
-          jam + (durasiMenit ~/ 60) <= jamKerjaSelesai;
-          jam++) {
-        final start = DateTime(hari.year, hari.month, hari.day, jam);
-        final end = start.add(Duration(minutes: durasiMenit));
-        final bentrok = itemsOn(hari).any((c) =>
-            start.isBefore(c.endAt) && end.isAfter(c.startAt));
-        if (!bentrok) {
-          hasil.add(DateTimeRange(start: start, end: end));
-          break; // satu sesi per hari
-        }
-      }
-      hari = hari.add(const Duration(days: 1));
-    }
-    return hasil;
+    return const [];
   }
 
-  /// Terima rekomendasi menjadi komitmen lomba nyata (ditandai source lomba).
-  void terapkanRekomendasi({
+  Future<bool> terapkanRekomendasi({
     required String competitionId,
     required String judulLomba,
     String? deskripsi,
     required List<DateTimeRange> slot,
-  }) {
-    final now = DateTime.now().millisecondsSinceEpoch;
-    for (var i = 0; i < slot.length; i++) {
-      final s = slot[i];
-      _all.add(Commitment(
-        id: 'lomba_${now}_$i',
+  }) async {
+    for (final range in slot) {
+      final ok = await tambah(
         title: judulLomba,
         category: deskripsi,
+        start: range.start,
+        end: range.end,
         type: CommitmentType.flexible,
-        startAtEpochMs: _floorToMinute(s.start.millisecondsSinceEpoch),
-        endAtEpochMs: _floorToMinute(s.end.millisecondsSinceEpoch),
-        timezone: 'Asia/Jakarta',
         source: 'lomba:$competitionId',
-        createdAtEpochMs: now,
-        updatedAtEpochMs: now,
-      ));
+      );
+      if (!ok) return false;
     }
-    if (slot.isNotEmpty) _selectedDate = _dateOnly(slot.first.start);
-    notifyListeners();
+    return true;
   }
 
-  /// Fokuskan kalender ke tanggal lomba pertama (dipakai "Cek Jadwal").
   void fokusKompetisi(String competitionId) {
     final items = itemsForCompetition(competitionId);
     if (items.isNotEmpty) {
@@ -184,61 +454,72 @@ class JadwalViewModel extends ChangeNotifier {
     }
   }
 
-  /// Tambah jadwal WAJIB (rutin mingguan) pada [weekdays] (1=Sen..7=Min).
-  /// Untuk sekarang di-expand jadi beberapa kejadian nyata beberapa pekan ke
-  /// depan (default 12 pekan) supaya langsung tampil di kalender. Nanti saat
-  /// pindah ke DB, ini menjadi satu Commitment + satu RecurrenceRule.
-  void tambahRutin({
-    required String title,
-    String? category,
-    required Set<int> weekdays,
-    required int jamMulai,
-    required int menitMulai,
-    required int jamSelesai,
-    required int menitSelesai,
-    int pekan = 12,
-    DateTime? mulaiDari,
-    String timezone = 'Asia/Jakarta',
-  }) {
-    if (weekdays.isEmpty) return;
-    final base = _dateOnly(mulaiDari ?? DateTime.now());
-    final now = DateTime.now().millisecondsSinceEpoch;
-    DateTime? pertama;
-    var idx = 0;
-
-    for (var w = 0; w < pekan; w++) {
-      for (var d = 0; d < 7; d++) {
-        final hari = base.add(Duration(days: w * 7 + d));
-        if (!weekdays.contains(hari.weekday)) continue;
-        if (hari.isBefore(base)) continue;
-        final start =
-            DateTime(hari.year, hari.month, hari.day, jamMulai, menitMulai);
-        final end = DateTime(
-            hari.year, hari.month, hari.day, jamSelesai, menitSelesai);
-        if (!end.isAfter(start)) continue;
-        _all.add(Commitment(
-          id: 'rutin_${now}_${idx++}',
-          title: title,
-          category: category,
-          type: CommitmentType.fixed,
-          startAtEpochMs: _floorToMinute(start.millisecondsSinceEpoch),
-          endAtEpochMs: _floorToMinute(end.millisecondsSinceEpoch),
-          timezone: timezone,
-          source: 'manual-rutin',
-          createdAtEpochMs: now,
-          updatedAtEpochMs: now,
-        ));
-        pertama ??= start;
-      }
-    }
-    if (pertama != null) _selectedDate = _dateOnly(pertama);
+  Future<bool> _save(Future<void> Function() action) async {
+    if (_isSaving) return false;
+    _isSaving = true;
+    _errorMessage = null;
     notifyListeners();
+    try {
+      await action();
+      return true;
+    } catch (_) {
+      _errorMessage = 'Perubahan jadwal gagal disimpan. Coba lagi.';
+      return false;
+    } finally {
+      _isSaving = false;
+      notifyListeners();
+    }
   }
 
-  // ---- Util privat ---------------------------------------------------------
+  static DateTime _firstMatchingDay(DateTime from, Set<int> weekdays) {
+    var day = _dateOnly(from);
+    for (var i = 0; i < 7; i++) {
+      if (weekdays.contains(day.weekday)) return day;
+      day = day.add(const Duration(days: 1));
+    }
+    throw StateError('No matching weekday found.');
+  }
 
-  static DateTime _dateOnly(DateTime d) => DateTime(d.year, d.month, d.day);
+  static String _weeklyRrule(Set<int> weekdays) {
+    final sorted = weekdays.toList()..sort();
+    final tokens = sorted.map(_weekdayToken).join(',');
+    return 'FREQ=WEEKLY;BYDAY=$tokens';
+  }
 
-  /// Bulatkan epoch ms ke menit terdekat ke bawah (DB wajib kelipatan 60000).
+  static String _weekdayToken(int weekday) => switch (weekday) {
+        DateTime.monday => 'MO',
+        DateTime.tuesday => 'TU',
+        DateTime.wednesday => 'WE',
+        DateTime.thursday => 'TH',
+        DateTime.friday => 'FR',
+        DateTime.saturday => 'SA',
+        DateTime.sunday => 'SU',
+        _ => throw ArgumentError.value(weekday, 'weekday'),
+      };
+
+  static int _weekdayFromToken(String token) => switch (token) {
+        'MO' => DateTime.monday,
+        'TU' => DateTime.tuesday,
+        'WE' => DateTime.wednesday,
+        'TH' => DateTime.thursday,
+        'FR' => DateTime.friday,
+        'SA' => DateTime.saturday,
+        'SU' => DateTime.sunday,
+        _ => throw StateError('Unsupported BYDAY token: $token'),
+      };
+
+  static DateTime _dateOnly(DateTime date) =>
+      DateTime(date.year, date.month, date.day);
+
   static int _floorToMinute(int epochMs) => (epochMs ~/ 60000) * 60000;
+
+  static String _newId(String prefix) =>
+      '${prefix}_${DateTime.now().microsecondsSinceEpoch}';
+
+  @override
+  void dispose() {
+    _subscription?.cancel();
+    unawaited(_repository.close());
+    super.dispose();
+  }
 }

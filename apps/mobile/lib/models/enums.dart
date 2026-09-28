@@ -2,45 +2,38 @@
 library;
 
 /// Jenis komitmen. SQL: type TEXT CHECK (type IN ('FIXED','FLEXIBLE')).
-/// - fixed    : waktu terkunci (kuliah, rapat) — tidak bisa digeser penjadwal.
-/// - flexible : blok kerja yang boleh diatur ulang penjadwal.
 enum CommitmentType {
   fixed('FIXED'),
   flexible('FLEXIBLE');
 
   const CommitmentType(this.wire);
-
-  /// Nilai string persis seperti yang disimpan di kolom DB.
   final String wire;
 
   static CommitmentType fromWire(String value) {
     return CommitmentType.values.firstWhere(
-      (e) => e.wire == value,
-      orElse: () => CommitmentType.fixed,
+      (item) => item.wire == value,
+      orElse: () => throw StateError('Unknown commitment type: $value'),
     );
   }
 }
 
 /// Aksi pengecualian recurrence.
-/// SQL: action TEXT CHECK (action IN ('CANCELLED','MOVED')).
 enum ExceptionAction {
   cancelled('CANCELLED'),
   moved('MOVED');
 
   const ExceptionAction(this.wire);
-
   final String wire;
 
   static ExceptionAction fromWire(String value) {
     return ExceptionAction.values.firstWhere(
-      (e) => e.wire == value,
-      orElse: () => ExceptionAction.cancelled,
+      (item) => item.wire == value,
+      orElse: () => throw StateError('Unknown recurrence action: $value'),
     );
   }
 }
 
 /// Status kesiapan evaluasi.
-/// SQL: readiness_status IN (...5 nilai...).
 enum ReadinessStatus {
   readyToEvaluate('READY_TO_EVALUATE'),
   needsReview('NEEDS_REVIEW'),
@@ -57,7 +50,6 @@ enum ReadinessStatus {
 }
 
 /// Status kelayakan (feasibility). Boleh null.
-/// SQL: feasibility_status IN (...4 nilai...).
 enum FeasibilityStatus {
   feasible('FEASIBLE'),
   feasibleWithTradeoffs('FEASIBLE_WITH_TRADEOFFS'),
@@ -75,7 +67,6 @@ enum FeasibilityStatus {
 }
 
 /// Jenis transisi re-evaluasi.
-/// SQL: kind IN ('UNCHANGED','SUPERSEDED').
 enum ReevaluationKind {
   unchanged('UNCHANGED'),
   superseded('SUPERSEDED');
@@ -89,7 +80,6 @@ enum ReevaluationKind {
 }
 
 /// Sumber pemilihan kandidat pada revisi rencana.
-/// SQL: selection_source IN ('PRIMARY','ALTERNATIVE').
 enum SelectionSource {
   primary('PRIMARY'),
   alternative('ALTERNATIVE');
