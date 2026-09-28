@@ -15,6 +15,41 @@ enum PremiumFeature {
   alternativeCandidates,
 }
 
+final class EntitlementState {
+  const EntitlementState._({
+    required this.access,
+    required this.sync,
+  });
+
+  const EntitlementState.initial()
+      : access = EntitlementAccess.unknown,
+        sync = EntitlementSync.idle;
+
+  final EntitlementAccess access;
+  final EntitlementSync sync;
+
+  EntitlementState loading() {
+    return EntitlementState._(
+      access: access,
+      sync: EntitlementSync.loading,
+    );
+  }
+
+  EntitlementState resolved({required bool isActive}) {
+    return EntitlementState._(
+      access: isActive ? EntitlementAccess.active : EntitlementAccess.inactive,
+      sync: EntitlementSync.ready,
+    );
+  }
+
+  EntitlementState failed() {
+    return EntitlementState._(
+      access: access,
+      sync: EntitlementSync.error,
+    );
+  }
+}
+
 abstract final class RevenueCatContract {
   static const entitlementIdentifier = 'pro';
   static const offeringIdentifier = 'default';
