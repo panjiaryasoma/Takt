@@ -53,6 +53,12 @@ jobs:
       - name: Resolve Flutter dependencies
         run: flutter pub get
 
+      - name: Capture resolved pubspec lock
+        uses: actions/upload-artifact@v4
+        with:
+          name: resolved-pubspec-lock
+          path: apps/mobile/pubspec.lock
+
       - name: Flutter analyze
         run: flutter analyze
 
