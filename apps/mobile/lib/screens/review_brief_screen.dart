@@ -5,9 +5,16 @@ import '../theme/app_theme.dart';
 /// ReviewBriefScreen — Figma node 11:1627 ("Review brief kompetisi").
 /// Hasil analisis: info lomba, rundown tahapan, deadline, analisa jadwal.
 class ReviewBriefScreen extends StatelessWidget {
-  const ReviewBriefScreen({super.key, this.onBack});
+  const ReviewBriefScreen({
+    super.key,
+    this.onBack,
+    this.onTambahJadwal,
+    this.onSimpan,
+  });
 
   final VoidCallback? onBack;
+  final VoidCallback? onTambahJadwal;
+  final VoidCallback? onSimpan;
 
   @override
   Widget build(BuildContext context) {
@@ -235,6 +242,57 @@ class ReviewBriefScreen extends StatelessWidget {
                         'Rekomendasi: Bisa diambil jika mengurangi 1 kegiatan lain'),
               ],
             ),
+          ),
+          const SizedBox(height: 20),
+
+          // Aksi: Tambah Jadwal (primary) + Simpan Jadwal (outline)
+          Row(
+            children: [
+              Expanded(
+                child: GestureDetector(
+                  onTap: onTambahJadwal,
+                  child: Container(
+                    height: 52,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: C.accent,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Text(
+                      'Tambah Jadwal',
+                      style: TextStyle(
+                        color: C.accentText,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: GestureDetector(
+                  onTap: onSimpan,
+                  child: Container(
+                    height: 52,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: Colors.transparent,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: C.navInactive, width: 1.4),
+                    ),
+                    child: const Text(
+                      'Simpan Jadwal',
+                      style: TextStyle(
+                        color: C.navInactive,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),

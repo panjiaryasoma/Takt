@@ -5,6 +5,7 @@ import 'screens/home_screen.dart';
 import 'screens/jadwal_harian_screen.dart';
 import 'screens/jadwal_ringkasan_screen.dart';
 import 'screens/progres_analisis_screen.dart';
+import 'screens/rencana_screen.dart';
 import 'screens/review_brief_screen.dart';
 import 'screens/tambah_jadwal_screen.dart';
 import 'theme/app_theme.dart';
@@ -65,14 +66,28 @@ class _RootShellState extends State<RootShell> {
                 onReadResult: () => setState(() => _analisisStep = 2));
           case 2:
             return ReviewBriefScreen(
-                onBack: () => setState(() => _analisisStep = 1));
+                onBack: () => setState(() => _analisisStep = 1),
+                onTambahJadwal: () => setState(() {
+                      _analisisStep = 0;
+                      _navIndex = 1;
+                      _jadwalTab = 0;
+                      _showTambahJadwal = true;
+                    }),
+                onSimpan: () => setState(() {
+                      _analisisStep = 0;
+                      _navIndex = 1;
+                      _jadwalTab = 0;
+                    }));
           case 0:
           default:
             return AnalisisKompetisiScreen(
                 onSubmit: () => setState(() => _analisisStep = 1));
         }
       case 3:
-        return const _Placeholder(title: 'Rencana');
+        return RencanaScreen(
+          onTinjau: () => setState(() => _navIndex = 1),
+          onCekJadwal: () => setState(() => _navIndex = 1),
+        );
       case 0:
       default:
         return const HomeScreen();
@@ -153,27 +168,6 @@ class _BottomNav extends StatelessWidget {
           );
         }),
       ),
-    );
-  }
-}
-
-class _Placeholder extends StatelessWidget {
-  const _Placeholder({required this.title});
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        AppHeader(title: title),
-        const HeaderDivider(),
-        const Spacer(),
-        Text(
-          '$title — segera hadir',
-          style: const TextStyle(color: C.navInactive, fontSize: 14),
-        ),
-        const Spacer(),
-      ],
     );
   }
 }

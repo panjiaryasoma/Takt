@@ -55,13 +55,21 @@ class AppHeader extends StatelessWidget {
               color: C.white,
               borderRadius: BorderRadius.circular(8),
             ),
+            clipBehavior: Clip.antiAlias,
             alignment: Alignment.center,
-            child: const Text(
-              'Tk',
-              style: TextStyle(
-                color: Colors.black,
-                fontSize: 26,
-                fontWeight: FontWeight.w700,
+            child: Image.asset(
+              C.logoAsset,
+              width: 47,
+              height: 43,
+              fit: BoxFit.cover,
+              // Fallback ke teks "Tk" kalau file logo belum ada di assets.
+              errorBuilder: (context, error, stack) => const Text(
+                'Tk',
+                style: TextStyle(
+                  color: Colors.black,
+                  fontSize: 26,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
             ),
           ),
