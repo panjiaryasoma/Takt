@@ -10,7 +10,7 @@ import 'package:path_provider/path_provider.dart';
 /// Issue 1B deliberately creates only the schedule slice of the final physical
 /// schema. Later issues can migrate this same database from v1 -> v2 -> v3.
 class AppDatabase extends GeneratedDatabase {
-  AppDatabase(QueryExecutor executor) : super(executor);
+  AppDatabase(super.executor);
 
   factory AppDatabase.open() => AppDatabase(_openConnection());
 
