@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../models/commitment.dart';
 import '../theme/app_theme.dart';
+import '../viewmodels/jadwal_view_model.dart';
 import '../widgets/common.dart';
 
 /// Tab switcher Jadwal Harian / Ringkasan Pekan (dipakai di kedua screen jadwal).
@@ -56,36 +59,62 @@ class JadwalTabs extends StatelessWidget {
 }
 
 /// JadwalHarianScreen — Figma node 11:1331 (tab Jadwal Harian).
+/// Kini berbasis data: kalender bisa diklik, daftar aktivitas mengikuti
+/// tanggal terpilih dari [JadwalViewModel].
 class JadwalHarianScreen extends StatelessWidget {
   const JadwalHarianScreen({
     super.key,
     required this.onSwitchTab,
     this.onAdd,
+    this.onBack,
   });
 
   final ValueChanged<int> onSwitchTab;
   final VoidCallback? onAdd;
+  final VoidCallback? onBack;
 
   static const _dayHeaders = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
-  static const _firstOffset = 1; // 1 Sept 2026 = Selasa
-  static const _daysInMonth = 30;
-  static const _selectedDay = 27;
-  static const _eventDays = [21, 22, 23, 24, 25, 26, 27];
-
-  static const _activities = <_Activity>[
-    _Activity('07:00', 'Sarapan & Persiapan', '1 jam', C.dotGreen),
-    _Activity('08:00', 'Kuliah Pagi — Algoritma', '2 jam', C.dotBlue),
-    _Activity('10:00', 'Review Proposal Hackathon', '1.5 jam', C.accent),
-    _Activity('12:00', 'Istirahat & Makan Siang', '1 jam', C.dotGreen),
-    _Activity('13:00', 'Riset Kompetisi AI', '2 jam', C.accent),
-    _Activity('15:00', 'Rapat Tim — Prototipe', '1.5 jam', C.dotPurple),
-    _Activity('17:00', 'Cadangan / Waktu Luang', 'Fleksibel', C.dotGray),
+  static const _monthNames = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+  ];
+  static const _dayNames = [
+    'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu',
   ];
 
-  List<List<int?>> _weeks() {
+  /// Warna dot aktivitas — dari kategori komitmen (konsisten & deterministik).
+  static Color _dotFor(Commitment c) {
+    switch (c.category) {
+      case 'Kuliah':
+        return C.dotBlue;
+      case 'Lomba':
+        return C.accent;
+      case 'Tim':
+        return C.dotPurple;
+      default:
+        return C.dotGreen;
+    }
+  }
+
+  static String _hhmm(DateTime t) =>
+      '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
+
+  static String _durasi(int menit) {
+    if (menit % 60 == 0) return '${menit ~/ 60} jam';
+    if (menit < 60) return '$menit menit';
+    final j = menit ~/ 60;
+    final m = menit % 60;
+    return '$j jam $m menit';
+  }
+
+  /// Susun kotak-kotak kalender untuk [month]. Kolom pertama = Senin.
+  List<List<int?>> _weeks(DateTime month) {
+    final daysInMonth = DateTime(month.year, month.month + 1, 0).day;
+    // weekday: Senin=1 .. Minggu=7 → offset 0..6
+    final firstOffset = DateTime(month.year, month.month, 1).weekday - 1;
     final cells = <int?>[
-      ...List<int?>.filled(_firstOffset, null),
-      ...List<int?>.generate(_daysInMonth, (i) => i + 1),
+      ...List<int?>.filled(firstOffset, null),
+      ...List<int?>.generate(daysInMonth, (i) => i + 1),
     ];
     while (cells.length % 7 != 0) {
       cells.add(null);
@@ -99,6 +128,13 @@ class JadwalHarianScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final vm = context.watch<JadwalViewModel>();
+    final selected = vm.selectedDate;
+    final eventDays = vm.eventDaysOfMonth(selected);
+    final items = vm.itemsForSelectedDate;
+    final headerTanggal =
+        '${_dayNames[selected.weekday - 1]}, ${selected.day} ${_monthNames[selected.month - 1]}';
+
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(10, 0, 10, 24),
       child: Column(
@@ -107,6 +143,7 @@ class JadwalHarianScreen extends StatelessWidget {
           AppHeader(
             title: 'Jadwal Saya',
             trailing: AddButton(onTap: onAdd),
+            onBack: onBack,
           ),
           const HeaderDivider(),
           const SizedBox(height: 16),
@@ -124,17 +161,25 @@ class JadwalHarianScreen extends StatelessWidget {
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: const [
-                Icon(Icons.chevron_left, color: C.bg, size: 22),
+              children: [
+                GestureDetector(
+                  onTap: () => vm.selectDate(
+                      DateTime(selected.year, selected.month - 1, 1)),
+                  child: const Icon(Icons.chevron_left, color: C.bg, size: 22),
+                ),
                 Text(
-                  'September 2026',
-                  style: TextStyle(
+                  '${_monthNames[selected.month - 1]} ${selected.year}',
+                  style: const TextStyle(
                     color: C.bg,
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
-                Icon(Icons.chevron_right, color: C.bg, size: 22),
+                GestureDetector(
+                  onTap: () => vm.selectDate(
+                      DateTime(selected.year, selected.month + 1, 1)),
+                  child: const Icon(Icons.chevron_right, color: C.bg, size: 22),
+                ),
               ],
             ),
           ),
@@ -167,47 +212,56 @@ class JadwalHarianScreen extends StatelessWidget {
                       .toList(),
                 ),
                 const SizedBox(height: 8),
-                ..._weeks().map(
+                ..._weeks(selected).map(
                   (week) => Padding(
                     padding: const EdgeInsets.only(bottom: 4),
                     child: Row(
                       children: week.map((day) {
-                        final selected = day == _selectedDay;
+                        final isSelected = day == selected.day;
                         final hasEvent =
-                            day != null && _eventDays.contains(day);
+                            day != null && eventDays.contains(day);
                         return Expanded(
-                          child: Container(
-                            height: 44,
-                            margin: const EdgeInsets.symmetric(horizontal: 2),
-                            decoration: BoxDecoration(
-                              color: selected ? C.accent : Colors.transparent,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Text(
-                                  day?.toString() ?? '',
-                                  style: TextStyle(
-                                    color: selected ? C.bg : C.white,
-                                    fontSize: 14,
-                                    fontWeight: selected
-                                        ? FontWeight.w700
-                                        : FontWeight.w400,
+                          child: GestureDetector(
+                            behavior: HitTestBehavior.opaque,
+                            onTap: day == null
+                                ? null
+                                : () => vm.selectDay(day, inMonth: selected),
+                            child: Container(
+                              height: 44,
+                              margin:
+                                  const EdgeInsets.symmetric(horizontal: 2),
+                              decoration: BoxDecoration(
+                                color: isSelected
+                                    ? C.accent
+                                    : Colors.transparent,
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Text(
+                                    day?.toString() ?? '',
+                                    style: TextStyle(
+                                      color: isSelected ? C.bg : C.white,
+                                      fontSize: 14,
+                                      fontWeight: isSelected
+                                          ? FontWeight.w700
+                                          : FontWeight.w400,
+                                    ),
                                   ),
-                                ),
-                                const SizedBox(height: 4),
-                                Container(
-                                  width: 5,
-                                  height: 5,
-                                  decoration: BoxDecoration(
-                                    shape: BoxShape.circle,
-                                    color: hasEvent
-                                        ? (selected ? C.bg : C.accent)
-                                        : Colors.transparent,
+                                  const SizedBox(height: 4),
+                                  Container(
+                                    width: 5,
+                                    height: 5,
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: hasEvent
+                                          ? (isSelected ? C.bg : C.accent)
+                                          : Colors.transparent,
+                                    ),
                                   ),
-                                ),
-                              ],
+                                ],
+                              ),
                             ),
                           ),
                         );
@@ -220,14 +274,36 @@ class JadwalHarianScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
-          const SectionHeading(title: 'Sabtu, 27 September'),
+          SectionHeading(title: headerTanggal),
           const SizedBox(height: 16),
 
-          // Activity timeline
-          ..._activities.expand((a) => [
-                _ActivityCard(activity: a),
-                const SizedBox(height: 16),
-              ]),
+          // Activity timeline — dari data tanggal terpilih
+          if (items.isEmpty)
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.symmetric(vertical: 28),
+              decoration: BoxDecoration(
+                color: C.card,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              alignment: Alignment.center,
+              child: const Text(
+                'Belum ada jadwal di tanggal ini',
+                style: TextStyle(color: C.detailMuted, fontSize: 13),
+              ),
+            )
+          else
+            ...items.expand((c) => [
+                  _ActivityCard(
+                    time: _hhmm(c.startAt),
+                    title: c.title,
+                    duration: _durasi(c.durationMinutes),
+                    dot: _dotFor(c),
+                    onDelete: () => vm.hapus(c.id),
+                  ),
+                  const SizedBox(height: 16),
+                ]),
+          const SizedBox(height: 0),
 
           // Info note
           Container(
@@ -276,17 +352,20 @@ class JadwalHarianScreen extends StatelessWidget {
   }
 }
 
-class _Activity {
-  const _Activity(this.time, this.title, this.duration, this.dot);
+class _ActivityCard extends StatelessWidget {
+  const _ActivityCard({
+    required this.time,
+    required this.title,
+    required this.duration,
+    required this.dot,
+    this.onDelete,
+  });
+
   final String time;
   final String title;
   final String duration;
   final Color dot;
-}
-
-class _ActivityCard extends StatelessWidget {
-  const _ActivityCard({required this.activity});
-  final _Activity activity;
+  final VoidCallback? onDelete;
 
   @override
   Widget build(BuildContext context) {
@@ -302,13 +381,13 @@ class _ActivityCard extends StatelessWidget {
           Container(
             width: 10,
             height: 10,
-            decoration: BoxDecoration(color: activity.dot, shape: BoxShape.circle),
+            decoration: BoxDecoration(color: dot, shape: BoxShape.circle),
           ),
           const SizedBox(width: 12),
           SizedBox(
             width: 44,
             child: Text(
-              activity.time,
+              time,
               style: const TextStyle(
                 color: C.white,
                 fontSize: 14,
@@ -322,17 +401,26 @@ class _ActivityCard extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  activity.title,
+                  title,
                   style: const TextStyle(color: C.white, fontSize: 13),
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  activity.duration,
+                  duration,
                   style: const TextStyle(color: C.detailMuted, fontSize: 11),
                 ),
               ],
             ),
           ),
+          if (onDelete != null)
+            GestureDetector(
+              onTap: onDelete,
+              behavior: HitTestBehavior.opaque,
+              child: const Padding(
+                padding: EdgeInsets.only(left: 8),
+                child: Icon(Icons.close, color: C.detailMuted, size: 18),
+              ),
+            ),
         ],
       ),
     );

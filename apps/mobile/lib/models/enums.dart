@@ -1,0 +1,103 @@
+/// Enum domain jadwal — cocok dengan CHECK constraint di takt_schema_v3.sql.
+library;
+
+/// Jenis komitmen. SQL: type TEXT CHECK (type IN ('FIXED','FLEXIBLE')).
+/// - fixed    : waktu terkunci (kuliah, rapat) — tidak bisa digeser penjadwal.
+/// - flexible : blok kerja yang boleh diatur ulang penjadwal.
+enum CommitmentType {
+  fixed('FIXED'),
+  flexible('FLEXIBLE');
+
+  const CommitmentType(this.wire);
+
+  /// Nilai string persis seperti yang disimpan di kolom DB.
+  final String wire;
+
+  static CommitmentType fromWire(String value) {
+    return CommitmentType.values.firstWhere(
+      (e) => e.wire == value,
+      orElse: () => CommitmentType.fixed,
+    );
+  }
+}
+
+/// Aksi pengecualian recurrence.
+/// SQL: action TEXT CHECK (action IN ('CANCELLED','MOVED')).
+enum ExceptionAction {
+  cancelled('CANCELLED'),
+  moved('MOVED');
+
+  const ExceptionAction(this.wire);
+
+  final String wire;
+
+  static ExceptionAction fromWire(String value) {
+    return ExceptionAction.values.firstWhere(
+      (e) => e.wire == value,
+      orElse: () => ExceptionAction.cancelled,
+    );
+  }
+}
+
+/// Status kesiapan evaluasi.
+/// SQL: readiness_status IN (...5 nilai...).
+enum ReadinessStatus {
+  readyToEvaluate('READY_TO_EVALUATE'),
+  needsReview('NEEDS_REVIEW'),
+  eligibilityBlocked('ELIGIBILITY_BLOCKED'),
+  deadlinePassed('DEADLINE_PASSED'),
+  insufficientInformation('INSUFFICIENT_INFORMATION');
+
+  const ReadinessStatus(this.wire);
+  final String wire;
+
+  static ReadinessStatus fromWire(String value) =>
+      ReadinessStatus.values.firstWhere((e) => e.wire == value,
+          orElse: () => ReadinessStatus.needsReview);
+}
+
+/// Status kelayakan (feasibility). Boleh null.
+/// SQL: feasibility_status IN (...4 nilai...).
+enum FeasibilityStatus {
+  feasible('FEASIBLE'),
+  feasibleWithTradeoffs('FEASIBLE_WITH_TRADEOFFS'),
+  tightCapacity('TIGHT_CAPACITY'),
+  notFeasible('NOT_FEASIBLE_UNDER_CURRENT_CONSTRAINTS');
+
+  const FeasibilityStatus(this.wire);
+  final String wire;
+
+  static FeasibilityStatus? fromWire(String? value) {
+    if (value == null) return null;
+    return FeasibilityStatus.values.firstWhere((e) => e.wire == value,
+        orElse: () => FeasibilityStatus.feasible);
+  }
+}
+
+/// Jenis transisi re-evaluasi.
+/// SQL: kind IN ('UNCHANGED','SUPERSEDED').
+enum ReevaluationKind {
+  unchanged('UNCHANGED'),
+  superseded('SUPERSEDED');
+
+  const ReevaluationKind(this.wire);
+  final String wire;
+
+  static ReevaluationKind fromWire(String value) =>
+      ReevaluationKind.values.firstWhere((e) => e.wire == value,
+          orElse: () => ReevaluationKind.unchanged);
+}
+
+/// Sumber pemilihan kandidat pada revisi rencana.
+/// SQL: selection_source IN ('PRIMARY','ALTERNATIVE').
+enum SelectionSource {
+  primary('PRIMARY'),
+  alternative('ALTERNATIVE');
+
+  const SelectionSource(this.wire);
+  final String wire;
+
+  static SelectionSource fromWire(String value) =>
+      SelectionSource.values.firstWhere((e) => e.wire == value,
+          orElse: () => SelectionSource.primary);
+}

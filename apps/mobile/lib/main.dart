@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import 'screens/analisis_kompetisi_screen.dart';
 import 'screens/home_screen.dart';
@@ -9,6 +10,7 @@ import 'screens/rencana_screen.dart';
 import 'screens/review_brief_screen.dart';
 import 'screens/tambah_jadwal_screen.dart';
 import 'theme/app_theme.dart';
+import 'viewmodels/jadwal_view_model.dart';
 import 'widgets/common.dart';
 
 void main() {
@@ -20,11 +22,14 @@ class TaktApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Takt',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.dark,
-      home: const RootShell(),
+    return ChangeNotifierProvider(
+      create: (_) => JadwalViewModel(),
+      child: MaterialApp(
+        title: 'Takt',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.dark,
+        home: const RootShell(),
+      ),
     );
   }
 }
@@ -56,6 +61,7 @@ class _RootShellState extends State<RootShell> {
             ? JadwalHarianScreen(
                 onSwitchTab: (i) => setState(() => _jadwalTab = i),
                 onAdd: () => setState(() => _showTambahJadwal = true),
+                onBack: () => setState(() => _navIndex = 0),
               )
             : JadwalRingkasanScreen(
                 onSwitchTab: (i) => setState(() => _jadwalTab = i));
@@ -90,7 +96,13 @@ class _RootShellState extends State<RootShell> {
         );
       case 0:
       default:
-        return const HomeScreen();
+        return HomeScreen(
+          onLihatJadwal: () => setState(() {
+            _navIndex = 1;
+            _jadwalTab = 0;
+            _showTambahJadwal = false;
+          }),
+        );
     }
   }
 
@@ -109,7 +121,12 @@ class _RootShellState extends State<RootShell> {
       ),
       bottomNavigationBar: _BottomNav(
         activeIndex: _navIndex,
-        onTap: (i) => setState(() => _navIndex = i),
+        onTap: (i) => setState(() {
+          _navIndex = i;
+          // Setiap masuk tab Jadwal, selalu mulai dari daftar jadwal —
+          // jangan langsung ke form Tambah Jadwal.
+          if (i == 1) _showTambahJadwal = false;
+        }),
       ),
     );
   }

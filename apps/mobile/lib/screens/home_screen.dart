@@ -1,14 +1,49 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../theme/app_theme.dart';
+import '../viewmodels/jadwal_view_model.dart';
 import '../widgets/common.dart';
 
 /// HomeScreen — Figma node 11:1262 ("Home").
+/// Kapasitas pekan ini dihitung dari data jadwal ([JadwalViewModel]).
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+  const HomeScreen({super.key, this.onLihatJadwal});
+
+  /// Dipanggil saat "Lihat jadwal" ditekan (pindah ke tab Jadwal).
+  final VoidCallback? onLihatJadwal;
+
+  /// Menit terjadwal pada 7 hari pekan berjalan (Senin–Minggu).
+  static int _scheduledThisWeek(JadwalViewModel vm) {
+    final now = DateTime.now();
+    final monday = DateTime(now.year, now.month, now.day)
+        .subtract(Duration(days: now.weekday - 1));
+    var total = 0;
+    for (var i = 0; i < 7; i++) {
+      total += vm.scheduledMinutesOn(monday.add(Duration(days: i)));
+    }
+    return total;
+  }
+
+  static String _jam(int menit) {
+    final j = menit / 60.0;
+    final s = j.toStringAsFixed(1).replaceAll('.', ',');
+    return '$s jam';
+  }
 
   @override
   Widget build(BuildContext context) {
+    final vm = context.watch<JadwalViewModel>();
+    final terjadwalMenit = _scheduledThisWeek(vm);
+    // Kapasitas mingguan = 7 hari x preferensi (default 120 menit/hari fokus).
+    const kapasitasMenit = 7 * 120;
+    final tersediaMenit =
+        (kapasitasMenit - terjadwalMenit).clamp(0, kapasitasMenit);
+    final rasio = kapasitasMenit == 0
+        ? 0.0
+        : (terjadwalMenit / kapasitasMenit).clamp(0.0, 1.0);
+    final adaJadwal = vm.all.isNotEmpty;
+
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(10, 0, 10, 24),
       child: Column(
@@ -19,20 +54,28 @@ class HomeScreen extends StatelessWidget {
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
             child: Row(
               children: [
-                Container(
+                SizedBox(
                   width: 47,
                   height: 43,
-                  decoration: BoxDecoration(
-                    color: C.white,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  alignment: Alignment.center,
-                  child: const Text(
-                    'Tk',
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontSize: 26,
-                      fontWeight: FontWeight.w700,
+                  child: Image.asset(
+                    C.logoAsset,
+                    width: 47,
+                    height: 43,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stack) => Container(
+                      decoration: BoxDecoration(
+                        color: C.white,
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      alignment: Alignment.center,
+                      child: const Text(
+                        'Tk',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 26,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -47,79 +90,11 @@ class HomeScreen extends StatelessWidget {
           const HeaderDivider(),
           const SizedBox(height: 16),
 
-          // Featured card (oranye)
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 20),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: C.accent,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 10, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: C.bg,
-                        borderRadius: BorderRadius.circular(999),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 10,
-                            height: 10,
-                            decoration: const BoxDecoration(
-                              color: C.accent,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 7),
-                          const Text(
-                            'Lomba Terdekat',
-                            style: TextStyle(color: C.accent, fontSize: 12),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const Text(
-                      '18 hari lagi',
-                      style: TextStyle(
-                        color: C.white,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  'Lomba Inovasi Digital Nusantara 2026',
-                  style: TextStyle(
-                    color: C.accentText,
-                    fontSize: 20,
-                    fontWeight: FontWeight.w800,
-                    height: 1.25,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                const Text(
-                  '27 September 2026 - Online Project',
-                  style: TextStyle(color: C.accentSub, fontSize: 13),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // Kapasitas pekan ini
-          const SectionHeading(
-              title: 'Kapasitas pekan ini', action: 'Lihat jadwal'),
+          // Kapasitas pekan ini — dihitung dari data jadwal
+          SectionHeading(
+              title: 'Kapasitas pekan ini',
+              action: 'Lihat jadwal',
+              onAction: onLihatJadwal),
           const SizedBox(height: 16),
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -131,20 +106,27 @@ class HomeScreen extends StatelessWidget {
             child: Column(
               children: [
                 Row(
-                  children: const [
-                    _Metric(label: 'Terjadwal', value: '5,5 jam', color: C.accent),
-                    SizedBox(width: 16),
-                    _Metric(label: 'Tersedia', value: '8,5 jam', color: C.white),
+                  children: [
+                    _Metric(
+                        label: 'Terjadwal',
+                        value: _jam(terjadwalMenit),
+                        color: C.accent),
+                    const SizedBox(width: 16),
+                    _Metric(
+                        label: 'Tersedia',
+                        value: _jam(tersediaMenit),
+                        color: C.white),
                   ],
                 ),
                 const SizedBox(height: 12),
                 ClipRRect(
                   borderRadius: BorderRadius.circular(999),
-                  child: const LinearProgressIndicator(
-                    value: 0.39, // 5,5 / (5,5+8,5)
+                  child: LinearProgressIndicator(
+                    value: rasio,
                     minHeight: 8,
                     backgroundColor: C.white,
-                    valueColor: AlwaysStoppedAnimation<Color>(C.accent),
+                    valueColor:
+                        const AlwaysStoppedAnimation<Color>(C.accent),
                   ),
                 ),
               ],
@@ -152,64 +134,63 @@ class HomeScreen extends StatelessWidget {
           ),
           const SizedBox(height: 16),
 
-          // Lomba Minggu ini
+          // Lomba Minggu ini — belum ada domain kompetisi, tampil empty-state
           const SectionHeading(title: 'Lomba Minggu ini'),
           const SizedBox(height: 16),
-          const _CompetitionRow(
-            day: '18',
-            month: 'Sept',
-            title: 'Lomba ABC',
-            detail: 'hackaton - Inovasi Digital AI /ML',
-          ),
-          const SizedBox(height: 16),
-          const _CompetitionRow(
-            day: '18',
-            month: 'Sept',
-            title: 'Lomba BDA',
-            detail: 'hackaton - Inovasi Digital AI /ML',
+          const _EmptyCard(
+            icon: Icons.emoji_events_outlined,
+            text: 'Belum ada lomba. Tambahkan dari tab Analisis.',
           ),
           const SizedBox(height: 16),
 
-          // Rencana Tersimpan
+          // Rencana Tersimpan — empty-state sampai ada rencana tersimpan
           const SectionHeading(title: 'Rencana Tersimpan'),
           const SizedBox(height: 16),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: Row(
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: C.card,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  alignment: Alignment.center,
-                  child: const Icon(Icons.bookmark_rounded,
-                      color: C.accent, size: 18),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text(
-                        'Lihat Rencana Lomba',
-                        style: TextStyle(
-                          color: C.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      SizedBox(height: 3),
-                      Text(
-                        '7 pekan · 8–11 jam per pekan',
-                        style: TextStyle(color: C.navInactive, fontSize: 12),
-                      ),
-                    ],
-                  ),
-                ),
-              ],
+          _EmptyCard(
+            icon: Icons.bookmark_border_rounded,
+            text: adaJadwal
+                ? 'Belum ada rencana tersimpan.'
+                : 'Belum ada rencana. Susun jadwal dulu.',
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Kartu empty-state generik (ikon + teks abu).
+class _EmptyCard extends StatelessWidget {
+  const _EmptyCard({required this.icon, required this.text});
+
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: C.card,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: C.bg,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            alignment: Alignment.center,
+            child: Icon(icon, color: C.accent, size: 18),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(color: C.detailMuted, fontSize: 13),
             ),
           ),
         ],
@@ -237,76 +218,6 @@ class _Metric extends StatelessWidget {
             value,
             style: TextStyle(
                 color: color, fontSize: 20, fontWeight: FontWeight.w700),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _CompetitionRow extends StatelessWidget {
-  const _CompetitionRow({
-    required this.day,
-    required this.month,
-    required this.title,
-    required this.detail,
-  });
-
-  final String day;
-  final String month;
-  final String title;
-  final String detail;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: C.card,
-        borderRadius: BorderRadius.circular(16),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: C.bg,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              '$day\n$month',
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: C.accent,
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                height: 1.1,
-              ),
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: C.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                const SizedBox(height: 3),
-                Text(
-                  detail,
-                  style: const TextStyle(color: C.muted2, fontSize: 12),
-                ),
-              ],
-            ),
           ),
         ],
       ),

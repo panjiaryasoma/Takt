@@ -37,10 +37,13 @@ class StatusBarMock extends StatelessWidget {
 
 /// Header dengan logo "Tk" + judul + trailing opsional (mis. tombol Tambah).
 class AppHeader extends StatelessWidget {
-  const AppHeader({super.key, required this.title, this.trailing});
+  const AppHeader({super.key, required this.title, this.trailing, this.onBack});
 
   final String title;
   final Widget? trailing;
+
+  /// Bila diisi, tampilkan tombol back bulat di kiri header.
+  final VoidCallback? onBack;
 
   @override
   Widget build(BuildContext context) {
@@ -48,27 +51,46 @@ class AppHeader extends StatelessWidget {
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       child: Row(
         children: [
-          Container(
+          if (onBack != null) ...[
+            GestureDetector(
+              onTap: onBack,
+              child: Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: C.card,
+                  shape: BoxShape.circle,
+                  border: Border.all(color: C.accent.withValues(alpha: 0.6)),
+                ),
+                alignment: Alignment.center,
+                child:
+                    const Icon(Icons.chevron_left, color: C.accent, size: 22),
+              ),
+            ),
+            const SizedBox(width: 12),
+          ],
+          SizedBox(
             width: 47,
             height: 43,
-            decoration: BoxDecoration(
-              color: C.white,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            clipBehavior: Clip.antiAlias,
-            alignment: Alignment.center,
             child: Image.asset(
               C.logoAsset,
               width: 47,
               height: 43,
-              fit: BoxFit.cover,
+              fit: BoxFit.contain,
               // Fallback ke teks "Tk" kalau file logo belum ada di assets.
-              errorBuilder: (context, error, stack) => const Text(
-                'Tk',
-                style: TextStyle(
-                  color: Colors.black,
-                  fontSize: 26,
-                  fontWeight: FontWeight.w700,
+              errorBuilder: (context, error, stack) => Container(
+                decoration: BoxDecoration(
+                  color: C.white,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                alignment: Alignment.center,
+                child: const Text(
+                  'Tk',
+                  style: TextStyle(
+                    color: Colors.black,
+                    fontSize: 26,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
               ),
             ),
