@@ -68,7 +68,21 @@ class JadwalViewModel extends ChangeNotifier {
     _errorMessage = null;
     notifyListeners();
     try {
-      await _repository.refresh();
+      await _repository.initialize();
+      _state = await _repository.loadState();
+      _subscription ??= _repository.watchState().listen(
+        (state) {
+          _state = state;
+          _isLoading = false;
+          _errorMessage = null;
+          notifyListeners();
+        },
+        onError: (Object error, StackTrace stackTrace) {
+          _isLoading = false;
+          _errorMessage = 'Gagal membaca jadwal lokal.';
+          notifyListeners();
+        },
+      );
       _isLoading = false;
     } catch (_) {
       _isLoading = false;
