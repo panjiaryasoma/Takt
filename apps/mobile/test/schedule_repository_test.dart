@@ -1,11 +1,16 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:takt_mobile/data/database/app_database.dart';
 import 'package:takt_mobile/data/repositories/drift_schedule_repository.dart';
+import 'package:takt_mobile/data/repositories/schedule_repository.dart';
 import 'package:takt_mobile/models/commitment.dart';
 import 'package:takt_mobile/models/enums.dart';
+import 'package:takt_mobile/models/planning_preferences.dart';
+import 'package:takt_mobile/models/recurrence_exception.dart';
+import 'package:takt_mobile/models/recurrence_rule.dart';
 import 'package:takt_mobile/viewmodels/jadwal_view_model.dart';
 
 void main() {
@@ -192,4 +197,118 @@ INSERT INTO commitments (
     expect(replacement.single.startAt.hour, 14);
     expect(vm.itemsOn(DateTime(2026, 10, 5)), hasLength(1));
   });
+
+  test('retry after initial DB failure reloads state and attaches updates', () async {
+    final repository = _FailOnceScheduleRepository();
+    final vm = JadwalViewModel(repository);
+
+    await vm.initialize();
+    expect(vm.errorMessage, 'Gagal membuka database jadwal.');
+    expect(vm.all, isEmpty);
+
+    await vm.retry();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(vm.errorMessage, isNull);
+    expect(vm.all.map((item) => item.id), contains('cmt-recovered'));
+
+    repository.emitSecondState();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(vm.all, hasLength(2));
+    expect(vm.all.map((item) => item.id), contains('cmt-after-retry'));
+
+    vm.dispose();
+  });
+
+}
+
+
+class _FailOnceScheduleRepository implements ScheduleRepository {
+  _FailOnceScheduleRepository() {
+    _state = _buildState(['cmt-recovered']);
+  }
+
+  final StreamController<ScheduleState> _changes =
+      StreamController<ScheduleState>.broadcast();
+  late ScheduleState _state;
+  bool _failFirstInitialize = true;
+
+  @override
+  Future<void> initialize() async {
+    if (_failFirstInitialize) {
+      _failFirstInitialize = false;
+      throw StateError('simulated open failure');
+    }
+  }
+
+  @override
+  Stream<ScheduleState> watchState() async* {
+    yield _state;
+    yield* _changes.stream;
+  }
+
+  @override
+  Future<ScheduleState> loadState() async => _state;
+
+  @override
+  Future<void> refresh() async {
+    _changes.add(_state);
+  }
+
+  void emitSecondState() {
+    _state = _buildState(['cmt-recovered', 'cmt-after-retry']);
+    _changes.add(_state);
+  }
+
+  @override
+  Future<void> createCommitment(
+    Commitment commitment, {
+    RecurrenceRule? recurrenceRule,
+  }) async {}
+
+  @override
+  Future<void> updateCommitment(
+    Commitment commitment, {
+    RecurrenceRule? recurrenceRule,
+  }) async {}
+
+  @override
+  Future<void> deleteCommitment(String commitmentId) async {}
+
+  @override
+  Future<void> upsertRecurrenceException(
+    RecurrenceException exception,
+  ) async {}
+
+  @override
+  Future<void> savePlanningPreferences(
+    PlanningPreferences preferences,
+  ) async {}
+
+  @override
+  Future<void> close() => _changes.close();
+
+  static ScheduleState _buildState(List<String> ids) {
+    final now = DateTime(2026, 9, 29, 9).millisecondsSinceEpoch;
+    return ScheduleState(
+      commitments: [
+        for (var index = 0; index < ids.length; index++)
+          Commitment(
+            id: ids[index],
+            title: 'Recovered schedule $index',
+            type: CommitmentType.fixed,
+            startAtEpochMs: now + index * 3600000,
+            endAtEpochMs: now + (index + 1) * 3600000,
+            timezone: 'Asia/Jakarta',
+            source: 'test',
+            createdAtEpochMs: now,
+            updatedAtEpochMs: now,
+          ),
+      ],
+      recurrenceRules: const [],
+      recurrenceExceptions: const [],
+      preferences: PlanningPreferences.defaults(),
+    );
+  }
 }
