@@ -20,11 +20,11 @@ final class RevenueCatConfig {
   final RevenueCatEnvironment environment;
   final String apiKey;
 
-  static RevenueCatConfig fromDartDefines({AppBuildMode? buildMode}) {
+  static RevenueCatConfig fromDartDefines() {
     return validate(
       appEnv: const String.fromEnvironment('APP_ENV'),
       apiKey: const String.fromEnvironment('REVENUECAT_API_KEY'),
-      buildMode: buildMode ?? currentBuildMode(),
+      buildMode: currentBuildMode(),
     );
   }
 
@@ -41,6 +41,11 @@ final class RevenueCatConfig {
     }
     if (normalizedApiKey.isEmpty) {
       throw const FormatException('REVENUECAT_API_KEY is required.');
+    }
+    if (normalizedApiKey.endsWith('_REPLACE_ME')) {
+      throw const FormatException(
+        'Replace the RevenueCat example API key before running the app.',
+      );
     }
     if (normalizedApiKey.startsWith('sk_')) {
       throw const FormatException(
