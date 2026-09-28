@@ -172,7 +172,146 @@ class JadwalRingkasanScreen extends StatelessWidget {
               ],
             ),
           ),
+          const SizedBox(height: 16),
+
+          // Ringkasan pekan: jumlah tugas wajib & lomba
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: C.card,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  'Ringkasan Pekan',
+                  style: TextStyle(
+                    color: C.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    _SummaryTile(
+                      icon: Icons.menu_book_rounded,
+                      color: C.dotBlue,
+                      value: '${_hitungWajib()}',
+                      label: 'Tugas wajib',
+                      hint: 'Kuliah, kerja, rapat',
+                    ),
+                    const SizedBox(width: 12),
+                    _SummaryTile(
+                      icon: Icons.emoji_events_rounded,
+                      color: C.accent,
+                      value: '${_hitungLomba()}',
+                      label: 'Lomba',
+                      hint: 'Dijalankan pekan ini',
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ],
+      ),
+    );
+  }
+
+  /// Tugas wajib = aktivitas rutin non-lomba (Kelas/Kerja/Rapat/Bimbingan/
+  /// Deadline). Diidentifikasi dari label & warna.
+  static int _hitungWajib() {
+    const wajibKeywords = [
+      'kelas', 'kerja', 'rapat', 'bimbingan', 'deadline', 'kuliah', 'riset',
+    ];
+    var n = 0;
+    for (final list in _tasks.values) {
+      for (final t in list) {
+        final l = t.label.toLowerCase();
+        if (wajibKeywords.any(l.contains)) n++;
+      }
+    }
+    return n;
+  }
+
+  /// Lomba = aktivitas terkait lomba (label mengandung "lomba" atau warna
+  /// accent lomba, termasuk persiapan/latihan/review/evaluasi lomba).
+  static int _hitungLomba() {
+    const lombaKeywords = [
+      'lomba', 'latihan', 'persiapan', 'review', 'evaluasi',
+    ];
+    var n = 0;
+    for (final list in _tasks.values) {
+      for (final t in list) {
+        final l = t.label.toLowerCase();
+        if (lombaKeywords.any(l.contains)) n++;
+      }
+    }
+    return n;
+  }
+}
+
+/// Kotak ringkasan angka (ikon + nilai besar + label + hint).
+class _SummaryTile extends StatelessWidget {
+  const _SummaryTile({
+    required this.icon,
+    required this.color,
+    required this.value,
+    required this.label,
+    required this.hint,
+  });
+
+  final IconData icon;
+  final Color color;
+  final String value;
+  final String label;
+  final String hint;
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: C.bg,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(icon, color: color, size: 18),
+                const SizedBox(width: 8),
+                Text(
+                  value,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 24,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 6),
+            Text(
+              label,
+              style: const TextStyle(
+                color: C.white,
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Text(
+              hint,
+              style: const TextStyle(color: C.detailMuted, fontSize: 11),
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -26,3 +26,8 @@ export 'saved_plan_revision.dart';
 export 'saved_plan_task.dart';
 export 'accepted_commitment.dart';
 export 'task_progress.dart';
+
+// Model wire hasil AI + brief UI
+export 'decision_support_report.dart';
+export 'competition_brief.dart';
+export 'analysis_step.dart';

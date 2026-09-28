@@ -1,4 +1,4 @@
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 
 import '../models/commitment.dart';
 import '../models/enums.dart';
@@ -101,6 +101,87 @@ class JadwalViewModel extends ChangeNotifier {
   void hapus(String id) {
     _all.removeWhere((c) => c.id == id);
     notifyListeners();
+  }
+
+  /// Filter komitmen milik satu lomba (source == 'lomba:<competitionId>').
+  List<Commitment> itemsForCompetition(String competitionId) =>
+      _all.where((c) => c.source == 'lomba:$competitionId').toList()
+        ..sort((a, b) => a.startAtEpochMs.compareTo(b.startAtEpochMs));
+
+  /// Apakah tanggal [day] punya komitmen lomba [competitionId] (untuk highlight).
+  bool dayHasCompetition(DateTime day, String competitionId) => _all.any((c) =>
+      c.source == 'lomba:$competitionId' && c.occursOn(day));
+
+  /// Cari slot KOSONG untuk rekomendasi pengerjaan lomba.
+  ///
+  /// TITIK INTEGRASI AI: sekarang heuristik sederhana (cari jam kosong pada
+  /// [jamKerjaMulai]..[jamKerjaSelesai] di hari-hari antara sekarang dan
+  /// [sebelum], hindari bentrok dengan komitmen yang ada). Nanti ganti dengan
+  /// output penjadwal AI model temanmu; bentuk kembaliannya tetap sama.
+  List<DateTimeRange> rekomendasiSlot({
+    required DateTime sebelum,
+    int butuhSesi = 3,
+    int durasiMenit = 120,
+    int jamKerjaMulai = 8,
+    int jamKerjaSelesai = 21,
+  }) {
+    final hasil = <DateTimeRange>[];
+    var hari = _dateOnly(DateTime.now());
+    final batas = _dateOnly(sebelum);
+
+    while (hari.isBefore(batas) && hasil.length < butuhSesi) {
+      // Coba tempatkan satu sesi di jam kerja hari ini.
+      for (var jam = jamKerjaMulai;
+          jam + (durasiMenit ~/ 60) <= jamKerjaSelesai;
+          jam++) {
+        final start = DateTime(hari.year, hari.month, hari.day, jam);
+        final end = start.add(Duration(minutes: durasiMenit));
+        final bentrok = itemsOn(hari).any((c) =>
+            start.isBefore(c.endAt) && end.isAfter(c.startAt));
+        if (!bentrok) {
+          hasil.add(DateTimeRange(start: start, end: end));
+          break; // satu sesi per hari
+        }
+      }
+      hari = hari.add(const Duration(days: 1));
+    }
+    return hasil;
+  }
+
+  /// Terima rekomendasi menjadi komitmen lomba nyata (ditandai source lomba).
+  void terapkanRekomendasi({
+    required String competitionId,
+    required String judulLomba,
+    String? deskripsi,
+    required List<DateTimeRange> slot,
+  }) {
+    final now = DateTime.now().millisecondsSinceEpoch;
+    for (var i = 0; i < slot.length; i++) {
+      final s = slot[i];
+      _all.add(Commitment(
+        id: 'lomba_${now}_$i',
+        title: judulLomba,
+        category: deskripsi,
+        type: CommitmentType.flexible,
+        startAtEpochMs: _floorToMinute(s.start.millisecondsSinceEpoch),
+        endAtEpochMs: _floorToMinute(s.end.millisecondsSinceEpoch),
+        timezone: 'Asia/Jakarta',
+        source: 'lomba:$competitionId',
+        createdAtEpochMs: now,
+        updatedAtEpochMs: now,
+      ));
+    }
+    if (slot.isNotEmpty) _selectedDate = _dateOnly(slot.first.start);
+    notifyListeners();
+  }
+
+  /// Fokuskan kalender ke tanggal lomba pertama (dipakai "Cek Jadwal").
+  void fokusKompetisi(String competitionId) {
+    final items = itemsForCompetition(competitionId);
+    if (items.isNotEmpty) {
+      _selectedDate = _dateOnly(items.first.startAt);
+      notifyListeners();
+    }
   }
 
   /// Tambah jadwal WAJIB (rutin mingguan) pada [weekdays] (1=Sen..7=Min).

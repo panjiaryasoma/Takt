@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'models/competition_brief.dart';
 import 'screens/analisis_kompetisi_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/jadwal_harian_screen.dart';
 import 'screens/jadwal_ringkasan_screen.dart';
 import 'screens/progres_analisis_screen.dart';
+import 'screens/rekomendasi_jadwal_screen.dart';
 import 'screens/rencana_screen.dart';
 import 'screens/review_brief_screen.dart';
 import 'screens/tambah_jadwal_screen.dart';
 import 'theme/app_theme.dart';
+import 'viewmodels/analisis_view_model.dart';
 import 'viewmodels/jadwal_view_model.dart';
+import 'viewmodels/rencana_view_model.dart';
 import 'widgets/common.dart';
 
 void main() {
@@ -22,8 +26,12 @@ class TaktApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => JadwalViewModel(),
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => JadwalViewModel()),
+        ChangeNotifierProvider(create: (_) => AnalisisViewModel()),
+        ChangeNotifierProvider(create: (_) => RencanaViewModel()),
+      ],
       child: MaterialApp(
         title: 'Takt',
         debugShowCheckedModeBanner: false,
@@ -47,6 +55,10 @@ class _RootShellState extends State<RootShell> {
   int _jadwalTab = 0; // 0 harian, 1 ringkasan
   bool _showTambahJadwal = false; // overlay form Tambah Jadwal
   int _analisisStep = 0; // 0 kompetisi(form), 1 progres, 2 review brief
+  bool _showRekomendasi = false; // overlay rekomendasi jadwal dari lomba
+  CompetitionBrief? _briefAktif;
+
+  CompetitionBrief get _brief => _briefAktif ??= CompetitionBrief.demo();
 
   Widget _body() {
     switch (_navIndex) {
@@ -66,24 +78,49 @@ class _RootShellState extends State<RootShell> {
             : JadwalRingkasanScreen(
                 onSwitchTab: (i) => setState(() => _jadwalTab = i));
       case 2:
+        if (_showRekomendasi) {
+          return RekomendasiJadwalScreen(
+            brief: _brief,
+            onBack: () => setState(() => _showRekomendasi = false),
+            onSubmitDone: () => setState(() {
+              // Setelah submit rekomendasi: masuk kalender & buka tab Jadwal.
+              _showRekomendasi = false;
+              _analisisStep = 0;
+              _navIndex = 1;
+              _jadwalTab = 0;
+            }),
+          );
+        }
         switch (_analisisStep) {
           case 1:
             return ProgresAnalisisScreen(
                 onReadResult: () => setState(() => _analisisStep = 2));
           case 2:
             return ReviewBriefScreen(
+                brief: _brief,
                 onBack: () => setState(() => _analisisStep = 1),
-                onTambahJadwal: () => setState(() {
-                      _analisisStep = 0;
-                      _navIndex = 1;
-                      _jadwalTab = 0;
-                      _showTambahJadwal = true;
-                    }),
-                onSimpan: () => setState(() {
-                      _analisisStep = 0;
-                      _navIndex = 1;
-                      _jadwalTab = 0;
-                    }));
+                // Tambah Jadwal: buka layar rekomendasi (judul+deskripsi
+                // otomatis, slot dari jadwal kosong).
+                onTambahJadwal: () =>
+                    setState(() => _showRekomendasi = true),
+                // Simpan: masukkan ke daftar Rencana tersimpan, lalu buka tab.
+                onSimpan: () {
+                  context.read<RencanaViewModel>().simpan(
+                        competitionId: _brief.competitionId,
+                        title: _brief.nama,
+                        deadline: _brief.deadline,
+                      );
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('"${_brief.nama}" disimpan ke Rencana'),
+                      duration: const Duration(seconds: 2),
+                    ),
+                  );
+                  setState(() {
+                    _analisisStep = 0;
+                    _navIndex = 3;
+                  });
+                });
           case 0:
           default:
             return AnalisisKompetisiScreen(
@@ -91,8 +128,20 @@ class _RootShellState extends State<RootShell> {
         }
       case 3:
         return RencanaScreen(
-          onTinjau: () => setState(() => _navIndex = 1),
-          onCekJadwal: () => setState(() => _navIndex = 1),
+          onTinjau: (entry) => setState(() {
+            // Tinjau: kembali membaca hasil analisis (Review Brief).
+            _navIndex = 2;
+            _analisisStep = 2;
+          }),
+          onCekJadwal: (entry) {
+            // Cek Jadwal: buka tab Jadwal & fokus ke tanggal lomba.
+            context.read<JadwalViewModel>().fokusKompetisi(entry.competitionId);
+            setState(() {
+              _navIndex = 1;
+              _jadwalTab = 0;
+              _showTambahJadwal = false;
+            });
+          },
         );
       case 0:
       default:

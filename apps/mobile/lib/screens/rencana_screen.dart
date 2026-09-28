@@ -1,18 +1,46 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
 import '../theme/app_theme.dart';
+import '../viewmodels/rencana_view_model.dart';
 import '../widgets/common.dart';
 
 /// RencanaScreen — "Rencana tersimpan".
 /// Section: Rencana tersimpan (Tinjau) + History Rencana Disetujui (Cek Jadwal).
+/// Data dari [RencanaViewModel].
 class RencanaScreen extends StatelessWidget {
   const RencanaScreen({super.key, this.onTinjau, this.onCekJadwal});
 
-  final VoidCallback? onTinjau;
-  final VoidCallback? onCekJadwal;
+  /// Tinjau rencana tersimpan (baca lagi hasil analisis). Membawa entry-nya.
+  final void Function(SavedPlanEntry entry)? onTinjau;
+
+  /// Cek jadwal lomba yang sudah disetujui (highlight di kalender).
+  final void Function(SavedPlanEntry entry)? onCekJadwal;
+
+  static const _bulan = [
+    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
+    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+  ];
+  static const _bulanSingkat = [
+    'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+    'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des',
+  ];
+
+  String _deadlineLabel(DateTime d) =>
+      'Sebelum ${d.day} ${_bulan[d.month - 1]} ${d.year}';
+
+  String _decidedLabel(SavedPlanEntry e) {
+    final d = e.decidedAt;
+    if (d == null) return 'oleh ${e.decidedBy ?? 'Anda'}';
+    return '${d.day} ${_bulanSingkat[d.month - 1]} · oleh ${e.decidedBy ?? 'Anda'}';
+  }
 
   @override
   Widget build(BuildContext context) {
+    final vm = context.watch<RencanaViewModel>();
+    final tersimpan = vm.tersimpan;
+    final disetujui = vm.disetujui;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -27,25 +55,38 @@ class RencanaScreen extends StatelessWidget {
               children: [
                 const _Title('Rencana tersimpan'),
                 const SizedBox(height: 12),
-                _SavedCard(
-                  title: 'Lomba Makan',
-                  subtitle: 'Sebelum 17 September 2026',
-                  onTap: onTinjau,
-                ),
-                const SizedBox(height: 12),
-                _SavedCard(
-                  title: 'Lomba Makan',
-                  subtitle: 'Sebelum 15 September 2026',
-                  onTap: onTinjau,
-                ),
+                if (tersimpan.isEmpty)
+                  const _Empty(
+                    icon: Icons.eco_outlined,
+                    text:
+                        'Belum ada rencana tersimpan. Simpan dari hasil analisis.',
+                  )
+                else
+                  ...tersimpan.map((e) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _SavedCard(
+                          title: e.title,
+                          subtitle: _deadlineLabel(e.deadline),
+                          onTap: () => onTinjau?.call(e),
+                        ),
+                      )),
                 const SizedBox(height: 24),
                 const _Title('History Rencana Disetujui'),
                 const SizedBox(height: 12),
-                _HistoryCard(onTap: onCekJadwal),
-                const SizedBox(height: 12),
-                _HistoryCard(onTap: onCekJadwal),
-                const SizedBox(height: 12),
-                _HistoryCard(onTap: onCekJadwal),
+                if (disetujui.isEmpty)
+                  const _Empty(
+                    icon: Icons.check_circle_outline,
+                    text: 'Belum ada rencana yang disetujui.',
+                  )
+                else
+                  ...disetujui.map((e) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: _HistoryCard(
+                          title: e.title,
+                          meta: _decidedLabel(e),
+                          onTap: () => onCekJadwal?.call(e),
+                        ),
+                      )),
               ],
             ),
           ),
@@ -65,6 +106,44 @@ class _Title extends StatelessWidget {
         style: const TextStyle(
             color: C.white, fontSize: 18, fontWeight: FontWeight.w700),
       );
+}
+
+class _Empty extends StatelessWidget {
+  const _Empty({required this.icon, required this.text});
+  final IconData icon;
+  final String text;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: C.card,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: C.bg,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            alignment: Alignment.center,
+            child: Icon(icon, color: C.accent, size: 22),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(color: C.detailMuted, fontSize: 13),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 /// Card "Rencana tersimpan": ikon daun + judul + subtitle + tombol Tinjau.
@@ -130,8 +209,10 @@ class _SavedCard extends StatelessWidget {
 
 /// Card "History Rencana Disetujui": ikon check + judul + meta + Cek Jadwal.
 class _HistoryCard extends StatelessWidget {
-  const _HistoryCard({this.onTap});
+  const _HistoryCard({required this.title, required this.meta, this.onTap});
 
+  final String title;
+  final String meta;
   final VoidCallback? onTap;
 
   @override
@@ -159,15 +240,16 @@ class _HistoryCard extends StatelessWidget {
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text('Lomba Hackaton',
-                    style: TextStyle(
+              children: [
+                Text(title,
+                    style: const TextStyle(
                         color: C.white,
                         fontSize: 15,
                         fontWeight: FontWeight.w700)),
-                SizedBox(height: 2),
-                Text('21 Sep · oleh Anda',
-                    style: TextStyle(color: C.detailMuted, fontSize: 12)),
+                const SizedBox(height: 2),
+                Text(meta,
+                    style: const TextStyle(
+                        color: C.detailMuted, fontSize: 12)),
               ],
             ),
           ),

@@ -1,28 +1,42 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
+import '../models/analysis_step.dart';
 import '../theme/app_theme.dart';
+import '../viewmodels/analisis_view_model.dart';
 import '../widgets/common.dart';
 
 /// ProgresAnalisisScreen — Figma node 11:1473 ("Progres Analisis").
-/// Progress ring + daftar langkah analisis + peringatan konflik + Baca Hasil.
-class ProgresAnalisisScreen extends StatelessWidget {
+/// Progress ring beranimasi + daftar langkah + konflik + Baca Hasil.
+/// Data dari [AnalisisViewModel] (simulasi sekarang, AI model nanti).
+class ProgresAnalisisScreen extends StatefulWidget {
   const ProgresAnalisisScreen({super.key, this.onReadResult});
 
   final VoidCallback? onReadResult;
 
-  static const _steps = <_Step>[
-    _Step('Membaca sumber resmi', '3 dokumen · provenance disimpan',
-        _StepState.done),
-    _Step('Menyusun estimasi kerja', '', _StepState.done),
-    _Step('Mencocokkan kalender', 'Menggunakan 8,5 jam tersedia',
-        _StepState.process),
-    _Step('Menilai risiko dan alternatif', 'Belum dimulai', _StepState.waiting),
-  ];
+  @override
+  State<ProgresAnalisisScreen> createState() => _ProgresAnalisisScreenState();
+}
+
+class _ProgresAnalisisScreenState extends State<ProgresAnalisisScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // Mulai simulasi saat layar dibuka (idempotent).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<AnalisisViewModel>().mulaiSimulasi();
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
+    final vm = context.watch<AnalisisViewModel>();
+    final etaText = vm.etaDetik == null
+        ? '…'
+        : (vm.etaDetik! <= 0 ? 'selesai' : '± ${vm.etaDetik} detik');
+
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(10, 0, 10, 24),
       child: Column(
@@ -32,7 +46,7 @@ class ProgresAnalisisScreen extends StatelessWidget {
           const HeaderDivider(),
           const SizedBox(height: 16),
 
-          // Progress ring card
+          // Progress ring card (beranimasi)
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 20),
             padding: const EdgeInsets.symmetric(vertical: 24),
@@ -45,15 +59,20 @@ class ProgresAnalisisScreen extends StatelessWidget {
                 SizedBox(
                   width: 130,
                   height: 130,
-                  child: CustomPaint(
-                    painter: _RingPainter(0.72),
-                    child: const Center(
-                      child: Text(
-                        '72%',
-                        style: TextStyle(
-                          color: C.bg,
-                          fontSize: 32,
-                          fontWeight: FontWeight.w800,
+                  child: TweenAnimationBuilder<double>(
+                    duration: const Duration(milliseconds: 400),
+                    curve: Curves.easeOut,
+                    tween: Tween(begin: 0, end: vm.progress),
+                    builder: (context, value, _) => CustomPaint(
+                      painter: _RingPainter(value),
+                      child: Center(
+                        child: Text(
+                          '${(value * 100).round()}%',
+                          style: const TextStyle(
+                            color: C.bg,
+                            fontSize: 32,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                       ),
                     ),
@@ -69,21 +88,22 @@ class ProgresAnalisisScreen extends StatelessWidget {
                   ),
                   child: Row(
                     mainAxisSize: MainAxisSize.min,
-                    children: const [
-                      Icon(Icons.access_time, color: C.white, size: 13),
-                      SizedBox(width: 6),
-                      Text('± 40 detik',
-                          style: TextStyle(color: C.white, fontSize: 12)),
+                    children: [
+                      const Icon(Icons.access_time, color: C.white, size: 13),
+                      const SizedBox(width: 6),
+                      Text(etaText,
+                          style: const TextStyle(
+                              color: C.white, fontSize: 12)),
                     ],
                   ),
                 ),
                 const SizedBox(height: 14),
-                const Padding(
-                  padding: EdgeInsets.symmetric(horizontal: 24),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
                   child: Text(
-                    'Memeriksa kelayakan terhadap kapasitas nyata Anda.',
+                    vm.statusText,
                     textAlign: TextAlign.center,
-                    style: TextStyle(color: C.accentText, fontSize: 13),
+                    style: const TextStyle(color: C.accentText, fontSize: 13),
                   ),
                 ),
               ],
@@ -102,74 +122,80 @@ class ProgresAnalisisScreen extends StatelessWidget {
               borderRadius: BorderRadius.circular(16),
             ),
             child: Column(
-              children: _steps.map((s) => _StepRow(step: s)).toList(),
+              children:
+                  vm.steps.map((s) => _StepRow(step: s)).toList(),
             ),
           ),
           const SizedBox(height: 16),
 
-          // Konflik tanggal
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 20),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: C.card,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: BoxDecoration(
-                    color: C.bg,
-                    borderRadius: BorderRadius.circular(12),
+          // Konflik tanggal (muncul bila ada)
+          if (vm.konflikText != null) ...[
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: C.card,
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: C.bg,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    alignment: Alignment.center,
+                    child: const Icon(Icons.warning_amber_rounded,
+                        color: C.sedang, size: 18),
                   ),
-                  alignment: Alignment.center,
-                  child: const Icon(Icons.warning_amber_rounded,
-                      color: C.sedang, size: 18),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text('Konflik tanggal terdeteksi',
-                          style: TextStyle(
-                              color: C.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w700)),
-                      SizedBox(height: 3),
-                      Text(
-                        'Halaman utama: 15 Nov · PDF: 12 Nov. Anda akan diminta meninjau.',
-                        style:
-                            TextStyle(color: C.detailMuted, fontSize: 12),
-                      ),
-                    ],
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text('Konflik tanggal terdeteksi',
+                            style: TextStyle(
+                                color: C.white,
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700)),
+                        const SizedBox(height: 3),
+                        Text(
+                          vm.konflikText!,
+                          style: const TextStyle(
+                              color: C.detailMuted, fontSize: 12),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
+            const SizedBox(height: 16),
+          ],
 
-          // Baca Hasil
+          // Baca Hasil — aktif saat selesai
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: GestureDetector(
-              onTap: onReadResult,
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                decoration: BoxDecoration(
-                  color: C.accent,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                alignment: Alignment.center,
-                child: const Text(
-                  'Baca Hasil',
-                  style: TextStyle(
-                    color: C.bg,
-                    fontSize: 15,
-                    fontWeight: FontWeight.w700,
+              onTap: vm.selesai ? widget.onReadResult : null,
+              child: Opacity(
+                opacity: vm.selesai ? 1 : 0.5,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  decoration: BoxDecoration(
+                    color: C.accent,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    vm.selesai ? 'Baca Hasil' : 'Menganalisis…',
+                    style: const TextStyle(
+                      color: C.bg,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ),
               ),
@@ -190,18 +216,9 @@ class ProgresAnalisisScreen extends StatelessWidget {
   }
 }
 
-enum _StepState { done, process, waiting }
-
-class _Step {
-  const _Step(this.title, this.detail, this.state);
-  final String title;
-  final String detail;
-  final _StepState state;
-}
-
 class _StepRow extends StatelessWidget {
   const _StepRow({required this.step});
-  final _Step step;
+  final AnalysisStep step;
 
   @override
   Widget build(BuildContext context) {
@@ -210,19 +227,19 @@ class _StepRow extends StatelessWidget {
     late final String badge;
     late final IconData badgeIcon;
     switch (step.state) {
-      case _StepState.done:
+      case AnalysisStepState.done:
         leadIcon = Icons.check_circle;
         leadColor = C.kosong;
         badge = 'Selesai';
         badgeIcon = Icons.check_circle_outline;
         break;
-      case _StepState.process:
+      case AnalysisStepState.process:
         leadIcon = Icons.sync;
         leadColor = C.accent;
         badge = 'Proses';
         badgeIcon = Icons.timelapse;
         break;
-      case _StepState.waiting:
+      case AnalysisStepState.waiting:
         leadIcon = Icons.radio_button_unchecked;
         leadColor = C.navInactive;
         badge = 'Menunggu';
@@ -260,8 +277,7 @@ class _StepRow extends StatelessWidget {
             children: [
               Icon(badgeIcon, color: leadColor, size: 14),
               const SizedBox(width: 4),
-              Text(badge,
-                  style: TextStyle(color: leadColor, fontSize: 11)),
+              Text(badge, style: TextStyle(color: leadColor, fontSize: 11)),
             ],
           ),
         ],

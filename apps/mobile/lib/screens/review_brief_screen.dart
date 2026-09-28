@@ -1,23 +1,28 @@
 import 'package:flutter/material.dart';
 
+import '../models/competition_brief.dart';
 import '../theme/app_theme.dart';
 
 /// ReviewBriefScreen — Figma node 11:1627 ("Review brief kompetisi").
 /// Hasil analisis: info lomba, rundown tahapan, deadline, analisa jadwal.
+/// Data dari [CompetitionBrief] (demo sekarang, AI model nanti).
 class ReviewBriefScreen extends StatelessWidget {
   const ReviewBriefScreen({
     super.key,
+    this.brief,
     this.onBack,
     this.onTambahJadwal,
     this.onSimpan,
   });
 
+  final CompetitionBrief? brief;
   final VoidCallback? onBack;
   final VoidCallback? onTambahJadwal;
   final VoidCallback? onSimpan;
 
   @override
   Widget build(BuildContext context) {
+    final b = brief ?? CompetitionBrief.demo();
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
       child: Column(
@@ -68,16 +73,16 @@ class ReviewBriefScreen extends StatelessWidget {
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Text('Hackathon Nasional AI 2026',
-                          style: TextStyle(
+                    children: [
+                      Text(b.nama,
+                          style: const TextStyle(
                               color: C.accentText,
                               fontSize: 15,
                               fontWeight: FontWeight.w800)),
-                      SizedBox(height: 2),
-                      Text('Kementerian Kominfo x Telkom Indonesia',
-                          style:
-                              TextStyle(color: C.accentSub, fontSize: 12)),
+                      const SizedBox(height: 2),
+                      Text(b.penyelenggara,
+                          style: const TextStyle(
+                              color: C.accentSub, fontSize: 12)),
                     ],
                   ),
                 ),
@@ -88,8 +93,8 @@ class ReviewBriefScreen extends StatelessWidget {
                     color: C.accentSub,
                     borderRadius: BorderRadius.circular(999),
                   ),
-                  child: const Text('Online',
-                      style: TextStyle(color: C.white, fontSize: 12)),
+                  child: Text(b.online ? 'Online' : 'Offline',
+                      style: const TextStyle(color: C.white, fontSize: 12)),
                 ),
               ],
             ),
@@ -108,17 +113,15 @@ class ReviewBriefScreen extends StatelessWidget {
               children: [
                 const _FieldLabel('Format'),
                 const SizedBox(height: 6),
-                _pill('Tim (3-5 orang)'),
+                _pill(b.format),
                 const SizedBox(height: 14),
                 const _FieldLabel('Deskripsi'),
                 const SizedBox(height: 6),
-                _block(
-                    'Kompetisi pengembangan solusi AI untuk permasalahan publik di Indonesia. Peserta membangun prototipe aplikasi berbasis AI dalam waktu 48 jam.'),
+                _block(b.deskripsi),
                 const SizedBox(height: 14),
                 const _FieldLabel('Output yang Dikumpulkan'),
                 const SizedBox(height: 6),
-                _block(
-                    '• Proposal solusi (PDF)\n• Prototipe aplikasi\n• Video demo (3 menit)\n• Slide presentasi'),
+                _block(b.output.map((e) => '• $e').join('\n')),
               ],
             ),
           ),
@@ -135,23 +138,18 @@ class ReviewBriefScreen extends StatelessWidget {
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                _TimelineItem(
-                    title: 'Pendaftaran & Pengumpulan Proposal',
-                    date: '1-15 Okt 2026',
-                    first: true),
-                _TimelineItem(
-                    title: 'Penyisihan (Review Proposal)',
-                    date: '20-25 Okt 2026'),
-                _TimelineItem(
-                    title: 'Babak Semifinal (48 Jam Hackathon)',
-                    date: '5-7 Nov 2026'),
-                _TimelineItem(
-                    title: 'Grand Final & Presentasi',
-                    date: '20 Nov 2026',
-                    last: true),
-                SizedBox(height: 6),
-                Text(
+              children: [
+                ...List.generate(b.rundown.length, (i) {
+                  final t = b.rundown[i];
+                  return _TimelineItem(
+                    title: t.title,
+                    date: t.date,
+                    first: i == 0,
+                    last: i == b.rundown.length - 1,
+                  );
+                }),
+                const SizedBox(height: 6),
+                const Text(
                   'Kompetisi ini berjalan bertahap dan berakhir pada babak final.',
                   style: TextStyle(color: C.detailMuted, fontSize: 11),
                 ),
@@ -183,10 +181,10 @@ class ReviewBriefScreen extends StatelessWidget {
                       color: C.accent, size: 18),
                 ),
                 const SizedBox(width: 12),
-                const Expanded(
+                Expanded(
                   child: Text(
-                    'Deadline Penyisihan: 15 Oktober 2026',
-                    style: TextStyle(color: C.white, fontSize: 13),
+                    b.deadlineLabel,
+                    style: const TextStyle(color: C.white, fontSize: 13),
                   ),
                 ),
                 Container(
@@ -196,8 +194,8 @@ class ReviewBriefScreen extends StatelessWidget {
                     color: C.accent,
                     borderRadius: BorderRadius.circular(999),
                   ),
-                  child: const Text('18 Hari Lagi',
-                      style: TextStyle(
+                  child: Text('${b.sisaHari} Hari Lagi',
+                      style: const TextStyle(
                           color: C.bg,
                           fontSize: 12,
                           fontWeight: FontWeight.w700)),
@@ -218,28 +216,26 @@ class ReviewBriefScreen extends StatelessWidget {
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text('Analisa Kondisi Jadwal',
+              children: [
+                const Text('Analisa Kondisi Jadwal',
                     style: TextStyle(
                         color: C.white,
                         fontSize: 14,
                         fontWeight: FontWeight.w700)),
-                SizedBox(height: 12),
-                _AnalysisLine(
-                    color: C.padat, text: 'Status jadwal saat ini: Padat'),
-                _AnalysisLine(
-                    color: C.sibuk,
-                    text:
-                        'Jadwal bentrok: 2 kegiatan bentrok di minggu yang sama'),
-                _AnalysisLine(
-                    color: C.sibuk,
-                    text:
-                        'Estimasi beban kerja: Tinggi – perlu alokasi 15-20 jam/minggu'),
-                _AnalysisLine(
-                    color: C.kosong,
-                    textColor: C.kosong,
-                    text:
-                        'Rekomendasi: Bisa diambil jika mengurangi 1 kegiatan lain'),
+                const SizedBox(height: 12),
+                ...b.analisaJadwal.map((a) {
+                  final c = switch (a.severity) {
+                    BriefSeverity.tinggi => C.padat,
+                    BriefSeverity.sedang => C.sibuk,
+                    BriefSeverity.aman => C.kosong,
+                  };
+                  return _AnalysisLine(
+                    color: c,
+                    textColor:
+                        a.severity == BriefSeverity.aman ? C.kosong : C.white,
+                    text: a.text,
+                  );
+                }),
               ],
             ),
           ),
@@ -277,14 +273,14 @@ class ReviewBriefScreen extends StatelessWidget {
                     height: 52,
                     alignment: Alignment.center,
                     decoration: BoxDecoration(
-                      color: Colors.transparent,
+                      color: C.card,
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: C.navInactive, width: 1.4),
+                      border: Border.all(color: C.accent, width: 1.4),
                     ),
                     child: const Text(
                       'Simpan Jadwal',
                       style: TextStyle(
-                        color: C.navInactive,
+                        color: C.accent,
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
                       ),
