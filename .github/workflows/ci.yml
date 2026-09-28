@@ -5,6 +5,9 @@ on:
     branches: [main]
   pull_request:
 
+permissions:
+  contents: write
+
 jobs:
   python:
     runs-on: ubuntu-latest
@@ -43,6 +46,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.head_ref || github.ref_name }}
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -53,11 +58,17 @@ jobs:
       - name: Resolve Flutter dependencies
         run: flutter pub get
 
-      - name: Capture resolved pubspec lock
-        uses: actions/upload-artifact@v4
-        with:
-          name: resolved-pubspec-lock
-          path: apps/mobile/pubspec.lock
+      - name: Commit resolved Flutter lockfile
+        if: github.event_name == 'pull_request' && github.head_ref == 'issue-1b-panji-takeover'
+        run: |
+          if git diff --quiet -- pubspec.lock; then
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add pubspec.lock
+          git commit -m "chore(mobile): refresh resolved pubspec lock"
+          git push origin HEAD:${{ github.head_ref }}
 
       - name: Flutter analyze
         run: flutter analyze
