@@ -94,6 +94,17 @@ void main() {
       );
     });
 
+    test('rejects missing environment', () {
+      expect(
+        () => RevenueCatConfig.validate(
+          appEnv: '   ',
+          apiKey: 'test_demo_public_key',
+          buildMode: AppBuildMode.debug,
+        ),
+        throwsFormatException,
+      );
+    });
+
     test('rejects unknown environment', () {
       expect(
         () => RevenueCatConfig.validate(
@@ -182,8 +193,7 @@ void main() {
     });
 
     test('Android canonical identity is consistent', () {
-      final gradle =
-          File('android/app/build.gradle.kts').readAsStringSync();
+      final gradle = File('android/app/build.gradle.kts').readAsStringSync();
       final manifest =
           File('android/app/src/main/AndroidManifest.xml').readAsStringSync();
       final strings =
@@ -199,7 +209,10 @@ void main() {
       expect(gradle, contains('applicationId = "com.panjiaryasoma.takt"'));
       expect(manifest, contains('android:label="@string/app_name"'));
       expect(strings, contains('<string name="app_name">Takt</string>'));
-      expect(mainActivity.readAsStringSync(), contains('package com.panjiaryasoma.takt'));
+      expect(
+        mainActivity.readAsStringSync(),
+        contains('package com.panjiaryasoma.takt'),
+      );
       expect(oldMainActivity.existsSync(), isFalse);
     });
   });
