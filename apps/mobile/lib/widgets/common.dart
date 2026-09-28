@@ -8,19 +8,19 @@ class StatusBarMock extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return SizedBox(
+    return const SizedBox(
       height: 44,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 22),
+        padding: EdgeInsets.symmetric(horizontal: 22),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text(
+            Text(
               '9:41',
               style: TextStyle(color: C.white, fontSize: 14),
             ),
             Row(
-              children: const [
+              children: [
                 Icon(Icons.signal_cellular_alt, color: C.white, size: 16),
                 SizedBox(width: 6),
                 Icon(Icons.wifi, color: C.white, size: 16),
