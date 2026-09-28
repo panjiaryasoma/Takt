@@ -95,17 +95,12 @@ class JadwalHarianScreen extends StatelessWidget {
   }
 
   static String _hhmm(DateTime time) =>
-      time.hour.toString().padLeft(2, '0') +
-      ':' +
-      time.minute.toString().padLeft(2, '0');
+      "${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}";
 
   static String _duration(int minutes) {
-    if (minutes % 60 == 0) return (minutes ~/ 60).toString() + ' jam';
-    if (minutes < 60) return minutes.toString() + ' menit';
-    return (minutes ~/ 60).toString() +
-        ' jam ' +
-        (minutes % 60).toString() +
-        ' menit';
+    if (minutes % 60 == 0) return '${minutes ~/ 60} jam';
+    if (minutes < 60) return '$minutes menit';
+    return '${minutes ~/ 60} jam ${minutes % 60} menit';
   }
 
   static List<List<int?>> _weeks(DateTime month) {
@@ -218,11 +213,8 @@ class JadwalHarianScreen extends StatelessWidget {
     final selected = vm.selectedDate;
     final items = vm.itemsForSelectedDate;
     final eventDays = vm.eventDaysOfMonth(selected);
-    final header = _dayNames[selected.weekday - 1] +
-        ', ' +
-        selected.day.toString() +
-        ' ' +
-        _monthNames[selected.month - 1];
+    final header =
+        '${_dayNames[selected.weekday - 1]}, ${selected.day} ${_monthNames[selected.month - 1]}';
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(10, 0, 10, 24),
@@ -256,9 +248,7 @@ class JadwalHarianScreen extends StatelessWidget {
                   child: const Icon(Icons.chevron_left, color: C.bg),
                 ),
                 Text(
-                  _monthNames[selected.month - 1] +
-                      ' ' +
-                      selected.year.toString(),
+                  '${_monthNames[selected.month - 1]} ${selected.year}',
                   style: const TextStyle(
                     color: C.bg,
                     fontSize: 16,
@@ -513,7 +503,7 @@ class _ActivityCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  item.isRecurring ? duration + ' · rutin' : duration,
+                  item.isRecurring ? '$duration · rutin' : duration,
                   style: const TextStyle(color: C.detailMuted, fontSize: 11),
                 ),
               ],
