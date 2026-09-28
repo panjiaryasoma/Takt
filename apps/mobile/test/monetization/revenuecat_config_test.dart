@@ -72,6 +72,28 @@ void main() {
       );
     });
 
+    test('rejects Test Store example placeholder', () {
+      expect(
+        () => RevenueCatConfig.validate(
+          appEnv: 'test_store',
+          apiKey: 'test_REPLACE_ME',
+          buildMode: AppBuildMode.debug,
+        ),
+        throwsFormatException,
+      );
+    });
+
+    test('rejects Android production example placeholder', () {
+      expect(
+        () => RevenueCatConfig.validate(
+          appEnv: 'production_android',
+          apiKey: 'goog_REPLACE_ME',
+          buildMode: AppBuildMode.release,
+        ),
+        throwsFormatException,
+      );
+    });
+
     test('rejects secret API keys', () {
       expect(
         () => RevenueCatConfig.validate(
@@ -165,6 +187,64 @@ void main() {
         ),
         isTrue,
       );
+    });
+
+    test('initial state is UNKNOWN and IDLE', () {
+      const state = EntitlementState.initial();
+
+      expect(state.access, EntitlementAccess.unknown);
+      expect(state.sync, EntitlementSync.idle);
+    });
+
+    test('loading preserves last trustworthy access', () {
+      const initial = EntitlementState.initial();
+      final active = initial.resolved(isActive: true);
+      final loading = active.loading();
+
+      expect(loading.access, EntitlementAccess.active);
+      expect(loading.sync, EntitlementSync.loading);
+    });
+
+    test('first load failure stays UNKNOWN and becomes ERROR', () {
+      const initial = EntitlementState.initial();
+      final failed = initial.failed();
+
+      expect(failed.access, EntitlementAccess.unknown);
+      expect(failed.sync, EntitlementSync.error);
+    });
+
+    test('refresh failure preserves ACTIVE access', () {
+      const initial = EntitlementState.initial();
+      final active = initial.resolved(isActive: true);
+      final failed = active.failed();
+
+      expect(failed.access, EntitlementAccess.active);
+      expect(failed.sync, EntitlementSync.error);
+    });
+
+    test('refresh failure preserves INACTIVE access', () {
+      const initial = EntitlementState.initial();
+      final inactive = initial.resolved(isActive: false);
+      final failed = inactive.failed();
+
+      expect(failed.access, EntitlementAccess.inactive);
+      expect(failed.sync, EntitlementSync.error);
+    });
+
+    test('successful active resolution becomes ACTIVE and READY', () {
+      const initial = EntitlementState.initial();
+      final resolved = initial.resolved(isActive: true);
+
+      expect(resolved.access, EntitlementAccess.active);
+      expect(resolved.sync, EntitlementSync.ready);
+    });
+
+    test('successful inactive resolution becomes INACTIVE and READY', () {
+      const initial = EntitlementState.initial();
+      final resolved = initial.resolved(isActive: false);
+
+      expect(resolved.access, EntitlementAccess.inactive);
+      expect(resolved.sync, EntitlementSync.ready);
     });
   });
 
