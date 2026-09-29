@@ -1,4 +1,4 @@
-package com.example.takt_mobile
+package com.panjiaryasoma.takt
 
 import io.flutter.embedding.android.FlutterActivity
 

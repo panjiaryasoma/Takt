@@ -68,3 +68,45 @@ Technical MVP end-to-end remain dependent on that host.
 Verification: `flutter analyze`, `flutter test`, `flutter build apk --debug`, and
 the existing backend regression suite. Results must be associated with the tested
 commit, not inherited from an earlier baseline.
+
+## RevenueCat configuration contract
+
+RevenueCat is a mobile-owned access dependency. It must never change deadline,
+eligibility, source-conflict, feasibility, solver, or recommendation truth.
+
+The canonical identifiers are:
+
+```text
+entitlement: pro
+Test Store product: takt_pro_lifetime_v1
+Offering identifier: default
+lifetime package: $rc_lifetime
+premium feature: alternative_candidates
+```
+
+The Shipaton demo path uses RevenueCat Test Store on Android. Google Play
+provider setup and credentials are deferred.
+
+Create an ignored local Test Store config from the committed example:
+
+```bash
+cp config/revenuecat.test.example.json config/revenuecat.test.local.json
+```
+
+Replace the placeholder with the RevenueCat public Test Store SDK key, then
+run the debug build with:
+
+```bash
+flutter run --debug \
+  --dart-define-from-file=config/revenuecat.test.local.json
+```
+
+Test Store config is intentionally rejected for profile and release builds.
+Production Android config accepts only a public `goog_` SDK key.
+
+Never put RevenueCat secret `sk_` keys in the app or repository. Do not commit
+`*.local.json` config files.
+
+This branch keeps monetization at the access/presentation boundary. RevenueCat
+must not change planning inputs, solver feasibility, candidate validity, backend
+allowed actions, accepted-plan truth, or local domain persistence.
