@@ -53,7 +53,7 @@ class JadwalTabs extends StatelessWidget {
       ),
       child: Row(
         children: [
-          tab('Jadwal Harian', 0),
+          tab('Daily Schedule', 0),
           const SizedBox(width: 4),
           tab('Ringkasan Pekan', 1),
         ],
@@ -128,20 +128,20 @@ class JadwalHarianScreen extends StatelessWidget {
           context: context,
           builder: (context) => AlertDialog(
             backgroundColor: C.card,
-            title: const Text('Hapus jadwal?'),
+            title: const Text('Delete schedule?'),
             content: Text(
               item.isRecurring
-                  ? 'Ini akan menghapus seluruh rangkaian jadwal rutin.'
-                  : 'Jadwal ini akan dihapus dari perangkat.',
+                  ? 'This will delete the entire recurring schedule.'
+                  : 'This schedule will be deleted from this device.',
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text('Batal'),
+                child: const Text('Cancel'),
               ),
               TextButton(
                 onPressed: () => Navigator.pop(context, true),
-                child: const Text('Hapus'),
+                child: const Text('Delete'),
               ),
             ],
           ),
@@ -151,7 +151,7 @@ class JadwalHarianScreen extends StatelessWidget {
     final ok = await vm.hapus(item.commitment.id);
     if (!ok && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(vm.errorMessage ?? 'Jadwal gagal dihapus')),
+        SnackBar(content: Text(vm.errorMessage ?? 'Failed to delete schedule')),
       );
     }
   }
@@ -167,8 +167,8 @@ class JadwalHarianScreen extends StatelessWidget {
       SnackBar(
         content: Text(
           ok
-              ? 'Kejadian ini dibatalkan. Rangkaian rutin tetap ada.'
-              : (vm.errorMessage ?? 'Perubahan gagal disimpan'),
+              ? 'This occurrence was canceled. The recurring series remains.'
+              : (vm.errorMessage ?? 'Failed to save changes'),
         ),
       ),
     );
@@ -200,8 +200,8 @@ class JadwalHarianScreen extends StatelessWidget {
       SnackBar(
         content: Text(
           ok
-              ? 'Kejadian dipindahkan tanpa mengubah pola rutin.'
-              : (vm.errorMessage ?? 'Perubahan gagal disimpan'),
+              ? 'This occurrence was moved without changing the recurring pattern.'
+              : (vm.errorMessage ?? 'Failed to save changes'),
         ),
       ),
     );
@@ -366,7 +366,7 @@ class JadwalHarianScreen extends StatelessWidget {
               ),
               alignment: Alignment.center,
               child: const Text(
-                'Belum ada jadwal di tanggal ini',
+                'No schedule for this date',
                 style: TextStyle(color: C.detailMuted, fontSize: 13),
               ),
             )
@@ -436,7 +436,7 @@ class _RetryCard extends StatelessWidget {
               style: const TextStyle(color: C.detailMuted, fontSize: 13),
             ),
           ),
-          TextButton(onPressed: onRetry, child: const Text('Coba lagi')),
+          TextButton(onPressed: onRetry, child: const Text('Try again')),
         ],
       ),
     );
@@ -528,7 +528,7 @@ class _ActivityCard extends StatelessWidget {
                 ),
                 PopupMenuItem(
                   value: 'cancel',
-                  child: Text('Batalkan tanggal ini'),
+                  child: Text('Cancel this occurrence'),
                 ),
               ],
             ),
