@@ -299,7 +299,7 @@ void main() {
       addTearDown(client.close);
 
       const source = AnalysisSourceMetadata(
-        sourceId: 'src-url',
+        sourceId: 'src-1',
         sourceType: SourceTypeWire.officialRules,
       );
       final result = await client.analyzeUrl(
@@ -328,6 +328,38 @@ void main() {
       expect(requestJson['prior_source_artifacts'], isEmpty);
     });
 
+
+    test('rejects valid JSON response for the wrong competition', () async {
+      final recorder = _RecordingHttpClient(
+        _responseBody('cmp-other'),
+      );
+      final client = HttpCompetitionApiClient(
+        baseUrl: 'https://example.test',
+        client: recorder,
+      );
+      addTearDown(client.close);
+
+      const source = AnalysisSourceMetadata(
+        sourceId: 'src-1',
+        sourceType: SourceTypeWire.officialRules,
+      );
+
+      await expectLater(
+        client.analyzeUrl(
+          competitionId: 'cmp-expected',
+          url: 'https://example.com/rules',
+          source: source,
+        ),
+        throwsA(
+          isA<AnalysisFailure>().having(
+            (error) => error.code,
+            'code',
+            'RESPONSE_CONTRACT_INVALID',
+          ),
+        ),
+      );
+    });
+
     test('PDF multipart contains only metadata and one PDF file', () async {
       final responseBody = _responseBody('cmp-http-pdf');
       final recorder = _RecordingHttpClient(responseBody);
@@ -338,7 +370,7 @@ void main() {
       addTearDown(client.close);
 
       const source = AnalysisSourceMetadata(
-        sourceId: 'src-pdf',
+        sourceId: 'src-1',
         sourceType: SourceTypeWire.officialOrganizer,
       );
       final result = await client.analyzePdf(
