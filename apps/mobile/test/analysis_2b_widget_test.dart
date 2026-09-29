@@ -60,30 +60,54 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
-  testWidgets('review renders conflict, missing, candidates, and provenance',
+  testWidgets('review renders all truth states and provenance',
       (tester) async {
     final response = _reviewResponse();
+    var addSourceCalled = false;
 
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.dark,
         home: Scaffold(
-          body: ReviewBriefScreen(response: response),
+          body: ReviewBriefScreen(
+            response: response,
+            onAddSource: () => addSourceCalled = true,
+          ),
         ),
       ),
     );
     await tester.pumpAndSettle();
 
+    expect(find.text('Report v2'), findsOneWidget);
+    expect(find.text('Terverifikasi'), findsWidgets);
+    expect(find.text('Satu sumber'), findsOneWidget);
     expect(find.text('Konflik'), findsOneWidget);
     expect(find.text('Belum ditemukan'), findsWidgets);
-    expect(find.text('Candidate 1'), findsOneWidget);
+    expect(find.text('Belum terverifikasi'), findsOneWidget);
+    expect(find.text('Candidate 1'), findsWidgets);
     expect(find.text('Candidate 2'), findsOneWidget);
     expect(find.text('Lihat sumber'), findsWidgets);
 
+    final scrollable = find.byType(Scrollable).first;
     final firstSource = find.text('Lihat sumber').first;
+    await tester.scrollUntilVisible(
+      firstSource,
+      200,
+      scrollable: scrollable,
+    );
     await tester.tap(firstSource);
     await tester.pumpAndSettle();
     expect(find.text('Lihat selengkapnya'), findsOneWidget);
+
+    final addSource = find.text('Tambah sumber');
+    await tester.scrollUntilVisible(
+      addSource,
+      500,
+      scrollable: scrollable,
+    );
+    await tester.tap(addSource);
+    await tester.pump();
+    expect(addSourceCalled, isTrue);
 
     expect(find.textContaining('Tambah Jadwal'), findsNothing);
     expect(find.textContaining('Simpan Jadwal'), findsNothing);
@@ -130,6 +154,27 @@ CompetitionAnalyzeResponseWire _reviewResponse() {
       evidenceIds: [evidenceId],
     );
   }
+
+
+  final organizer = fields['organizer']!;
+  fields['organizer'] = CanonicalFieldWire(
+    fieldName: organizer.fieldName,
+    state: CanonicalFieldState.singleSource,
+    value: organizer.value,
+    normalizedValue: organizer.normalizedValue,
+    candidates: organizer.candidates,
+    evidenceIds: organizer.evidenceIds,
+  );
+
+  final eligibility = fields['eligibility']!;
+  fields['eligibility'] = CanonicalFieldWire(
+    fieldName: eligibility.fieldName,
+    state: CanonicalFieldState.unverified,
+    value: null,
+    normalizedValue: null,
+    candidates: eligibility.candidates,
+    evidenceIds: eligibility.evidenceIds,
+  );
 
   fields['submission_deadline'] = const CanonicalFieldWire(
     fieldName: 'submission_deadline',
