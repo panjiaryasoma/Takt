@@ -1,14 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-
 import '../models/competition_brief.dart';
 import '../theme/app_theme.dart';
-import '../viewmodels/jadwal_view_model.dart';
 
-/// RekomendasiJadwalScreen — dibuka dari Review Brief saat pilih "Tambah
-/// Jadwal". Judul & deskripsi terisi otomatis dari nama lomba; AI (sekarang
-/// heuristik) merekomendasikan slot pengerjaan dari jadwal kosong pengguna
-/// sebelum deadline. Pengguna bisa hapus slot lalu submit final.
+/// Placeholder presentation untuk rekomendasi jadwal.
+///
+/// Hari 3B akan mengisi layar ini dari Decision Report backend. Layar tidak
+/// boleh membangkitkan slot lokal atau menyimpulkan infeasible dari data kosong.
 class RekomendasiJadwalScreen extends StatefulWidget {
   const RekomendasiJadwalScreen({
     super.key,
@@ -42,12 +39,7 @@ class _RekomendasiJadwalScreenState extends State<RekomendasiJadwalScreen> {
   }
 
   void _hitungRekomendasi() {
-    final vm = context.read<JadwalViewModel>();
-    _slot = vm.rekomendasiSlot(
-      sebelum: widget.brief.deadline,
-      butuhSesi: 4,
-      durasiMenit: 120,
-    );
+    _slot = const [];
   }
 
   String _labelSlot(DateTimeRange r) {
@@ -59,20 +51,13 @@ class _RekomendasiJadwalScreenState extends State<RekomendasiJadwalScreen> {
   }
 
   void _submit() {
-    final vm = context.read<JadwalViewModel>();
-    if (_slot.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Tidak ada slot untuk ditambahkan')),
-      );
-      return;
-    }
-    vm.terapkanRekomendasi(
-      competitionId: widget.brief.competitionId,
-      judulLomba: widget.brief.nama,
-      deskripsi: widget.brief.deskripsi,
-      slot: _slot,
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Rekomendasi belum tersedia sampai Decision Report backend terhubung.',
+        ),
+      ),
     );
-    widget.onSubmitDone?.call();
   }
 
   @override
@@ -103,8 +88,8 @@ class _RekomendasiJadwalScreenState extends State<RekomendasiJadwalScreen> {
               style: TextStyle(color: C.white, fontSize: 24)),
           const SizedBox(height: 4),
           const Text(
-            'Judul & deskripsi terisi otomatis dari lomba. AI merekomendasikan '
-            'slot dari jadwal kosong Anda sebelum deadline.',
+            'Judul & deskripsi berasal dari brief. Slot pengerjaan akan tampil '
+            'setelah Decision Report backend terhubung.',
             style: TextStyle(color: C.detailMuted, fontSize: 12, height: 1.4),
           ),
           const SizedBox(height: 20),
@@ -135,16 +120,14 @@ class _RekomendasiJadwalScreenState extends State<RekomendasiJadwalScreen> {
                       color: C.white,
                       fontSize: 15,
                       fontWeight: FontWeight.w700)),
-              GestureDetector(
-                onTap: () => setState(_hitungRekomendasi),
-                child: const Row(
-                  children: [
-                    Icon(Icons.auto_awesome, color: C.accent, size: 16),
-                    SizedBox(width: 4),
-                    Text('Ulangi',
-                        style: TextStyle(color: C.accent, fontSize: 13)),
-                  ],
-                ),
+              const Row(
+                children: [
+                  Icon(Icons.lock_clock_outlined,
+                      color: C.detailMuted, size: 16),
+                  SizedBox(width: 4),
+                  Text('Menunggu backend',
+                      style: TextStyle(color: C.detailMuted, fontSize: 13)),
+                ],
               ),
             ],
           ),
@@ -161,8 +144,8 @@ class _RekomendasiJadwalScreenState extends State<RekomendasiJadwalScreen> {
                 borderRadius: BorderRadius.circular(14),
               ),
               child: const Text(
-                'Tidak ada slot kosong yang cukup sebelum deadline. Coba '
-                'kurangi kegiatan lain atau ubah durasi.',
+                'Rekomendasi belum tersedia. Hari 3B akan menampilkan candidate '
+                'window dari backend tanpa membuat scheduler kedua di Flutter.',
                 style: TextStyle(color: C.detailMuted, fontSize: 13),
               ),
             )
@@ -223,7 +206,7 @@ class _RekomendasiJadwalScreenState extends State<RekomendasiJadwalScreen> {
                 borderRadius: BorderRadius.circular(14),
               ),
               alignment: Alignment.center,
-              child: const Text('Submit ke Jadwal',
+              child: const Text('Belum tersedia',
                   style: TextStyle(
                       color: C.bg,
                       fontSize: 16,
