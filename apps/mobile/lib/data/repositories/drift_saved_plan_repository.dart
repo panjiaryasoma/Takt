@@ -314,7 +314,12 @@ INSERT INTO accepted_commitments (
       return revision;
     });
 
-    await refresh();
+    try {
+      await refresh();
+    } on Object {
+      // The Accept transaction is already durable. Read-model refresh is
+      // best-effort and must not turn a committed decision into a false failure.
+    }
     return result;
   }
 
