@@ -81,6 +81,8 @@ abstract class CompetitionApiClient {
     required AnalysisSourceMetadata source,
     AnalysisContinuationContext? continuation,
   });
+
+  void close() {}
 }
 
 class HttpCompetitionApiClient implements CompetitionApiClient {
@@ -294,6 +296,7 @@ class HttpCompetitionApiClient implements CompetitionApiClient {
         .replaceAll('\n', '_');
   }
 
+  @override
   void close() => _client.close();
 }
 
