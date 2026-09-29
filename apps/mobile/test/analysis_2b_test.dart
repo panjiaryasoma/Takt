@@ -647,6 +647,39 @@ void main() {
       expect(vm.canRetryRequest, isFalse);
     });
 
+
+    test('corrupt cached continuation requires fresh analysis without API call',
+        () async {
+      final api = _FakeApiClient();
+      final repository = _MemoryAnalysisRepository();
+      final vm = AnalisisViewModel(
+        apiClient: api,
+        repository: repository,
+      );
+
+      await vm.analyzeUrl(
+        url: 'https://example.com/rules',
+        sourceType: SourceTypeWire.officialRules,
+        continuation: false,
+      );
+      expect(vm.phase, AnalysisPhase.ready);
+      expect(api.calls, 1);
+
+      repository.corruptLatestOnRead = true;
+
+      await vm.analyzeUrl(
+        url: 'https://example.com/faq',
+        sourceType: SourceTypeWire.officialFaq,
+        continuation: true,
+      );
+
+      expect(vm.phase, AnalysisPhase.requestError);
+      expect(vm.failure?.code, 'LOCAL_CONTEXT_INVALID');
+      expect(vm.requiresFreshAnalysis, isTrue);
+      expect(vm.canRetryRequest, isFalse);
+      expect(api.calls, 1);
+    });
+
     test('retryable request failure can retry the same request', () async {
       final api = _FakeApiClient(failFirstRequest: true);
       final repository = _MemoryAnalysisRepository();
@@ -1054,9 +1087,13 @@ class _ContextFailureApiClient implements CompetitionApiClient {
 }
 
 class _MemoryAnalysisRepository implements AnalysisRepository {
-  _MemoryAnalysisRepository({this.failNextPersist = false});
+  _MemoryAnalysisRepository({
+    this.failNextPersist = false,
+    this.corruptLatestOnRead = false,
+  });
 
   bool failNextPersist;
+  bool corruptLatestOnRead;
   int persistCalls = 0;
   String? lastPersistedBody;
   final List<AnalysisSnapshot> _snapshots = [];
@@ -1071,7 +1108,23 @@ class _MemoryAnalysisRepository implements AnalysisRepository {
     final matches = _snapshots
         .where((item) => item.competitionId == competitionId)
         .toList();
-    return matches.isEmpty ? null : matches.last;
+    if (matches.isEmpty) return null;
+
+    final latest = matches.last;
+    if (!corruptLatestOnRead) return latest;
+
+    return AnalysisSnapshot(
+      id: latest.id,
+      competitionId: latest.competitionId,
+      reportVersion: latest.reportVersion,
+      assemblyMaterialFingerprint:
+          latest.assemblyMaterialFingerprint,
+      sourceSetFingerprint: latest.sourceSetFingerprint,
+      wireFingerprint: latest.wireFingerprint,
+      reportChanged: latest.reportChanged,
+      responseJson: '{"broken":',
+      cachedAtEpochMs: latest.cachedAtEpochMs,
+    );
   }
 
   @override
