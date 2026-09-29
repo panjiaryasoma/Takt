@@ -81,9 +81,12 @@ Map<String, dynamic> decisionFixture({
     },
     'readiness': {
       'status': readiness,
-      'blocking_reasons': readiness == 'DEADLINE_PASSED'
-          ? ['authoritative_submission_deadline_passed']
-          : <String>[],
+      'blocking_reasons': switch (readiness) {
+        'DEADLINE_PASSED' => ['authoritative_submission_deadline_passed'],
+        'ELIGIBILITY_BLOCKED' => ['minimum_age_not_met'],
+        'INSUFFICIENT_INFORMATION' => ['mandatory_competition_information_missing'],
+        _ => <String>[],
+      },
       'review_items': readiness == 'NEEDS_REVIEW'
           ? ['user_age_unknown']
           : <String>[],

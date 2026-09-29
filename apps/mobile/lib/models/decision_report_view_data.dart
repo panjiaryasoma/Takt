@@ -23,7 +23,13 @@ final class DecisionReportViewData {
   };
 
   String get feasibilityExplanation => switch (response.planning?.feasibility) {
-    null => 'Evaluasi jadwal menunggu kesiapan informasi dan persyaratan.',
+    null => switch (response.readiness.status) {
+      ReadinessStatus.needsReview => 'Evaluasi jadwal belum dijalankan karena ada informasi yang perlu ditinjau.',
+      ReadinessStatus.insufficientInformation => 'Evaluasi jadwal belum dijalankan karena informasi yang dibutuhkan belum cukup.',
+      ReadinessStatus.eligibilityBlocked => 'Evaluasi jadwal tidak dijalankan karena persyaratan peserta tidak terpenuhi.',
+      ReadinessStatus.deadlinePassed => 'Evaluasi jadwal tidak dijalankan karena batas pengumpulan sudah lewat.',
+      ReadinessStatus.readyToEvaluate => throw StateError('Ready response requires planning'),
+    },
     FeasibilityStatus.feasible => 'Pekerjaan wajib beserta prasyaratnya muat pada estimasi maksimum. Seluruh scope muat pada estimasi likely.',
     FeasibilityStatus.feasibleWithTradeoffs => 'Pekerjaan wajib beserta prasyaratnya muat pada estimasi maksimum, tetapi seluruh scope tidak muat pada estimasi likely.',
     FeasibilityStatus.tightCapacity => 'Pekerjaan wajib beserta prasyaratnya muat pada estimasi likely, tetapi tidak muat pada estimasi maksimum.',

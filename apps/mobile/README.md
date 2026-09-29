@@ -19,8 +19,6 @@ suggested work window != accepted commitment
 
 ## 3B Decision Report
 
-Baseline: `main@47295a945d4a81fc0a6c00602bcb9a59dfeed85b`; implementation branch: `H-3B`.
-
 3B owns strict response parsing, the immutable evaluation session, report presentation,
 candidate selection, confirmation, and decision intents. The screen reuses the
 existing Steffi theme and card layout. It has no HTTP client or database dependency.
@@ -30,6 +28,13 @@ The 4B integration host supplies `decisionSession`, `currentInputRevision`,
 (or supplies the equivalent inputs directly to `RekomendasiJadwalScreen`).
 Without a session, the existing 2B analysis flow remains available. Tests use
 explicit wire fixtures under `test/support`; production never installs a demo session.
+Both backend and Flutter tests also read the same contract golden at
+`tests/fixtures/api/plan_evaluate_response_v1.json` (from the repository root).
+The backend validates that JSON and compares it with `evaluate_plan` output using
+the fixed request, clock and evaluation ID in `test_plan_evaluate_behavior.py`;
+Flutter parses the file unchanged. Update it deliberately with any wire contract
+change. This checks producer/consumer compatibility; real API integration remains
+part of 4B.
 
 Host contract:
 
@@ -48,7 +53,9 @@ Host contract:
 - Edit Constraints emits an intent. 4B opens its real editor, changes inputs, bumps
   revision, evaluates, and publishes a new session. Ignore dismisses the suggestion.
 
-Readiness and feasibility stay separate. Primary recommendation never changes when
+Readiness and feasibility stay separate. Blocked readiness explains its specific
+gate (review, missing information, unmet eligibility or passed deadline), while
+feasibility remains unevaluated. Primary recommendation never changes when
 the user selects an alternative. Only backend-allowed actions are rendered; missing
 host handlers disable Accept/Edit rather than silently pretending success.
 Timestamps are shown in device local time with explicit UTC offsets.
@@ -59,5 +66,5 @@ Issue #7 component behavior can be tested here; real edit-to-evaluate and the
 Technical MVP end-to-end remain dependent on that host.
 
 Verification: `flutter analyze`, `flutter test`, `flutter build apk --debug`, and
-the existing backend regression suite. CI also runs on pushes to `H-3B`; results
-must be associated with the tested commit, not inherited from the 706-test baseline.
+the existing backend regression suite. Results must be associated with the tested
+commit, not inherited from an earlier baseline.

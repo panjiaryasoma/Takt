@@ -149,15 +149,35 @@ void main() {
     expect(find.text('Rekomendasi diabaikan. Jadwal Anda tidak berubah.'), findsOneWidget);
   });
 
-  testWidgets('blocked readiness is not infeasible and cannot emit candidate decisions', (tester) async {
-    await tester.pumpWidget(report(testSession(readiness: 'NEEDS_REVIEW')));
-    expect(find.text('Perlu review'), findsOneWidget);
-    expect(find.text('Belum dievaluasi'), findsOneWidget);
-    expect(find.text('Tidak feasible dengan batasan saat ini'), findsNothing);
-    expect(find.byKey(const Key('accept-candidate')), findsNothing);
-    expect(find.byKey(const Key('edit-constraints')), findsNothing);
-    expect(find.text('Usia peserta perlu dilengkapi untuk memeriksa persyaratan.'), findsOneWidget);
-  });
+  const blockedCases = [
+    (ReadinessStatus.needsReview, 'Perlu review',
+      'Evaluasi jadwal belum dijalankan karena ada informasi yang perlu ditinjau.'),
+    (ReadinessStatus.insufficientInformation, 'Informasi belum cukup',
+      'Evaluasi jadwal belum dijalankan karena informasi yang dibutuhkan belum cukup.'),
+    (ReadinessStatus.eligibilityBlocked, 'Syarat peserta belum terpenuhi',
+      'Evaluasi jadwal tidak dijalankan karena persyaratan peserta tidak terpenuhi.'),
+    (ReadinessStatus.deadlinePassed, 'Batas pengumpulan sudah lewat',
+      'Evaluasi jadwal tidak dijalankan karena batas pengumpulan sudah lewat.'),
+  ];
+  for (final (status, readinessLabel, explanation) in blockedCases) {
+    testWidgets('${status.wire} explains the readiness gate without implying infeasibility', (tester) async {
+      var decisions = 0;
+      await tester.pumpWidget(report(testSession(readiness: status.wire),
+          onAccept: (_, _) async { decisions++; },
+          onEdit: (_) { decisions++; }, onIgnore: (_) { decisions++; }));
+      expect(find.text(readinessLabel), findsOneWidget);
+      expect(find.text('Belum dievaluasi'), findsOneWidget);
+      expect(find.text(explanation), findsOneWidget);
+      expect(find.text('Tidak feasible dengan batasan saat ini'), findsNothing);
+      expect(find.text('Rekomendasi utama sistem'), findsNothing);
+      expect(find.byKey(const Key('accept-candidate')), findsNothing);
+      expect(find.byKey(const Key('edit-constraints')), findsNothing);
+      expect(find.byKey(const Key('ignore-recommendation')), findsNothing);
+      expect(find.text('Evaluasi jadwal menunggu kesiapan informasi dan persyaratan.'), findsNothing);
+      expect(decisions, 0);
+      expect(tester.takeException(), isNull);
+    });
+  }
 
   testWidgets('missing integration handlers cannot silently accept or edit', (tester) async {
     await tester.pumpWidget(report(testSession(alternatives: false)));

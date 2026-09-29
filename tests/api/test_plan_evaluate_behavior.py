@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime
 from importlib.metadata import PackageNotFoundError
+from pathlib import Path
 from uuid import UUID
 
 import pytest
@@ -20,6 +21,7 @@ from apps.api.contracts import (
     CanonicalReportRefV1,
     PlanEvaluatePlanningV1,
     PlanEvaluateRequestV1,
+    PlanEvaluateResponseV1,
     PlanReevaluateRequestV1,
     PriorEvaluationBasisSnapshotV1,
     PriorEvaluationV1,
@@ -189,6 +191,21 @@ def _id_one() -> UUID:
 
 def _id_two() -> UUID:
     return UUID("00000000-0000-4000-8000-000000000002")
+
+
+def test_evaluation_output_matches_shared_mobile_golden() -> None:
+    path = Path(__file__).resolve().parents[1] / "fixtures/api/plan_evaluate_response_v1.json"
+    raw = path.read_text(encoding="utf-8")
+    golden = PlanEvaluateResponseV1.model_validate_json(raw)
+    actual = evaluate_plan(
+        _request(effort_minutes=60),
+        clock=_clock,
+        evaluation_id_factory=_id_one,
+    )
+
+    # Flutter reads this same file. Catch both serializer and producer drift.
+    assert golden.model_dump(mode="json") == json.loads(raw)
+    assert actual.model_dump(mode="json") == golden.model_dump(mode="json")
 
 
 def test_server_cutoff_clips_partial_window_and_candidates_never_start_before_it() -> None:

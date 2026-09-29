@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:flutter_test/flutter_test.dart';
 import 'package:takt_mobile/models/enums.dart';
@@ -9,6 +10,24 @@ import 'support/decision_fixture.dart';
 void main() {
   PlanEvaluateResponseV1 parse(Map<String, dynamic> raw) =>
       PlanEvaluateResponseV1.parse(jsonEncode(raw));
+
+  test('parses the same golden JSON validated by the backend contract', () {
+    final response = PlanEvaluateResponseV1.parse(
+      File('../../tests/fixtures/api/plan_evaluate_response_v1.json').readAsStringSync(),
+    );
+    final planning = response.planning!;
+    final recommendation = planning.recommendation!;
+    expect(response.readiness.status, ReadinessStatus.readyToEvaluate);
+    expect(planning.feasibility, FeasibilityStatus.feasible);
+    expect(planning.allowedActions, [RecommendationAction.accept,
+      RecommendationAction.chooseAlternative, RecommendationAction.editConstraints,
+      RecommendationAction.ignore]);
+    expect(planning.candidates.map((candidate) => candidate.ref.candidateId),
+        ['candidate-001', 'candidate-002']);
+    expect(recommendation.primaryCandidate.candidateId, 'candidate-001');
+    expect(recommendation.recommendation.alternatives.single.bufferMinutes, 39);
+    expect(recommendation.trace.evaluationBasisFingerprint, response.basis.fingerprint);
+  });
 
   test('parses primary, alternatives, trace and all feasibility statuses', () {
     for (final status in FeasibilityStatus.values) {

@@ -1,0 +1,179 @@
+{
+  "evaluation_id": "00000000-0000-4000-8000-000000000001",
+  "evaluated_at": "2026-09-27T13:20:17Z",
+  "basis": {
+    "version": "evaluation-basis-v1",
+    "domain_schema_version": "3.0.0",
+    "fingerprint": "54df0960b5b6238eccf8d3b1a256cd8794af84e6e411616d176ed9d56dd552cd",
+    "report": {
+      "competition_id": "cmp-ready",
+      "report_version": 4,
+      "reconciliation_policy_version": "reconciliation-v1",
+      "assembly_policy_version": "canonical-v1",
+      "assembly_material_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+    },
+    "readiness": {
+      "basis_version": "readiness-basis-v1",
+      "basis_fingerprint": "f28b5344c3d9819cb023d0b014aa7d025be3ca8ad8be03c766d2db75649bc858",
+      "projection_version": "readiness-projection-v1",
+      "rule_version": "1.0"
+    },
+    "planning": {
+      "basis_version": "planning-basis-v1",
+      "basis_fingerprint": "58aa278c321f46116de8398e705314254b2ca2df442a53dd19815edc23d4140e",
+      "policy_version": "planning-policy-v1",
+      "solver_backend": "ortools-cp-sat",
+      "solver_backend_version": "9.15.6755"
+    }
+  },
+  "readiness": {
+    "status": "READY_TO_EVALUATE",
+    "blocking_reasons": [],
+    "review_items": [],
+    "passed_checks": [
+      "deadline_valid",
+      "mandatory_information_complete"
+    ],
+    "rule_version": "1.0"
+  },
+  "planning": {
+    "feasibility": "FEASIBLE",
+    "candidates": [
+      {
+        "ref": {
+          "evaluation_id": "00000000-0000-4000-8000-000000000001",
+          "candidate_id": "candidate-001"
+        },
+        "work_blocks": [
+          {
+            "task_id": "task-1",
+            "start": "2026-09-27T13:21:00Z",
+            "end": "2026-09-27T14:21:00Z",
+            "allocated_minutes": 60,
+            "availability_source": "derived:work_window:0"
+          }
+        ],
+        "buffer_minutes": 39,
+        "assumptions": [
+          "solver effort basis: LIKELY",
+          "task-1: single-person estimate"
+        ]
+      },
+      {
+        "ref": {
+          "evaluation_id": "00000000-0000-4000-8000-000000000001",
+          "candidate_id": "candidate-002"
+        },
+        "work_blocks": [
+          {
+            "task_id": "task-1",
+            "start": "2026-09-27T13:51:00Z",
+            "end": "2026-09-27T14:51:00Z",
+            "allocated_minutes": 60,
+            "availability_source": "derived:work_window:0"
+          }
+        ],
+        "buffer_minutes": 39,
+        "assumptions": [
+          "solver effort basis: LIKELY",
+          "task-1: single-person estimate"
+        ]
+      }
+    ],
+    "allowed_actions": [
+      "ACCEPT",
+      "CHOOSE_ALTERNATIVE",
+      "EDIT_CONSTRAINTS",
+      "IGNORE"
+    ],
+    "reason_codes": [
+      "ALL_REQUIRED_SCENARIOS_FEASIBLE",
+      "FULL_SCOPE_LIKELY_FEASIBLE"
+    ],
+    "tradeoff_codes": [],
+    "sensitivity_codes": [
+      "MINIMUM_EFFORT_SCENARIO_FEASIBLE",
+      "MAX_EFFORT_SCENARIO_FEASIBLE"
+    ],
+    "recommendation": {
+      "primary_candidate": {
+        "evaluation_id": "00000000-0000-4000-8000-000000000001",
+        "candidate_id": "candidate-001"
+      },
+      "alternative_candidates": [
+        {
+          "evaluation_id": "00000000-0000-4000-8000-000000000001",
+          "candidate_id": "candidate-002"
+        }
+      ],
+      "recommendation": {
+        "recommended_candidate_id": "candidate-001",
+        "recommended_next_work": {
+          "task_id": "task-1",
+          "task_name": "Build demo",
+          "start": "2026-09-27T13:21:00Z",
+          "end": "2026-09-27T14:21:00Z",
+          "allocated_minutes": 60,
+          "availability_source": "derived:work_window:0"
+        },
+        "suggested_windows": [
+          {
+            "task_id": "task-1",
+            "start": "2026-09-27T13:21:00Z",
+            "end": "2026-09-27T14:21:00Z",
+            "allocated_minutes": 60,
+            "availability_source": "derived:work_window:0"
+          }
+        ],
+        "alternatives": [
+          {
+            "candidate_id": "candidate-002",
+            "buffer_minutes": 39,
+            "recommended_next_work": {
+              "task_id": "task-1",
+              "task_name": "Build demo",
+              "start": "2026-09-27T13:51:00Z",
+              "end": "2026-09-27T14:51:00Z",
+              "allocated_minutes": 60,
+              "availability_source": "derived:work_window:0"
+            },
+            "suggested_windows": [
+              {
+                "task_id": "task-1",
+                "start": "2026-09-27T13:51:00Z",
+                "end": "2026-09-27T14:51:00Z",
+                "allocated_minutes": 60,
+                "availability_source": "derived:work_window:0"
+              }
+            ],
+            "tradeoffs": [
+              "Completes 30 minutes later than the primary candidate."
+            ]
+          }
+        ],
+        "rationale": [
+          "Required work fits across the modeled minimum, likely, and maximum effort scenarios.",
+          "The full scope fits at the likely effort estimate.",
+          "Required work fits at the minimum effort estimate.",
+          "Required work still fits at the maximum effort estimate.",
+          "Primary candidate ranks first among valid candidates because ranking prioritizes fewer work blocks, then earlier completion, with a deterministic schedule signature as the final tie-breaker. It uses 1 work blocks and completes at 2026-09-27T14:21:00+00:00."
+        ],
+        "tradeoffs": [],
+        "assumptions": [
+          {
+            "task_id": "task-1",
+            "description": "single-person estimate"
+          }
+        ]
+      },
+      "trace": {
+        "competition_id": "cmp-ready",
+        "report_version": 4,
+        "assembly_material_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "evaluation_basis_fingerprint": "54df0960b5b6238eccf8d3b1a256cd8794af84e6e411616d176ed9d56dd552cd",
+        "planning_basis_fingerprint": "58aa278c321f46116de8398e705314254b2ca2df442a53dd19815edc23d4140e",
+        "planning_policy_version": "planning-policy-v1"
+      }
+    }
+  }
+}
