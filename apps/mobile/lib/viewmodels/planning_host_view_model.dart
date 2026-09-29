@@ -48,7 +48,9 @@ final class PlanningHostViewModel extends ChangeNotifier {
     required EvaluationRepository evaluationRepository,
     required SavedPlanRepository savedPlanRepository,
     PlanningRequestAssembler? assembler,
-    this.closeRepositoriesOnDispose = false,
+    this.closeScheduleRepositoryOnDispose = false,
+    this.closeEvaluationRepositoryOnDispose = false,
+    this.closeSavedPlanRepositoryOnDispose = false,
   })  : _apiClient = apiClient,
         _scheduleRepository = scheduleRepository,
         _evaluationRepository = evaluationRepository,
@@ -60,7 +62,9 @@ final class PlanningHostViewModel extends ChangeNotifier {
   final EvaluationRepository _evaluationRepository;
   final SavedPlanRepository _savedPlanRepository;
   final PlanningRequestAssembler _assembler;
-  final bool closeRepositoriesOnDispose;
+  final bool closeScheduleRepositoryOnDispose;
+  final bool closeEvaluationRepositoryOnDispose;
+  final bool closeSavedPlanRepositoryOnDispose;
 
   PlanningHostPhase _phase = PlanningHostPhase.idle;
   AnalysisSnapshot? _analysisSnapshot;
@@ -819,9 +823,13 @@ final class PlanningHostViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _apiClient.close();
-    if (closeRepositoriesOnDispose) {
+    if (closeScheduleRepositoryOnDispose) {
       unawaited(_scheduleRepository.close());
+    }
+    if (closeEvaluationRepositoryOnDispose) {
       unawaited(_evaluationRepository.close());
+    }
+    if (closeSavedPlanRepositoryOnDispose) {
       unawaited(_savedPlanRepository.close());
     }
     super.dispose();
