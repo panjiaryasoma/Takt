@@ -702,9 +702,6 @@ AND NOT EXISTS (
     return Map<String, dynamic>.from(value);
   }
 
-  static String _newId(String prefix) =>
-      '$prefix-${DateTime.now().microsecondsSinceEpoch}';
-
   @override
   Future<void> close() async {
     if (_closed) return;
