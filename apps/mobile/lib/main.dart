@@ -206,10 +206,25 @@ class _RootShellState extends State<RootShell> {
       });
 
   Future<void> _refreshAcceptedProjections() async {
-    await Future.wait([
-      context.read<SavedPlansViewModel>().refresh(),
-      context.read<JadwalViewModel>().refreshAcceptedPlans(),
-    ]);
+    var failed = false;
+    try {
+      await context.read<SavedPlansViewModel>().refresh();
+    } on Object {
+      failed = true;
+    }
+    try {
+      await context.read<JadwalViewModel>().refreshAcceptedPlans();
+    } on Object {
+      failed = true;
+    }
+    if (!failed || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Plan accepted. Some local views could not refresh yet.',
+        ),
+      ),
+    );
   }
 
   Future<void> _openPlanningFromCurrentAnalysis() async {
