@@ -2,27 +2,27 @@ import 'plan_evaluation_wire.dart';
 
 /// Host-owned snapshot. The 4B host must pair/validate request, response and
 /// analysis snapshot before publication, and discard late request generations.
-/// The component carries the original request unchanged; it never assembles it.
+/// The component carries validated evaluation snapshots; transport wrappers remain host-owned.
 final class EvaluationSession {
   EvaluationSession._({
     required this.sessionId,
     required this.generation,
     required this.inputRevision,
     required this.analysisSnapshotId,
-    required this.originalRequestJson,
-    required this.originalResponseJson,
-  }) : parsedResponse = PlanEvaluateResponseV1.parse(originalResponseJson);
+    required this.evaluationRequestJson,
+    required this.evaluationResponseJson,
+  }) : parsedResponse = PlanEvaluateResponseV1.parse(evaluationResponseJson);
 
-  factory EvaluationSession.fromRaw({
+  factory EvaluationSession.fromEvaluationSnapshot({
     required String sessionId,
     required int generation,
     required int inputRevision,
     required String analysisSnapshotId,
-    required String originalRequestJson,
-    required String originalResponseJson,
+    required String evaluationRequestJson,
+    required String evaluationResponseJson,
   }) {
     if (sessionId.trim().isEmpty || analysisSnapshotId.trim().isEmpty ||
-        originalRequestJson.trim().isEmpty || generation < 0 || inputRevision < 0) {
+        evaluationRequestJson.trim().isEmpty || generation < 0 || inputRevision < 0) {
       throw const FormatException('Invalid evaluation session metadata');
     }
     return EvaluationSession._(
@@ -30,8 +30,8 @@ final class EvaluationSession {
       generation: generation,
       inputRevision: inputRevision,
       analysisSnapshotId: analysisSnapshotId,
-      originalRequestJson: originalRequestJson,
-      originalResponseJson: originalResponseJson,
+      evaluationRequestJson: evaluationRequestJson,
+      evaluationResponseJson: evaluationResponseJson,
     );
   }
 
@@ -39,7 +39,7 @@ final class EvaluationSession {
   final int generation;
   final int inputRevision;
   final String analysisSnapshotId;
-  final String originalRequestJson;
-  final String originalResponseJson;
+  final String evaluationRequestJson;
+  final String evaluationResponseJson;
   final PlanEvaluateResponseV1 parsedResponse;
 }
