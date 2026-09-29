@@ -297,6 +297,14 @@ class CanonicalCompetitionReportWire {
       );
     }
 
+    final sourceIds = _strings(
+      map['source_ids'],
+      'report.source_ids',
+    );
+    if (sourceIds.isEmpty) {
+      throw const FormatException('report.source_ids must not be empty');
+    }
+
     final unresolved = _strings(
       map['unresolved_critical_fields'],
       'report.unresolved_critical_fields',
@@ -319,7 +327,7 @@ class CanonicalCompetitionReportWire {
       competitionId:
           _string(map['competition_id'], 'report.competition_id'),
       reportVersion: reportVersion,
-      sourceIds: _strings(map['source_ids'], 'report.source_ids'),
+      sourceIds: sourceIds,
       canonicalFields: Map.unmodifiable(fields),
       unresolvedCriticalFields: unresolved,
     );
@@ -551,6 +559,15 @@ class AnalysisProvenanceWire {
           ),
         )
         .toList(growable: false);
+    final provenanceSourceIds =
+        sources.map((item) => item.sourceId).toList(growable: false);
+    if (provenanceSourceIds.length !=
+        provenanceSourceIds.toSet().length) {
+      throw const FormatException(
+        'provenance source_id values must be unique',
+      );
+    }
+
     final evidence = _list(map['evidence'], 'provenance.evidence')
         .asMap()
         .entries
@@ -570,6 +587,8 @@ class AnalysisProvenanceWire {
         entry.value,
         'provenance.extraction_runs[${entry.key}]',
       );
+      final runPath =
+          'provenance.extraction_runs[${entry.key}]';
       _expectKeys(
         run,
         const {
@@ -578,8 +597,21 @@ class AnalysisProvenanceWire {
           'extraction_path',
           'extractor_version',
         },
-        'provenance.extraction_runs[${entry.key}]',
+        runPath,
       );
+      _string(run['source_id'], '$runPath.source_id');
+      _string(run['snapshot_id'], '$runPath.snapshot_id');
+      _string(run['extractor_version'], '$runPath.extractor_version');
+      final extractionPath = _string(
+        run['extraction_path'],
+        '$runPath.extraction_path',
+      );
+      if (!const {'native', 'ocr', 'vision', 'manual'}
+          .contains(extractionPath)) {
+        throw FormatException(
+          '$runPath has unsupported extraction path',
+        );
+      }
     }
 
     return AnalysisProvenanceWire(
@@ -639,7 +671,8 @@ class CompetitionAnalyzeResponseWire {
       throw const FormatException('report/ref identity mismatch');
     }
 
-    final artifactIds = <String>{};
+    final artifactIds = <String>[];
+    final artifactIdSet = <String>{};
     for (final entry
         in _list(root['source_artifacts'], 'source_artifacts')
             .asMap()
@@ -655,9 +688,10 @@ class CompetitionAnalyzeResponseWire {
         artifact['source'],
         path: '$path.source',
       );
-      if (!artifactIds.add(source.sourceId)) {
+      if (!artifactIdSet.add(source.sourceId)) {
         throw const FormatException('Duplicate source artifact ID');
       }
+      artifactIds.add(source.sourceId);
 
       final reports = _list(
         artifact['candidate_reports'],
@@ -807,11 +841,12 @@ class CompetitionAnalyzeResponseWire {
 
     final provenance =
         AnalysisProvenanceWire.fromJson(root['provenance']);
-    final reportIds = report.sourceIds.toSet();
-    final provenanceIds =
-        provenance.sources.map((item) => item.sourceId).toSet();
-    if (!_sameSet(artifactIds, reportIds) ||
-        !_sameSet(artifactIds, provenanceIds)) {
+    final reportIds = List<String>.from(report.sourceIds);
+    final provenanceIds = provenance.sources
+        .map((item) => item.sourceId)
+        .toList(growable: false);
+    if (!_sameStringMultiset(artifactIds, reportIds) ||
+        !_sameStringMultiset(artifactIds, provenanceIds)) {
       throw const FormatException('Source-set traceability mismatch');
     }
 
@@ -917,8 +952,14 @@ void _expectKeys(
   }
 }
 
-bool _sameSet(Set<String> left, Set<String> right) {
-  return left.length == right.length && left.containsAll(right);
+bool _sameStringMultiset(List<String> left, List<String> right) {
+  if (left.length != right.length) return false;
+  final sortedLeft = List<String>.from(left)..sort();
+  final sortedRight = List<String>.from(right)..sort();
+  for (var index = 0; index < sortedLeft.length; index++) {
+    if (sortedLeft[index] != sortedRight[index]) return false;
+  }
+  return true;
 }
 
 
