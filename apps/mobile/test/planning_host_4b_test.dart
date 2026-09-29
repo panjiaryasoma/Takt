@@ -9,7 +9,6 @@ import 'package:takt_mobile/data/remote/plan_api_client.dart';
 import 'package:takt_mobile/data/repositories/drift_evaluation_repository.dart';
 import 'package:takt_mobile/data/repositories/drift_saved_plan_repository.dart';
 import 'package:takt_mobile/data/repositories/drift_schedule_repository.dart';
-import 'package:takt_mobile/data/repositories/saved_plan_repository.dart';
 import 'package:takt_mobile/data/repositories/evaluation_repository.dart';
 import 'package:takt_mobile/models/analysis_snapshot.dart';
 import 'package:takt_mobile/models/decision_intent.dart';
