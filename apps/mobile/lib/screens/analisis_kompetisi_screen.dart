@@ -1,72 +1,169 @@
-import 'package:flutter/material.dart';
-import 'package:file_picker/file_picker.dart';
+import 'dart:typed_data';
 
+import 'package:file_picker/file_picker.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+
+import '../data/remote/competition_api_client.dart';
+import '../models/competition_analysis_wire.dart';
 import '../theme/app_theme.dart';
+import '../viewmodels/analisis_view_model.dart';
 import '../widgets/common.dart';
 
-/// AnalisisKompetisiScreen — Figma node 11:1556 ("Analisis kompetisi").
-/// Form input sumber kompetisi (Upload PDF / Masukkan Link) + tujuan analisis.
 class AnalisisKompetisiScreen extends StatefulWidget {
-  const AnalisisKompetisiScreen({super.key, this.onSubmit});
+  const AnalisisKompetisiScreen({
+    super.key,
+    required this.continuation,
+    this.onSubmitted,
+    this.onBack,
+  });
 
-  final VoidCallback? onSubmit;
+  final bool continuation;
+  final VoidCallback? onSubmitted;
+  final VoidCallback? onBack;
 
   @override
   State<AnalisisKompetisiScreen> createState() =>
       _AnalisisKompetisiScreenState();
 }
 
-class _AnalisisKompetisiScreenState extends State<AnalisisKompetisiScreen> {
-  int _mode = 0; // 0 = Upload PDF, 1 = Masukkan Link
+class _AnalisisKompetisiScreenState
+    extends State<AnalisisKompetisiScreen> {
+  final TextEditingController _urlController = TextEditingController();
+  int _mode = 0;
   PlatformFile? _picked;
+  SourceTypeWire? _sourceType;
+  String? _error;
+  bool _submitting = false;
+
+  @override
+  void dispose() {
+    _urlController.dispose();
+    super.dispose();
+  }
 
   Future<void> _pickFile() async {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
-      allowedExtensions: ['pdf', 'png', 'jpg', 'jpeg', 'webp', 'heic'],
+      allowedExtensions: const ['pdf'],
       withData: true,
     );
-    if (result != null && result.files.isNotEmpty) {
-      setState(() => _picked = result.files.first);
+    if (!mounted || result == null || result.files.isEmpty) return;
+    final file = result.files.single;
+    if (file.size <= 0 || file.size > maxAnalysisSourceBytes) {
+      setState(() {
+        _picked = null;
+        _error = 'PDF harus berisi data dan maksimal 20 MiB.';
+      });
+      return;
     }
+    setState(() {
+      _picked = file;
+      _error = null;
+    });
   }
 
-  String _fmtSize(int? bytes) {
-    if (bytes == null) return '';
-    if (bytes >= 1024 * 1024) {
-      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
+  Future<void> _submit() async {
+    if (_submitting) return;
+    final sourceType = _sourceType;
+    if (sourceType == null) {
+      setState(() => _error = 'Pilih jenis sumber.');
+      return;
     }
-    return '${(bytes / 1024).toStringAsFixed(0)} KB';
+
+    final vm = context.read<AnalisisViewModel>();
+    Future<void> request;
+
+    if (_mode == 0) {
+      final file = _picked;
+      final bytes = file?.bytes;
+      if (file == null || bytes == null || bytes.isEmpty) {
+        setState(() => _error = 'Pilih file PDF terlebih dahulu.');
+        return;
+      }
+      if (file.size > maxAnalysisSourceBytes) {
+        setState(
+          () => _error = 'PDF melebihi batas 20 MiB.',
+        );
+        return;
+      }
+      request = vm.analyzePdf(
+        filename: file.name,
+        bytes: Uint8List.fromList(bytes),
+        sourceType: sourceType,
+        continuation: widget.continuation,
+      );
+    } else {
+      final url = _urlController.text.trim();
+      final uri = Uri.tryParse(url);
+      if (uri == null ||
+          (uri.scheme != 'http' && uri.scheme != 'https') ||
+          uri.host.isEmpty) {
+        setState(
+          () => _error = 'Masukkan URL http/https yang valid.',
+        );
+        return;
+      }
+      request = vm.analyzeUrl(
+        url: url,
+        sourceType: sourceType,
+        continuation: widget.continuation,
+      );
+    }
+
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    widget.onSubmitted?.call();
+    await request;
+    if (mounted) {
+      setState(() => _submitting = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final title = widget.continuation
+        ? 'Tambah sumber'
+        : 'Analisis kompetisi';
+    final subtitle = widget.continuation
+        ? 'Tambahkan evidence baru ke kompetisi yang sama.'
+        : 'Masukkan satu sumber kompetisi untuk mulai analisis.';
+
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(10, 0, 10, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Header: back + eyebrow + judul
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Container(
-                  width: 36,
-                  height: 36,
-                  decoration: const BoxDecoration(
-                    color: C.card,
-                    shape: BoxShape.circle,
+                GestureDetector(
+                  onTap: widget.onBack,
+                  child: Container(
+                    width: 36,
+                    height: 36,
+                    decoration: const BoxDecoration(
+                      color: C.card,
+                      shape: BoxShape.circle,
+                    ),
+                    alignment: Alignment.center,
+                    child: const Icon(
+                      Icons.chevron_left,
+                      color: C.accent,
+                      size: 22,
+                    ),
                   ),
-                  alignment: Alignment.center,
-                  child: const Icon(Icons.chevron_left,
-                      color: C.accent, size: 22),
                 ),
                 const SizedBox(height: 12),
-                const Text(
-                  'KEPUTUSAN BARU',
-                  style: TextStyle(
+                Text(
+                  widget.continuation
+                      ? 'SUMBER TAMBAHAN'
+                      : 'KEPUTUSAN BARU',
+                  style: const TextStyle(
                     color: C.accent,
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
@@ -74,9 +171,12 @@ class _AnalisisKompetisiScreenState extends State<AnalisisKompetisiScreen> {
                   ),
                 ),
                 const SizedBox(height: 4),
-                const Text(
-                  'Analisis kompetisi',
-                  style: TextStyle(color: C.white, fontSize: 22),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    color: C.white,
+                    fontSize: 22,
+                  ),
                 ),
               ],
             ),
@@ -84,32 +184,18 @@ class _AnalisisKompetisiScreenState extends State<AnalisisKompetisiScreen> {
           const SizedBox(height: 14),
           const HeaderDivider(),
           const SizedBox(height: 16),
-
-          // Sub-heading
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Analisis Kompetisi Baru',
-                  style: TextStyle(
-                    color: C.white,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                SizedBox(height: 4),
-                Text(
-                  'Masukkan sumber kompetisi untuk dianalisa',
-                  style: TextStyle(color: C.muted, fontSize: 12),
-                ),
-              ],
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Text(
+              subtitle,
+              style: const TextStyle(
+                color: C.muted,
+                fontSize: 12,
+                height: 1.4,
+              ),
             ),
           ),
           const SizedBox(height: 14),
-
-          // Segmented: Upload PDF / Masukkan Link
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(
@@ -121,77 +207,52 @@ class _AnalisisKompetisiScreenState extends State<AnalisisKompetisiScreen> {
             ),
           ),
           const SizedBox(height: 14),
-
-          // Dropzone atau input link
           if (_mode == 0) _dropzone() else _linkInput(),
           const SizedBox(height: 14),
-
-          // Tujuan analisis
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 20),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: C.card,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text(
-                  'Tujuan Analisis (opsional)',
-                  style: TextStyle(color: C.muted, fontSize: 12),
+          _sourceTypeInput(),
+          if (_error != null) ...[
+            const SizedBox(height: 12),
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: C.card,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: C.padat),
+              ),
+              child: Text(
+                _error!,
+                style: const TextStyle(
+                  color: C.white,
+                  fontSize: 12,
                 ),
-                const SizedBox(height: 10),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: C.bg,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: const TextField(
-                    style: TextStyle(color: C.white, fontSize: 13),
-                    cursorColor: C.accent,
-                    decoration: InputDecoration(
-                      isDense: true,
-                      border: InputBorder.none,
-                      hintText: 'Contoh: Validasi ide dan portofolio...',
-                      hintStyle:
-                          TextStyle(color: C.navInactive, fontSize: 13),
-                    ),
-                  ),
-                ),
-              ],
+              ),
             ),
-          ),
+          ],
           const SizedBox(height: 16),
-
-          // Submit
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: GestureDetector(
-              onTap: widget.onSubmit,
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 16),
-                decoration: BoxDecoration(
-                  color: C.accent,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                alignment: Alignment.center,
-                child: const Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.auto_awesome, color: C.bg, size: 18),
-                    SizedBox(width: 8),
-                    Text(
-                      'Submit & Mulai Analisis',
-                      style: TextStyle(
-                        color: C.bg,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700,
-                      ),
+              onTap: _submitting ? null : _submit,
+              child: Opacity(
+                opacity: _submitting ? 0.55 : 1,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  decoration: BoxDecoration(
+                    color: C.accent,
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    widget.continuation
+                        ? 'Tambah & Analisis Ulang'
+                        : 'Submit & Mulai Analisis',
+                    style: const TextStyle(
+                      color: C.bg,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
                     ),
-                  ],
+                  ),
                 ),
               ),
             ),
@@ -200,9 +261,13 @@ class _AnalisisKompetisiScreenState extends State<AnalisisKompetisiScreen> {
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 24),
             child: Text(
-              'Analisis membantu pengambilan keputusan. Anda tetap menentukan rencana dan perubahan kalender.',
+              'Flutter hanya mengirim sumber. Ekstraksi dan reconciliation tetap menjadi otoritas backend.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: C.navInactive, fontSize: 11, height: 1.4),
+              style: TextStyle(
+                color: C.navInactive,
+                fontSize: 11,
+                height: 1.4,
+              ),
             ),
           ),
         ],
@@ -213,7 +278,12 @@ class _AnalisisKompetisiScreenState extends State<AnalisisKompetisiScreen> {
   Widget _segment(String label, int index) {
     final active = index == _mode;
     return GestureDetector(
-      onTap: () => setState(() => _mode = index),
+      onTap: _submitting
+          ? null
+          : () => setState(() {
+                _mode = index;
+                _error = null;
+              }),
       child: Container(
         padding: const EdgeInsets.symmetric(vertical: 12),
         decoration: BoxDecoration(
@@ -234,112 +304,87 @@ class _AnalisisKompetisiScreenState extends State<AnalisisKompetisiScreen> {
   }
 
   Widget _dropzone() {
+    final file = _picked;
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 20),
-      padding: const EdgeInsets.symmetric(vertical: 28, horizontal: 16),
+      padding: const EdgeInsets.symmetric(
+        vertical: 26,
+        horizontal: 16,
+      ),
       decoration: BoxDecoration(
         color: C.card,
         borderRadius: BorderRadius.circular(16),
       ),
       child: DottedBorderBox(
-        child: _picked == null ? _emptyDropzone() : _pickedPreview(),
+        child: file == null
+            ? Column(
+                children: [
+                  const Icon(
+                    Icons.picture_as_pdf_outlined,
+                    color: C.white,
+                    size: 28,
+                  ),
+                  const SizedBox(height: 10),
+                  const Text(
+                    'Pilih dokumen PDF',
+                    style: TextStyle(
+                      color: C.white,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  const Text(
+                    'Maks. 20 MiB · application/pdf',
+                    style: TextStyle(
+                      color: C.navInactive,
+                      fontSize: 11,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  _outlineButton('Pilih File', _pickFile),
+                ],
+              )
+            : Column(
+                children: [
+                  const Icon(
+                    Icons.picture_as_pdf_outlined,
+                    color: C.accent,
+                    size: 28,
+                  ),
+                  const SizedBox(height: 10),
+                  Text(
+                    file.name,
+                    textAlign: TextAlign.center,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: C.white,
+                      fontSize: 14,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    _fmtSize(file.size),
+                    style: const TextStyle(
+                      color: C.navInactive,
+                      fontSize: 12,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _outlineButton('Ganti', _pickFile),
+                      const SizedBox(width: 10),
+                      _outlineButton(
+                        'Hapus',
+                        () => setState(() => _picked = null),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
       ),
-    );
-  }
-
-  Widget _emptyDropzone() {
-    return Column(
-      children: [
-        const Icon(Icons.file_upload_outlined, color: C.white, size: 28),
-        const SizedBox(height: 10),
-        const Text(
-          'Seret file PDF atau foto ke sini',
-          style: TextStyle(color: C.white, fontSize: 14),
-        ),
-        const SizedBox(height: 6),
-        const Text('atau',
-            style: TextStyle(color: C.navInactive, fontSize: 12)),
-        const SizedBox(height: 12),
-        GestureDetector(
-          onTap: _pickFile,
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: C.accent),
-            ),
-            child: const Text('Pilih File',
-                style: TextStyle(color: C.accent, fontSize: 13)),
-          ),
-        ),
-        const SizedBox(height: 16),
-        const Text(
-          'Maks. 10MB · PDF atau Foto',
-          style: TextStyle(color: C.navInactive, fontSize: 11),
-        ),
-      ],
-    );
-  }
-
-  Widget _pickedPreview() {
-    final f = _picked!;
-    final ext = (f.extension ?? '').toLowerCase();
-    final isImage =
-        ['png', 'jpg', 'jpeg', 'webp', 'heic'].contains(ext);
-    return Column(
-      children: [
-        Icon(
-          isImage ? Icons.image_outlined : Icons.picture_as_pdf_outlined,
-          color: C.accent,
-          size: 28,
-        ),
-        const SizedBox(height: 10),
-        Text(
-          f.name,
-          textAlign: TextAlign.center,
-          maxLines: 2,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(color: C.white, fontSize: 14),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          _fmtSize(f.size),
-          style: const TextStyle(color: C.navInactive, fontSize: 12),
-        ),
-        const SizedBox(height: 12),
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            GestureDetector(
-              onTap: _pickFile,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: C.accent),
-                ),
-                child: const Text('Ganti File',
-                    style: TextStyle(color: C.accent, fontSize: 13)),
-              ),
-            ),
-            const SizedBox(width: 10),
-            GestureDetector(
-              onTap: () => setState(() => _picked = null),
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(999),
-                  border: Border.all(color: C.navInactive),
-                ),
-                child: const Text('Hapus',
-                    style: TextStyle(color: C.navInactive, fontSize: 13)),
-              ),
-            ),
-          ],
-        ),
-      ],
     );
   }
 
@@ -351,23 +396,112 @@ class _AnalisisKompetisiScreenState extends State<AnalisisKompetisiScreen> {
         color: C.card,
         borderRadius: BorderRadius.circular(16),
       ),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-        decoration: BoxDecoration(
-          color: C.bg,
-          borderRadius: BorderRadius.circular(10),
+      child: TextField(
+        controller: _urlController,
+        enabled: !_submitting,
+        keyboardType: TextInputType.url,
+        autocorrect: false,
+        style: const TextStyle(
+          color: C.white,
+          fontSize: 13,
         ),
-        child: const TextField(
-          style: TextStyle(color: C.white, fontSize: 13),
-          cursorColor: C.accent,
-          decoration: InputDecoration(
-            isDense: true,
-            border: InputBorder.none,
-            hintText: 'https://... link halaman kompetisi',
-            hintStyle: TextStyle(color: C.navInactive, fontSize: 13),
+        cursorColor: C.accent,
+        decoration: const InputDecoration(
+          isDense: true,
+          border: InputBorder.none,
+          hintText: 'https://... link halaman kompetisi',
+          hintStyle: TextStyle(
+            color: C.navInactive,
+            fontSize: 13,
           ),
         ),
       ),
     );
+  }
+
+  Widget _sourceTypeInput() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 14,
+        vertical: 6,
+      ),
+      decoration: BoxDecoration(
+        color: C.card,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: DropdownButtonHideUnderline(
+        child: DropdownButton<SourceTypeWire>(
+          value: _sourceType,
+          isExpanded: true,
+          dropdownColor: C.card,
+          hint: const Text(
+            'Pilih jenis sumber',
+            style: TextStyle(
+              color: C.navInactive,
+              fontSize: 13,
+            ),
+          ),
+          style: const TextStyle(
+            color: C.white,
+            fontSize: 13,
+          ),
+          items: [
+            for (final type in SourceTypeWire.runtimeOptions)
+              DropdownMenuItem(
+                value: type,
+                child: Text(_sourceLabel(type)),
+              ),
+          ],
+          onChanged: _submitting
+              ? null
+              : (value) => setState(() {
+                    _sourceType = value;
+                    _error = null;
+                  }),
+        ),
+      ),
+    );
+  }
+
+  Widget _outlineButton(String label, VoidCallback action) {
+    return GestureDetector(
+      onTap: _submitting ? null : action,
+      child: Container(
+        padding: const EdgeInsets.symmetric(
+          horizontal: 18,
+          vertical: 8,
+        ),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: C.accent),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(
+            color: C.accent,
+            fontSize: 12,
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _sourceLabel(SourceTypeWire type) {
+    return switch (type) {
+      SourceTypeWire.officialRules => 'Peraturan resmi',
+      SourceTypeWire.officialOrganizer => 'Situs penyelenggara',
+      SourceTypeWire.officialFaq => 'FAQ resmi',
+      SourceTypeWire.platform => 'Platform kompetisi',
+      SourceTypeWire.secondary => 'Sumber sekunder',
+      SourceTypeWire.derivedFixture => 'Fixture internal',
+    };
+  }
+
+  String _fmtSize(int bytes) {
+    if (bytes >= 1024 * 1024) {
+      return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MiB';
+    }
+    return '${(bytes / 1024).toStringAsFixed(0)} KiB';
   }
 }
