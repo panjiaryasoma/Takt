@@ -339,7 +339,7 @@ class _PlanningSetupScreenState extends State<PlanningSetupScreen> {
                     'Only enable this when technology requirements are relevant to your decision.',
                   ),
                   value: _requireTech,
-                  onChanged: busy
+                  onChanged: inputsLocked
                       ? null
                       : (value) => setState(() => _requireTech = value),
                 ),
