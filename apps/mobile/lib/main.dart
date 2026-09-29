@@ -1,371 +1,269 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 
-const Color kNavy = Color(0xFF2D3250);
-const Color kIndigo = Color(0xFF424769);
-const Color kPeriwinkle = Color(0xFF676F9D);
-const Color kPeach = Color(0xFFF9B17A);
-const Color kWhite = Color(0xFFFFFFFF);
-const Color kMuted = Color(0xFF9DA3C8);
+import 'data/database/app_database.dart';
+import 'data/repositories/drift_schedule_repository.dart';
+import 'data/repositories/schedule_repository.dart';
+import 'models/commitment.dart';
+import 'models/competition_brief.dart';
+import 'screens/analisis_kompetisi_screen.dart';
+import 'screens/home_screen.dart';
+import 'screens/jadwal_harian_screen.dart';
+import 'screens/jadwal_ringkasan_screen.dart';
+import 'screens/progres_analisis_screen.dart';
+import 'screens/rekomendasi_jadwal_screen.dart';
+import 'screens/rencana_screen.dart';
+import 'screens/review_brief_screen.dart';
+import 'screens/tambah_jadwal_screen.dart';
+import 'theme/app_theme.dart';
+import 'viewmodels/analisis_view_model.dart';
+import 'viewmodels/jadwal_view_model.dart';
+import 'viewmodels/rencana_view_model.dart';
+import 'widgets/common.dart';
 
 void main() {
   runApp(const TaktApp());
 }
 
 class TaktApp extends StatelessWidget {
-  const TaktApp({super.key});
+  const TaktApp({super.key, this.scheduleRepository});
+
+  final ScheduleRepository? scheduleRepository;
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Takt',
-      debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: kNavy,
-        colorScheme: const ColorScheme.dark(
-          primary: kPeach,
-          secondary: kPeach,
-          surface: kIndigo,
-          background: kNavy,
+    return MultiProvider(
+      providers: [
+        ChangeNotifierProvider(
+          create: (_) {
+            final repository = scheduleRepository ??
+                DriftScheduleRepository(AppDatabase.open());
+            return JadwalViewModel(repository)..initialize();
+          },
         ),
-        useMaterial3: true,
-        appBarTheme: const AppBarTheme(
-          backgroundColor: kNavy,
-          foregroundColor: kWhite,
-          elevation: 0,
-        ),
+        ChangeNotifierProvider(create: (_) => AnalisisViewModel()),
+        ChangeNotifierProvider(create: (_) => RencanaViewModel()),
+      ],
+      child: MaterialApp(
+        title: 'Takt',
+        debugShowCheckedModeBanner: false,
+        theme: AppTheme.dark,
+        home: const RootShell(),
       ),
-      home: const HomeScreen(),
     );
   }
 }
 
-class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+class RootShell extends StatefulWidget {
+  const RootShell({super.key});
+
+  @override
+  State<RootShell> createState() => _RootShellState();
+}
+
+class _RootShellState extends State<RootShell> {
+  int _navIndex = 0;
+  int _jadwalTab = 0;
+  bool _showTambahJadwal = false;
+  Commitment? _editingCommitment;
+  int _analisisStep = 0;
+  bool _showRekomendasi = false;
+  CompetitionBrief? _briefAktif;
+
+  CompetitionBrief get _brief => _briefAktif ??= CompetitionBrief.demo();
+
+  Widget _body() {
+    switch (_navIndex) {
+      case 1:
+        if (_showTambahJadwal) {
+          final editing = _editingCommitment;
+          final recurrence = editing == null
+              ? null
+              : context.read<JadwalViewModel>().recurrenceFor(editing.id);
+          return TambahJadwalScreen(
+            commitment: editing,
+            recurrenceRule: recurrence,
+            onBack: () => setState(() {
+              _showTambahJadwal = false;
+              _editingCommitment = null;
+            }),
+            onSave: () => setState(() {
+              _showTambahJadwal = false;
+              _editingCommitment = null;
+            }),
+          );
+        }
+        return _jadwalTab == 0
+            ? JadwalHarianScreen(
+                onSwitchTab: (index) => setState(() => _jadwalTab = index),
+                onAdd: () => setState(() {
+                  _editingCommitment = null;
+                  _showTambahJadwal = true;
+                }),
+                onEdit: (commitment) => setState(() {
+                  _editingCommitment = commitment;
+                  _showTambahJadwal = true;
+                }),
+                onBack: () => setState(() => _navIndex = 0),
+              )
+            : JadwalRingkasanScreen(
+                onSwitchTab: (index) => setState(() => _jadwalTab = index),
+              );
+      case 2:
+        if (_showRekomendasi) {
+          return RekomendasiJadwalScreen(
+            brief: _brief,
+            onBack: () => setState(() => _showRekomendasi = false),
+            onSubmitDone: () => setState(() {
+              _showRekomendasi = false;
+              _analisisStep = 0;
+              _navIndex = 1;
+              _jadwalTab = 0;
+            }),
+          );
+        }
+        switch (_analisisStep) {
+          case 1:
+            return ProgresAnalisisScreen(
+              onReadResult: () => setState(() => _analisisStep = 2),
+            );
+          case 2:
+            return ReviewBriefScreen(
+              brief: _brief,
+              onBack: () => setState(() => _analisisStep = 1),
+              onTambahJadwal: () => setState(() => _showRekomendasi = true),
+              onSimpan: () {
+                context.read<RencanaViewModel>().simpan(
+                      competitionId: _brief.competitionId,
+                      title: _brief.nama,
+                      deadline: _brief.deadline,
+                    );
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('"${_brief.nama}" disimpan ke Rencana'),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+                setState(() {
+                  _analisisStep = 0;
+                  _navIndex = 3;
+                });
+              },
+            );
+          case 0:
+          default:
+            return AnalisisKompetisiScreen(
+              onSubmit: () => setState(() => _analisisStep = 1),
+            );
+        }
+      case 3:
+        return RencanaScreen(
+          onTinjau: (entry) => setState(() {
+            _navIndex = 2;
+            _analisisStep = 2;
+          }),
+          onCekJadwal: (entry) {
+            context.read<JadwalViewModel>().fokusKompetisi(entry.competitionId);
+            setState(() {
+              _navIndex = 1;
+              _jadwalTab = 0;
+              _showTambahJadwal = false;
+              _editingCommitment = null;
+            });
+          },
+        );
+      case 0:
+      default:
+        return HomeScreen(
+          onLihatJadwal: () => setState(() {
+            _navIndex = 1;
+            _jadwalTab = 0;
+            _showTambahJadwal = false;
+            _editingCommitment = null;
+          }),
+        );
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: kNavy,
+      backgroundColor: C.bg,
       body: SafeArea(
-        child: SingleChildScrollView(
-          padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: const [
-                  Text(
-                    'Takt',
-                    style: TextStyle(
-                      color: kWhite,
-                      fontSize: 24,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  CircleAvatar(
-                    radius: 18,
-                    backgroundColor: kPeach,
-                    child: Icon(Icons.person, color: kNavy, size: 20),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 18),
-              const Text(
-                'Good morning, Stephanie',
-                style: TextStyle(
-                  color: kWhite,
-                  fontSize: 22,
-                  fontWeight: FontWeight.w400,
-                ),
-              ),
-              const SizedBox(height: 6),
-              const Text(
-                'Here is your decision support overview.',
-                style: TextStyle(
-                  color: kMuted,
-                  fontSize: 14,
-                  fontWeight: FontWeight.w400,
-                ),
-              ),
-              const SizedBox(height: 22),
-              Container(
-                padding: const EdgeInsets.all(18),
-                decoration: BoxDecoration(
-                  color: kIndigo,
-                  borderRadius: BorderRadius.circular(24),
-                  border: Border.all(color: kPeriwinkle.withOpacity(0.4)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: const [
-                        Text(
-                          'Today',
-                          style: TextStyle(
-                            color: kWhite,
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                          ),
-                        ),
-                        Text(
-                          '89% focus',
-                          style: TextStyle(
-                            color: kPeach,
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 18),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
-                              Text(
-                                'Recommended window',
-                                style: TextStyle(
-                                  color: kMuted,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              SizedBox(height: 8),
-                              Text(
-                                '2:30 PM - 4:00 PM',
-                                style: TextStyle(
-                                  color: kWhite,
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                        Container(
-                          width: 44,
-                          height: 44,
-                          decoration: const BoxDecoration(
-                            color: kPeach,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.arrow_forward,
-                            color: kNavy,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 18),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(999),
-                      child: const LinearProgressIndicator(
-                        value: 0.74,
-                        minHeight: 8,
-                        backgroundColor: kNavy,
-                        valueColor: AlwaysStoppedAnimation<Color>(kPeach),
-                      ),
-                    ),
-                    const SizedBox(height: 18),
-                    const Row(
-                      children: [
-                        Expanded(
-                          child: _MetricTile(label: 'Capacity', value: '75%'),
-                        ),
-                        Expanded(
-                          child: _MetricTile(label: 'Priority', value: 'High'),
-                        ),
-                        Expanded(
-                          child: _MetricTile(label: 'Risk', value: 'Low'),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: const [
-                  _FilterChip(label: 'Today'),
-                  SizedBox(width: 10),
-                  _FilterChip(label: 'Week', selected: false),
-                  SizedBox(width: 10),
-                  _FilterChip(label: 'Month', selected: false),
-                ],
-              ),
-              const SizedBox(height: 20),
-              const _ActionCard(
-                title: 'My Schedule',
-                subtitle: 'Review fixed and flexible commitments.',
-                icon: Icons.calendar_month,
-                accent: kPeach,
-              ),
-              const SizedBox(height: 14),
-              const _ActionCard(
-                title: 'Analyze Competition',
-                subtitle: 'Paste a URL or upload rules to build a verified brief.',
-                icon: Icons.search_rounded,
-                accent: kPeriwinkle,
-              ),
-              const SizedBox(height: 14),
-              const _ActionCard(
-                title: 'Saved Plans',
-                subtitle: 'Review recommendations and re-evaluate decisions.',
-                icon: Icons.bookmark_rounded,
-                accent: kPeach,
-              ),
-            ],
-          ),
-        ),
-      ),
-      bottomNavigationBar: Container(
-        decoration: const BoxDecoration(
-          color: kNavy,
-          border: Border(top: BorderSide(color: kPeriwinkle, width: 0.4)),
-        ),
-        child: BottomNavigationBar(
-          type: BottomNavigationBarType.fixed,
-          backgroundColor: kNavy,
-          selectedItemColor: kPeach,
-          unselectedItemColor: kPeriwinkle,
-          showUnselectedLabels: true,
-          items: const [
-            BottomNavigationBarItem(icon: Icon(Icons.home_rounded), label: 'Home'),
-            BottomNavigationBarItem(icon: Icon(Icons.calendar_today_rounded), label: 'Calendar'),
-            BottomNavigationBarItem(icon: Icon(Icons.insights_rounded), label: 'Insights'),
-            BottomNavigationBarItem(icon: Icon(Icons.person_rounded), label: 'Profile'),
+        bottom: false,
+        child: Column(
+          children: [
+            const StatusBarMock(),
+            Expanded(child: _body()),
           ],
         ),
       ),
-    );
-  }
-}
-
-class _MetricTile extends StatelessWidget {
-  const _MetricTile({
-    required this.label,
-    required this.value,
-  });
-
-  final String label;
-  final String value;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Text(
-          label,
-          style: const TextStyle(color: kMuted, fontSize: 12),
-        ),
-        const SizedBox(height: 6),
-        Text(
-          value,
-          style: const TextStyle(
-            color: kWhite,
-            fontSize: 17,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-class _FilterChip extends StatelessWidget {
-  const _FilterChip({
-    required this.label,
-    this.selected = true,
-  });
-
-  final String label;
-  final bool selected;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: selected ? kPeach : kIndigo,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: selected ? kNavy : kWhite,
-          fontSize: 12,
-          fontWeight: FontWeight.w600,
-        ),
+      bottomNavigationBar: _BottomNav(
+        activeIndex: _navIndex,
+        onTap: (index) => setState(() {
+          _navIndex = index;
+          if (index == 1) {
+            _showTambahJadwal = false;
+            _editingCommitment = null;
+          }
+        }),
       ),
     );
   }
 }
 
-class _ActionCard extends StatelessWidget {
-  const _ActionCard({
-    required this.title,
-    required this.subtitle,
-    required this.icon,
-    required this.accent,
-  });
+class _BottomNav extends StatelessWidget {
+  const _BottomNav({required this.activeIndex, required this.onTap});
 
-  final String title;
-  final String subtitle;
-  final IconData icon;
-  final Color accent;
+  final int activeIndex;
+  final ValueChanged<int> onTap;
+
+  static const _items = <(IconData, String)>[
+    (Icons.home_rounded, 'Beranda'),
+    (Icons.calendar_today_rounded, 'Jadwal'),
+    (Icons.auto_awesome_rounded, 'Analisis'),
+    (Icons.bookmark_rounded, 'Rencana'),
+  ];
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: kIndigo,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: kPeriwinkle.withOpacity(0.35)),
+      color: C.card,
+      padding: EdgeInsets.only(
+        top: 10,
+        bottom: 8 + MediaQuery.of(context).padding.bottom,
+        left: 10,
+        right: 10,
       ),
       child: Row(
-        children: [
-          Container(
-            width: 42,
-            height: 42,
-            decoration: BoxDecoration(
-              color: accent.withOpacity(0.18),
-              borderRadius: BorderRadius.circular(12),
-            ),
-            child: Icon(icon, color: accent),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  title,
-                  style: const TextStyle(
-                    color: kWhite,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+        children: List.generate(_items.length, (index) {
+          final active = index == activeIndex;
+          return Expanded(
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTap: () => onTap(index),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    _items[index].$1,
+                    size: 20,
+                    color: active ? C.accent : C.navInactive,
                   ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  subtitle,
-                  style: const TextStyle(
-                    color: kMuted,
-                    fontSize: 12,
-                    height: 1.4,
+                  const SizedBox(height: 4),
+                  Text(
+                    _items[index].$2,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w600,
+                      color: active ? C.accent : C.navInactive,
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const Icon(Icons.chevron_right, color: kPeriwinkle),
-        ],
+          );
+        }),
       ),
     );
   }
