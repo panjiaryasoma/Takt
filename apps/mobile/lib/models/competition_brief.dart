@@ -1,11 +1,7 @@
-import 'decision_support_report.dart';
-import 'enums.dart';
-
-/// Ringkasan brief lomba hasil analisis AI (sumber data ReviewBriefScreen).
+/// Ringkasan presentation model untuk ReviewBriefScreen.
 ///
-/// TITIK INTEGRASI AI: sekarang pakai [CompetitionBrief.demo]. Saat AI model
-/// temanmu siap, panggil [CompetitionBrief.fromReport] dengan hasil
-/// [DecisionSupportReport.fromJson] — UI tidak berubah.
+/// Data demo tetap dipakai sampai Hari 2B memasang adapter dari public API DTO
+/// current. Jangan parse payload backend langsung ke model presentation ini.
 class CompetitionBrief {
   const CompetitionBrief({
     required this.competitionId,
@@ -82,55 +78,7 @@ class CompetitionBrief {
         ],
       );
 
-  /// Bangun brief UI dari output AI model (DecisionSupportReport).
-  /// Field yang belum ada padanannya di kontrak (rundown, analisa naratif)
-  /// diturunkan seadanya; sisanya diambil langsung dari brief wire.
-  factory CompetitionBrief.fromReport(DecisionSupportReport r) {
-    final b = r.competitionBrief;
-    final deadline = b.submissionDeadline;
-    final sisa = deadline.difference(DateTime.now()).inDays;
 
-    // deliverables bisa berupa list string atau struktur lain (Any di kontrak).
-    final deliverables = <String>[];
-    final d = b.deliverables;
-    if (d is List) {
-      deliverables.addAll(d.map((e) => e.toString()));
-    } else if (d is String && d.isNotEmpty) {
-      deliverables.add(d);
-    }
-
-    // Analisa jadwal diturunkan dari feasibility + readiness.
-    final analisa = <BriefAnalisa>[
-      BriefAnalisa(
-        severity: switch (r.feasibility) {
-          FeasibilityStatus.feasible => BriefSeverity.aman,
-          FeasibilityStatus.feasibleWithTradeoffs => BriefSeverity.sedang,
-          FeasibilityStatus.tightCapacity => BriefSeverity.sedang,
-          FeasibilityStatus.notFeasible => BriefSeverity.tinggi,
-        },
-        text: 'Kelayakan: ${r.feasibility.wire}',
-      ),
-      for (final reason in r.readiness.blockingReasons)
-        BriefAnalisa(severity: BriefSeverity.tinggi, text: reason),
-      for (final item in r.readiness.reviewItems)
-        BriefAnalisa(severity: BriefSeverity.sedang, text: item),
-    ];
-
-    return CompetitionBrief(
-      competitionId: b.competitionId,
-      nama: b.name,
-      penyelenggara: b.organizer,
-      format: '—',
-      deskripsi: b.eligibility?.toString() ?? '',
-      output: deliverables,
-      rundown: const [],
-      deadline: deadline,
-      deadlineLabel:
-          'Deadline: ${deadline.day}/${deadline.month}/${deadline.year}',
-      sisaHari: sisa < 0 ? 0 : sisa,
-      analisaJadwal: analisa,
-    );
-  }
 }
 
 class BriefTahap {

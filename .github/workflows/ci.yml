@@ -53,9 +53,14 @@ jobs:
       - name: Resolve Flutter dependencies
         run: flutter pub get
 
+      - name: Verify Flutter lockfile is committed
+        run: git diff --exit-code -- pubspec.lock
 
       - name: Flutter analyze
         run: flutter analyze
 
       - name: Flutter test
         run: flutter test
+
+      - name: Flutter Android debug build
+        run: flutter build apk --debug
