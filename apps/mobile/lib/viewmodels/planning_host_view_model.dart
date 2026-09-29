@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 
 import 'package:flutter/foundation.dart';
@@ -49,6 +50,7 @@ final class PlanningHostViewModel extends ChangeNotifier {
     required EvaluationRepository evaluationRepository,
     required SavedPlanRepository savedPlanRepository,
     PlanningRequestAssembler? assembler,
+    this.closeRepositoriesOnDispose = false,
   })  : _apiClient = apiClient,
         _scheduleRepository = scheduleRepository,
         _evaluationRepository = evaluationRepository,
@@ -60,6 +62,7 @@ final class PlanningHostViewModel extends ChangeNotifier {
   final EvaluationRepository _evaluationRepository;
   final SavedPlanRepository _savedPlanRepository;
   final PlanningRequestAssembler _assembler;
+  final bool closeRepositoriesOnDispose;
 
   PlanningHostPhase _phase = PlanningHostPhase.idle;
   AnalysisSnapshot? _analysisSnapshot;
@@ -787,6 +790,11 @@ final class PlanningHostViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _apiClient.close();
+    if (closeRepositoriesOnDispose) {
+      unawaited(_scheduleRepository.close());
+      unawaited(_evaluationRepository.close());
+      unawaited(_savedPlanRepository.close());
+    }
     super.dispose();
   }
 }
