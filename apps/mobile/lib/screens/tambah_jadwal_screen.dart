@@ -67,7 +67,7 @@ class _TambahJadwalScreenState extends State<TambahJadwalScreen> {
   @override
   void dispose() { _titleCtrl.dispose(); _categoryCtrl.dispose(); super.dispose(); }
   String get _tanggalLabel => '${_tanggal.day} ${_monthShort[_tanggal.month - 1]} ${_tanggal.year}';
-  String _hhmm(TimeOfDay time) => '${time.hour.toString().padLeft(2,'0')}.${time.minute.toString().padLeft(2,'0')}';
+  String _hhmm(TimeOfDay time) => '${time.hour.toString().padLeft(2,'0')}:${time.minute.toString().padLeft(2,'0')}';
 
   Future<void> _pilihTanggal() async {
     final picked = await showDatePicker(context: context, initialDate: _tanggal, firstDate: DateTime(2024), lastDate: DateTime(2035));
