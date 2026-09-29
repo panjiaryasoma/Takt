@@ -67,7 +67,7 @@ class PremiumAccessScreen extends StatelessWidget {
                         ? 'Purchasing...'
                         : offering == null
                             ? 'Purchase unavailable'
-                            : 'Get lifetime access · ' + offering.priceString,
+                            : 'Get lifetime access · ${offering.priceString}',
                   ),
                 ),
                 const SizedBox(height: 8),
@@ -119,7 +119,7 @@ class _OfferingStatus extends StatelessWidget {
           style: TextStyle(color: C.detailMuted),
         ),
       OfferingSync.ready => Text(
-          'Lifetime package: ' + service.offering.offering!.priceString,
+          'Lifetime package: ${service.offering.offering!.priceString}',
           style: const TextStyle(color: C.accent, fontWeight: FontWeight.w600),
         ),
       OfferingSync.empty => const Text(
