@@ -219,6 +219,16 @@ class _RootShellState extends State<RootShell> {
     final host = context.read<PlanningHostViewModel>();
     await host.startPlanning(snapshot);
     if (!mounted) return;
+    if (host.phase != PlanningHostPhase.setup) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            host.failure?.message ?? 'Planning context could not be prepared.',
+          ),
+        ),
+      );
+      return;
+    }
     setState(() {
       _navIndex = 2;
       _analisisStep = 4;
@@ -245,6 +255,16 @@ class _RootShellState extends State<RootShell> {
     await analysis.loadSnapshot(snapshot);
     await host.startPlanning(snapshot);
     if (!mounted) return;
+    if (host.phase != PlanningHostPhase.setup) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            host.failure?.message ?? 'Planning context could not be prepared.',
+          ),
+        ),
+      );
+      return;
+    }
     setState(() {
       _selectedSavedPlanId = null;
       _navIndex = 2;
