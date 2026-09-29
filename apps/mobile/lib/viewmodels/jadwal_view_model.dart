@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../data/repositories/saved_plan_repository.dart';
 import '../data/repositories/schedule_repository.dart';
+import '../models/active_accepted_block.dart';
 import '../models/commitment.dart';
 import '../models/enums.dart';
 import '../models/planning_preferences.dart';
@@ -15,12 +17,18 @@ import '../models/schedule_occurrence.dart';
 /// SQLite/Drift is authoritative. The in-memory state here is only a read model
 /// fed by [ScheduleRepository], so restarting the app does not erase schedules.
 class JadwalViewModel extends ChangeNotifier {
-  JadwalViewModel(this._repository);
+  JadwalViewModel(
+    this._repository, {
+    SavedPlanRepository? savedPlanRepository,
+  }) : _savedPlanRepository = savedPlanRepository;
 
   final ScheduleRepository _repository;
+  final SavedPlanRepository? _savedPlanRepository;
 
   ScheduleState _state = ScheduleState.empty();
   StreamSubscription<ScheduleState>? _subscription;
+  StreamSubscription<List<SavedPlanSummary>>? _savedPlanSubscription;
+  List<ActiveAcceptedBlock> _acceptedBlocks = const [];
   DateTime _selectedDate = _dateOnly(DateTime.now());
 
   bool _isLoading = true;
@@ -32,6 +40,8 @@ class JadwalViewModel extends ChangeNotifier {
   String? get errorMessage => _errorMessage;
 
   List<Commitment> get all => List.unmodifiable(_state.commitments);
+  List<ActiveAcceptedBlock> get acceptedBlocks =>
+      List.unmodifiable(_acceptedBlocks);
   PlanningPreferences get preferences => _state.preferences;
   DateTime get selectedDate => _selectedDate;
 
@@ -43,6 +53,20 @@ class JadwalViewModel extends ChangeNotifier {
 
     try {
       await _repository.initialize();
+      final saved = _savedPlanRepository;
+      if (saved != null) {
+        await saved.initialize();
+        _acceptedBlocks = await saved.activeAcceptedBlocks();
+        _savedPlanSubscription = saved.watchSummaries().listen((_) async {
+          try {
+            _acceptedBlocks = await saved.activeAcceptedBlocks();
+            notifyListeners();
+          } on Object {
+            _errorMessage = 'Accepted plan schedule could not be refreshed.';
+            notifyListeners();
+          }
+        });
+      }
       _subscription = _repository.watchState().listen(
         (state) {
           _state = state;
@@ -92,6 +116,19 @@ class JadwalViewModel extends ChangeNotifier {
   }
 
   List<ScheduleOccurrence> get itemsForSelectedDate => itemsOn(_selectedDate);
+
+  List<ActiveAcceptedBlock> get acceptedItemsForSelectedDate =>
+      acceptedItemsOn(_selectedDate);
+
+  List<ActiveAcceptedBlock> acceptedItemsOn(DateTime day) {
+    final start = _dateOnly(day);
+    final end = start.add(const Duration(days: 1));
+    return _acceptedBlocks
+        .where((block) =>
+            !block.startAt.isBefore(start) && block.startAt.isBefore(end))
+        .toList(growable: false)
+      ..sort((a, b) => a.startAtEpochMs.compareTo(b.startAtEpochMs));
+  }
 
   List<ScheduleOccurrence> itemsOn(DateTime day) {
     final start = _dateOnly(day);
@@ -196,11 +233,31 @@ class JadwalViewModel extends ChangeNotifier {
   Set<int> eventDaysOfMonth(DateTime month) {
     final start = DateTime(month.year, month.month, 1);
     final end = DateTime(month.year, month.month + 1, 1);
-    return occurrencesBetween(start, end).map((item) => item.startAt.day).toSet();
+    final days =
+        occurrencesBetween(start, end).map((item) => item.startAt.day).toSet();
+    days.addAll(
+      _acceptedBlocks
+          .where((block) =>
+              !block.startAt.isBefore(start) && block.startAt.isBefore(end))
+          .map((block) => block.startAt.day),
+    );
+    return days;
   }
 
   int scheduledMinutesOn(DateTime day) {
-    return itemsOn(day).fold(0, (sum, item) => sum + item.durationMinutes);
+    final manual =
+        itemsOn(day).fold(0, (sum, item) => sum + item.durationMinutes);
+    final accepted = acceptedItemsOn(day)
+        .fold(0, (sum, item) => sum + item.durationMinutes);
+    return manual + accepted;
+  }
+
+  Future<void> refreshAcceptedPlans() async {
+    final saved = _savedPlanRepository;
+    if (saved == null) return;
+    await saved.refresh();
+    _acceptedBlocks = await saved.activeAcceptedBlocks();
+    notifyListeners();
   }
 
   void selectDate(DateTime day) {
@@ -461,6 +518,15 @@ class JadwalViewModel extends ChangeNotifier {
   }
 
   void fokusKompetisi(String competitionId) {
+    final accepted = _acceptedBlocks
+        .where((item) => item.competitionId == competitionId)
+        .toList()
+      ..sort((a, b) => a.startAtEpochMs.compareTo(b.startAtEpochMs));
+    if (accepted.isNotEmpty) {
+      _selectedDate = _dateOnly(accepted.first.startAt);
+      notifyListeners();
+      return;
+    }
     final items = itemsForCompetition(competitionId);
     if (items.isNotEmpty) {
       _selectedDate = _dateOnly(items.first.startAt);
@@ -533,7 +599,10 @@ class JadwalViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _subscription?.cancel();
+    _savedPlanSubscription?.cancel();
     unawaited(_repository.close());
+    final saved = _savedPlanRepository;
+    if (saved != null) unawaited(saved.close());
     super.dispose();
   }
 }
