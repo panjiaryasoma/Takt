@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
 
-import 'package:drift/drift.dart';
+import 'package:drift/drift.dart' show Variable;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:takt_mobile/data/database/app_database.dart';
@@ -103,7 +103,7 @@ INSERT INTO commitments (
     expect(await migrated.userVersion(), 2);
     final commitments = await migrated.customSelect(
       'SELECT id FROM commitments WHERE id = ?',
-      variables: [Variable<String>('cmt-v1')],
+      variables: [const Variable<String>('cmt-v1')],
     ).get();
     expect(commitments, hasLength(1));
 
