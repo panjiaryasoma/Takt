@@ -75,6 +75,49 @@ void main() {
       );
     });
 
+
+    test('conflict requires normalized candidate disagreement', () {
+      final raw = jsonDecode(_responseBody('cmp-conflict-equal'))
+          as Map<String, dynamic>;
+      final field = _fieldMap(raw, 'submission_deadline');
+      field['state'] = 'CONFLICT';
+      field['value'] = null;
+      field['normalized_value'] = null;
+      field['candidates'] = [
+        _candidate(
+          'submission_deadline',
+          '2026-10-01T00:00:00Z',
+          'ev-submission_deadline',
+        ),
+        _candidate(
+          'submission_deadline',
+          '2026-10-01T00:00:00Z',
+          'ev-submission-alt',
+        ),
+      ];
+      field['evidence_ids'] = [
+        'ev-submission_deadline',
+        'ev-submission-alt',
+      ];
+
+      final provenance = raw['provenance'] as Map<String, dynamic>;
+      final evidence = provenance['evidence'] as List<dynamic>;
+      evidence.add({
+        'evidence_id': 'ev-submission-alt',
+        'source_id': 'src-1',
+        'page_or_locator': 'alternate',
+        'raw_text_or_visual_reference': 'same normalized deadline',
+        'field_name': 'submission_deadline',
+        'extraction_path': 'native',
+        'extractor_version': 'test-v1',
+      });
+
+      expect(
+        () => CompetitionAnalyzeResponseWire.parse(jsonEncode(raw)),
+        throwsFormatException,
+      );
+    });
+
     test('missing field remains null and has no candidates', () {
       final raw = jsonDecode(_responseBody('cmp-missing'))
           as Map<String, dynamic>;
