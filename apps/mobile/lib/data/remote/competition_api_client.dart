@@ -1,8 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
-import 'dart:io';
-import 'dart:math';
 import 'dart:typed_data';
+
+import 'package:http/http.dart' as http;
 
 import '../../models/analysis_failure.dart';
 import '../../models/competition_analysis_wire.dart';
@@ -86,13 +86,13 @@ abstract class CompetitionApiClient {
 class HttpCompetitionApiClient implements CompetitionApiClient {
   HttpCompetitionApiClient({
     required String baseUrl,
-    HttpClient? httpClient,
+    http.Client? client,
     this.timeout = const Duration(seconds: 120),
   })  : _baseUrl = baseUrl.replaceFirst(RegExp(r'/+$'), ''),
-        _client = httpClient ?? HttpClient();
+        _client = client ?? http.Client();
 
   final String _baseUrl;
-  final HttpClient _client;
+  final http.Client _client;
   final Duration timeout;
 
   @override
@@ -116,16 +116,24 @@ class HttpCompetitionApiClient implements CompetitionApiClient {
       );
     }
 
-    final payload = buildUrlAnalysisPayload(
-      competitionId: competitionId,
-      url: clean,
-      source: source,
-      continuation: continuation,
-    );
-    return _postJson(
-      '/api/v1/competitions/analyze/url',
-      payload,
-    );
+    final request = http.Request(
+      'POST',
+      Uri.parse('$_baseUrl/api/v1/competitions/analyze/url'),
+    )
+      ..headers['Accept'] = 'application/json'
+      ..headers['Content-Type'] = 'application/json; charset=utf-8'
+      ..bodyBytes = utf8.encode(
+        jsonEncode(
+          buildUrlAnalysisPayload(
+            competitionId: competitionId,
+            url: clean,
+            source: source,
+            continuation: continuation,
+          ),
+        ),
+      );
+
+    return _send(request);
   }
 
   @override
@@ -156,78 +164,38 @@ class HttpCompetitionApiClient implements CompetitionApiClient {
       );
     }
 
-    final metadata = buildPdfAnalysisMetadata(
-      competitionId: competitionId,
-      documentId: documentId,
-      source: source,
-      continuation: continuation,
-    );
+    final request = http.MultipartRequest(
+      'POST',
+      Uri.parse('$_baseUrl/api/v1/competitions/analyze/pdf'),
+    )
+      ..headers['Accept'] = 'application/json'
+      ..fields['metadata'] = jsonEncode(
+        buildPdfAnalysisMetadata(
+          competitionId: competitionId,
+          documentId: documentId,
+          source: source,
+          continuation: continuation,
+        ),
+      )
+      ..files.add(
+        http.MultipartFile.fromBytes(
+          'file',
+          bytes,
+          filename: _safeFilename(filename),
+          contentType: http.MediaType('application', 'pdf'),
+        ),
+      );
 
-    final boundary =
-        '----takt-${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(1 << 32)}';
-    final body = BytesBuilder(copy: false)
-      ..add(utf8.encode('--$boundary\r\n'))
-      ..add(
-        utf8.encode(
-          'Content-Disposition: form-data; name="metadata"\r\n',
-        ),
-      )
-      ..add(
-        utf8.encode(
-          'Content-Type: application/json; charset=utf-8\r\n\r\n',
-        ),
-      )
-      ..add(utf8.encode(jsonEncode(metadata)))
-      ..add(utf8.encode('\r\n--$boundary\r\n'))
-      ..add(
-        utf8.encode(
-          'Content-Disposition: form-data; name="file"; '
-          'filename="${_escapeFilename(filename)}"\r\n',
-        ),
-      )
-      ..add(utf8.encode('Content-Type: application/pdf\r\n\r\n'))
-      ..add(bytes)
-      ..add(utf8.encode('\r\n--$boundary--\r\n'));
-
-    return _postBytes(
-      '/api/v1/competitions/analyze/pdf',
-      body.takeBytes(),
-      contentType: 'multipart/form-data; boundary=$boundary',
-    );
+    return _send(request);
   }
 
-  Future<CompetitionAnalysisTransportResult> _postJson(
-    String path,
-    Map<String, Object?> payload,
-  ) {
-    return _postBytes(
-      path,
-      Uint8List.fromList(utf8.encode(jsonEncode(payload))),
-      contentType: 'application/json; charset=utf-8',
-    );
-  }
-
-  Future<CompetitionAnalysisTransportResult> _postBytes(
-    String path,
-    Uint8List body, {
-    required String contentType,
-  }) async {
+  Future<CompetitionAnalysisTransportResult> _send(
+    http.BaseRequest request,
+  ) async {
     try {
-      final request = await _client
-          .postUrl(Uri.parse('$_baseUrl$path'))
-          .timeout(timeout);
-      request.headers.set(HttpHeaders.contentTypeHeader, contentType);
-      request.headers.set(HttpHeaders.acceptHeader, 'application/json');
-      request.contentLength = body.length;
-      request.add(body);
-
-      final response = await request.close().timeout(timeout);
-      final responseBytes = await response
-          .fold<List<int>>(
-            <int>[],
-            (buffer, chunk) => buffer..addAll(chunk),
-          )
-          .timeout(timeout);
+      final response = await _client.send(request).timeout(timeout);
+      final responseBytes =
+          await response.stream.toBytes().timeout(timeout);
       final originalBody = utf8.decode(responseBytes);
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
@@ -245,13 +213,9 @@ class HttpCompetitionApiClient implements CompetitionApiClient {
       }
     } on AnalysisFailure {
       rethrow;
-    } on SocketException catch (error) {
-      throw AnalysisFailure.network(error);
     } on TimeoutException catch (error) {
       throw AnalysisFailure.network(error);
-    } on HttpException catch (error) {
-      throw AnalysisFailure.network(error);
-    } on HandshakeException catch (error) {
+    } on http.ClientException catch (error) {
       throw AnalysisFailure.network(error);
     }
   }
@@ -291,16 +255,15 @@ class HttpCompetitionApiClient implements CompetitionApiClient {
     }
   }
 
-  static String _escapeFilename(String value) {
+  static String _safeFilename(String value) {
     return value
         .replaceAll('"', '_')
         .replaceAll('\r', '_')
         .replaceAll('\n', '_');
   }
 
-  void close() => _client.close(force: true);
+  void close() => _client.close();
 }
-
 
 Map<String, Object?> buildUrlAnalysisPayload({
   required String competitionId,
