@@ -172,7 +172,7 @@ class JadwalRingkasanScreen extends StatelessWidget {
                   const Padding(
                     padding: EdgeInsets.only(top: 8),
                     child: Text(
-                      'Belum ada jadwal pada pekan ini.',
+                      'No schedule for this week.',
                       style: TextStyle(color: C.detailMuted, fontSize: 11),
                     ),
                   ),
