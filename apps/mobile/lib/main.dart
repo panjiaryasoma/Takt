@@ -207,14 +207,16 @@ class _RootShellState extends State<RootShell> {
       });
 
   Future<void> _refreshAcceptedProjections() async {
+    final savedPlans = context.read<SavedPlansViewModel>();
+    final schedule = context.read<JadwalViewModel>();
     var failed = false;
     try {
-      await context.read<SavedPlansViewModel>().refresh();
+      await savedPlans.refresh();
     } on Object {
       failed = true;
     }
     try {
-      await context.read<JadwalViewModel>().refreshAcceptedPlans();
+      await schedule.refreshAcceptedPlans();
     } on Object {
       failed = true;
     }
