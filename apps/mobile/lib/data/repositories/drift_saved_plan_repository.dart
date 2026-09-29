@@ -29,10 +29,12 @@ final class DriftSavedPlanRepository implements SavedPlanRepository {
   DriftSavedPlanRepository(
     this._db, {
     DateTime Function()? now,
+    this.closeDatabaseOnDispose = true,
   }) : _now = now ?? DateTime.now;
 
   final AppDatabase _db;
   final DateTime Function() _now;
+  final bool closeDatabaseOnDispose;
   final StreamController<List<SavedPlanSummary>> _changes =
       StreamController<List<SavedPlanSummary>>.broadcast();
 
@@ -712,6 +714,8 @@ AND NOT EXISTS (
     if (_closed) return;
     _closed = true;
     await _changes.close();
-    await _db.close();
+    if (closeDatabaseOnDispose) {
+      await _db.close();
+    }
   }
 }
