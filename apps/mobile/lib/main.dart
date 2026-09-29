@@ -95,6 +95,13 @@ class _RootShellState extends State<RootShell> {
         return ProgresAnalisisScreen(
           onReadResult: () => setState(() => _analisisStep = 2),
           onBackToInput: () => setState(() => _analisisStep = 0),
+          onStartNewAnalysis: () {
+            vm.resetForNewCompetition();
+            setState(() {
+              _addingSource = false;
+              _analisisStep = 0;
+            });
+          },
         );
       case 2:
         final response = vm.response;
