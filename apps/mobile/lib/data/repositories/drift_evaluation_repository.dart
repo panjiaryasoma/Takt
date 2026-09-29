@@ -215,10 +215,9 @@ INSERT INTO evaluations (
         if (currentAnalysisSnapshot != null ||
             currentEvaluationRequestJson != null ||
             currentEvaluationResponseJson != null ||
-            planningWindowPolicyJson != null ||
-            transition.currentBasisFingerprint != null) {
+            planningWindowPolicyJson != null) {
           throw const EvaluationIntegrityException(
-            'failed SUPERSEDED transition cannot persist a fresh evaluation',
+            'failed SUPERSEDED transition cannot persist fresh evaluation material',
           );
         }
         _jsonObject(errorJson, 're-evaluation error');
