@@ -265,6 +265,9 @@ class _NoopApiClient implements CompetitionApiClient {
   }) {
     throw UnimplementedError();
   }
+
+  @override
+  void close() {}
 }
 
 class _NoopAnalysisRepository implements AnalysisRepository {
