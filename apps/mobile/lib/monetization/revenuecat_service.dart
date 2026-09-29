@@ -227,6 +227,8 @@ final class RevenueCatService extends ChangeNotifier {
       return;
     }
 
+    _restoreError = null;
+    _restoreSync = RestoreSync.idle;
     _purchaseError = null;
     _purchaseSync = PurchaseSync.purchasing;
     notifyListeners();
@@ -269,6 +271,8 @@ final class RevenueCatService extends ChangeNotifier {
       return;
     }
 
+    _purchaseError = null;
+    _purchaseSync = PurchaseSync.idle;
     _restoreError = null;
     _restoreSync = RestoreSync.restoring;
     notifyListeners();
