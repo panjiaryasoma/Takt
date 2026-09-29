@@ -115,6 +115,67 @@ void main() {
       );
     });
 
+
+    test('URL and PDF builders preserve exact continuation material', () {
+      const source = AnalysisSourceMetadata(
+        sourceId: 'src-1',
+        sourceType: SourceTypeWire.officialRules,
+      );
+      const continuation = AnalysisContinuationContext(
+        reportBundle: {
+          'report': {'competition_id': 'cmp-1'},
+          'ref': {'competition_id': 'cmp-1'},
+        },
+        sourceArtifacts: [
+          {'source': {'source_id': 'src-1'}},
+        ],
+      );
+
+      final urlPayload = buildUrlAnalysisPayload(
+        competitionId: 'cmp-1',
+        url: 'https://example.com/rules',
+        source: source,
+        continuation: continuation,
+      );
+      final pdfPayload = buildPdfAnalysisMetadata(
+        competitionId: 'cmp-1',
+        documentId: 'pdf:rules.pdf:abc',
+        source: source,
+        continuation: continuation,
+      );
+
+      expect(urlPayload.keys.toSet(), {
+        'competition_id',
+        'url',
+        'source',
+        'previous_report_bundle',
+        'prior_source_artifacts',
+      });
+      expect(pdfPayload.keys.toSet(), {
+        'competition_id',
+        'document_id',
+        'source',
+        'previous_report_bundle',
+        'prior_source_artifacts',
+      });
+      expect(
+        urlPayload['previous_report_bundle'],
+        same(continuation.reportBundle),
+      );
+      expect(
+        urlPayload['prior_source_artifacts'],
+        same(continuation.sourceArtifacts),
+      );
+      expect(
+        pdfPayload['previous_report_bundle'],
+        same(continuation.reportBundle),
+      );
+      expect(
+        pdfPayload['prior_source_artifacts'],
+        same(continuation.sourceArtifacts),
+      );
+    });
+
     test('source metadata defaults preserve unknown scope/freshness', () {
       const metadata = AnalysisSourceMetadata(
         sourceId: 'src-1',
