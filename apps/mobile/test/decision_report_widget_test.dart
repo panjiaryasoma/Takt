@@ -206,13 +206,26 @@ void main() {
   });
 
   testWidgets('navigation injects host sessions and revisions without evaluating or writing schedules', (tester) async {
-    final schedule = DriftScheduleRepository(AppDatabase.forTesting(NativeDatabase.memory()));
-    final analysis = DriftAnalysisRepository(AppDatabase.forTesting(NativeDatabase.memory()));
+    final database = AppDatabase.forTesting(NativeDatabase.memory());
+    final schedule = DriftScheduleRepository(
+      database,
+      closeDatabaseOnDispose: false,
+    );
+    final analysis = DriftAnalysisRepository(
+      database,
+      closeDatabaseOnDispose: false,
+    );
     addTearDown(schedule.close);
     addTearDown(analysis.close);
+    addTearDown(database.close);
     final session = testSession();
-    Widget app(int revision) => TaktApp(scheduleRepository: schedule, analysisRepository: analysis,
-        decisionSession: session, currentInputRevision: revision, onAcceptCandidate: (_, _) async {});
+    Widget app(int revision) => TaktApp(
+        database: database,
+        scheduleRepository: schedule,
+        analysisRepository: analysis,
+        decisionSession: session,
+        currentInputRevision: revision,
+        onAcceptCandidate: (_, _) async {});
     await tester.pumpWidget(app(3));
     await tester.pumpAndSettle();
     expect(find.text('Decision Report'), findsOneWidget);
