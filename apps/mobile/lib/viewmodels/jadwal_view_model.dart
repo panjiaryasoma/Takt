@@ -93,6 +93,20 @@ class JadwalViewModel extends ChangeNotifier {
     notifyListeners();
     try {
       await _repository.initialize();
+      final saved = _savedPlanRepository;
+      if (saved != null) {
+        await saved.initialize();
+        _acceptedBlocks = await saved.activeAcceptedBlocks();
+        _savedPlanSubscription ??= saved.watchSummaries().listen((_) async {
+          try {
+            _acceptedBlocks = await saved.activeAcceptedBlocks();
+            notifyListeners();
+          } on Object {
+            _errorMessage = 'Accepted plan schedule could not be refreshed.';
+            notifyListeners();
+          }
+        });
+      }
       _state = await _repository.loadState();
       _subscription ??= _repository.watchState().listen(
         (state) {
