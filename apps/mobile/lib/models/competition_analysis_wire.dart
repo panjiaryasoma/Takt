@@ -1,5 +1,11 @@
 import 'dart:convert';
 
+const supportedDomainSchemaVersion = '3.0.0';
+const supportedReconciliationPolicyVersion = 'reconciliation-v1';
+const supportedAssemblyPolicyVersion = 'canonical-v1';
+const supportedSourceSetFingerprintVersion = 'source-set-jcs-sha256-v1';
+const supportedWireFingerprintVersion = 'report-wire-jcs-sha256-v1';
+
 const coreCanonicalFieldNames = <String>{
   'competition_name',
   'organizer',
@@ -348,6 +354,25 @@ class CanonicalReportRefWire {
       },
       'report_ref',
     );
+    final supportedVersions = <String, String>{
+      'domain_schema_version': supportedDomainSchemaVersion,
+      'reconciliation_policy_version':
+          supportedReconciliationPolicyVersion,
+      'assembly_policy_version': supportedAssemblyPolicyVersion,
+      'source_set_fingerprint_version':
+          supportedSourceSetFingerprintVersion,
+      'wire_fingerprint_version': supportedWireFingerprintVersion,
+    };
+    for (final entry in supportedVersions.entries) {
+      final actual =
+          _string(map[entry.key], 'report_ref.${entry.key}');
+      if (actual != entry.value) {
+        throw FormatException(
+          'Unsupported report contract version ${entry.key}: $actual',
+        );
+      }
+    }
+
     final sourceSet = map['source_set_fingerprint'];
     return CanonicalReportRefWire(
       competitionId:
