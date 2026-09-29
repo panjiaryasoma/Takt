@@ -10,6 +10,7 @@ import 'package:takt_mobile/data/repositories/drift_saved_plan_repository.dart';
 import 'package:takt_mobile/data/repositories/drift_schedule_repository.dart';
 import 'package:takt_mobile/data/repositories/evaluation_repository.dart';
 import 'package:takt_mobile/models/analysis_snapshot.dart';
+import 'package:takt_mobile/models/decision_intent.dart';
 import 'package:takt_mobile/models/enums.dart';
 import 'package:takt_mobile/models/evaluation.dart';
 import 'package:takt_mobile/models/plan_evaluation_wire.dart';
@@ -170,6 +171,302 @@ void main() {
     expect(draft.tasks.single.taskId, 'task-draft');
     host.dispose();
   });
+
+  test('UNCHANGED re-evaluation keeps accepted revision current', () async {
+    final prior = await _persistAndAcceptPrior(
+      evaluations,
+      savedPlans,
+      snapshot,
+    );
+    final api = _ReevaluationPlanApi(
+      mode: _ReevaluationMode.unchanged,
+      priorEvaluationId: prior.id,
+      priorBasisFingerprint: prior.evaluationBasisFingerprint,
+    );
+    final host = PlanningHostViewModel(
+      apiClient: api,
+      scheduleRepository: schedule,
+      evaluationRepository: evaluations,
+      savedPlanRepository: savedPlans,
+    );
+
+    await host.startPlanning(snapshot);
+    await host.evaluate();
+
+    expect(api.reevaluateCalls, 1);
+    expect(host.phase, PlanningHostPhase.unchanged);
+    expect(host.activeSession, isNull);
+    expect(await evaluations.isStale(prior.id), isFalse);
+    final plan = await savedPlans.planForCompetition(snapshot.competitionId);
+    final detail = await savedPlans.loadDetail(plan!.id);
+    expect(detail!.revisions, hasLength(1));
+    expect(detail.summary.currentRevision.evaluationId, prior.id);
+    host.dispose();
+  });
+
+  test('SUPERSEDED re-evaluation publishes fresh session and Accept creates revision 2',
+      () async {
+    final prior = await _persistAndAcceptPrior(
+      evaluations,
+      savedPlans,
+      snapshot,
+    );
+    final api = _ReevaluationPlanApi(
+      mode: _ReevaluationMode.superseded,
+      priorEvaluationId: prior.id,
+      priorBasisFingerprint: prior.evaluationBasisFingerprint,
+    );
+    final host = PlanningHostViewModel(
+      apiClient: api,
+      scheduleRepository: schedule,
+      evaluationRepository: evaluations,
+      savedPlanRepository: savedPlans,
+    );
+
+    await host.startPlanning(snapshot);
+    await host.evaluate();
+
+    expect(host.phase, PlanningHostPhase.decision);
+    expect(await evaluations.isStale(prior.id), isTrue);
+    final session = host.activeSession!;
+    expect(session.parsedResponse.evaluationId, _freshEvaluationId);
+
+    await host.accept(
+      session,
+      AcceptCandidateIntent(
+        sessionId: session.sessionId,
+        evaluationId: session.parsedResponse.evaluationId,
+        candidateId: primaryId,
+        selectionSource: SelectionSource.primary,
+      ),
+    );
+
+    expect(host.phase, PlanningHostPhase.accepted);
+    final plan = await savedPlans.planForCompetition(snapshot.competitionId);
+    final detail = await savedPlans.loadDetail(plan!.id);
+    expect(detail!.revisions, hasLength(2));
+    expect(detail.summary.currentRevision.revisionNumber, 2);
+    expect(detail.summary.currentRevision.evaluationId, _freshEvaluationId);
+    expect(detail.summary.stale, isFalse);
+    host.dispose();
+  });
+
+  test('trusted SUPERSEDED failure marks prior stale and keeps old schedule active',
+      () async {
+    final prior = await _persistAndAcceptPrior(
+      evaluations,
+      savedPlans,
+      snapshot,
+    );
+    final api = _ReevaluationPlanApi(
+      mode: _ReevaluationMode.failure,
+      priorEvaluationId: prior.id,
+      priorBasisFingerprint: prior.evaluationBasisFingerprint,
+    );
+    final host = PlanningHostViewModel(
+      apiClient: api,
+      scheduleRepository: schedule,
+      evaluationRepository: evaluations,
+      savedPlanRepository: savedPlans,
+    );
+
+    await host.startPlanning(snapshot);
+    await host.evaluate();
+
+    expect(host.phase, PlanningHostPhase.error);
+    expect(host.failure?.code, 'PLANNING_EXECUTION_FAILED');
+    expect(await evaluations.isStale(prior.id), isTrue);
+    final active = await savedPlans.activeAcceptedBlocks();
+    expect(active, hasLength(1));
+    final plan = await savedPlans.planForCompetition(snapshot.competitionId);
+    final detail = await savedPlans.loadDetail(plan!.id);
+    expect(detail!.revisions, hasLength(1));
+    expect(detail.summary.stale, isTrue);
+    host.dispose();
+  });
+
+  test('unsupported re-evaluation contract requires explicit fresh baseline', () async {
+    final prior = await _persistAndAcceptPrior(
+      evaluations,
+      savedPlans,
+      snapshot,
+    );
+    final api = _ReevaluationPlanApi(
+      mode: _ReevaluationMode.unsupported,
+      priorEvaluationId: prior.id,
+      priorBasisFingerprint: prior.evaluationBasisFingerprint,
+    );
+    final host = PlanningHostViewModel(
+      apiClient: api,
+      scheduleRepository: schedule,
+      evaluationRepository: evaluations,
+      savedPlanRepository: savedPlans,
+    );
+
+    await host.startPlanning(snapshot);
+    await host.evaluate();
+
+    expect(host.phase, PlanningHostPhase.error);
+    expect(host.canCreateFreshBaseline, isTrue);
+    expect(api.evaluateCalls, 0);
+
+    host.createFreshEvaluationBaseline();
+    await host.evaluate();
+
+    expect(api.evaluateCalls, 1);
+    expect(host.phase, PlanningHostPhase.decision);
+    expect(
+      host.activeSession!.parsedResponse.evaluationId,
+      _fallbackEvaluationId,
+    );
+    expect(await evaluations.isStale(prior.id), isFalse);
+    host.dispose();
+  });
+}
+
+enum _ReevaluationMode { unchanged, superseded, failure, unsupported }
+
+const _freshEvaluationId = '22222222-2222-4222-8222-222222222222';
+const _fallbackEvaluationId = '33333333-3333-4333-8333-333333333333';
+
+final class _ReevaluationPlanApi implements PlanApiClient {
+  _ReevaluationPlanApi({
+    required this.mode,
+    required this.priorEvaluationId,
+    required this.priorBasisFingerprint,
+  });
+
+  final _ReevaluationMode mode;
+  final String priorEvaluationId;
+  final String priorBasisFingerprint;
+  int evaluateCalls = 0;
+  int reevaluateCalls = 0;
+
+  @override
+  Future<PlanEvaluateTransportResult> evaluate({
+    required String evaluationRequestJson,
+  }) async {
+    evaluateCalls++;
+    final raw = _decisionResponse(
+      evaluationIdValue: _fallbackEvaluationId,
+      basisFingerprint: List.filled(64, 'e').join(),
+    );
+    return PlanEvaluateTransportResult(
+      evaluationRequestJson: evaluationRequestJson,
+      evaluationResponseJson: raw,
+      response: PlanEvaluateResponseV1.parse(raw),
+    );
+  }
+
+  @override
+  Future<PlanReevaluateTransportResult> reevaluate({
+    required String priorEvaluationId,
+    required String priorEvaluationResponseJson,
+    required String currentEvaluationRequestJson,
+  }) async {
+    reevaluateCalls++;
+    expect(priorEvaluationId, this.priorEvaluationId);
+    expect(
+      PlanEvaluateResponseV1.parse(priorEvaluationResponseJson).basis.fingerprint,
+      priorBasisFingerprint,
+    );
+
+    if (mode == _ReevaluationMode.unsupported) {
+      throw const PlanApiFailure(
+        code: 'UNSUPPORTED_REEVALUATION_CONTRACT',
+        stage: 'reevaluation',
+        message: 'Prior evaluation basis structural version is not supported.',
+        retryable: false,
+      );
+    }
+
+    if (mode == _ReevaluationMode.failure) {
+      final transition = ReevaluationTransitionWire.fromValue({
+        'kind': 'SUPERSEDED',
+        'prior_evaluation_id': this.priorEvaluationId,
+        'prior_basis_fingerprint': priorBasisFingerprint,
+        'current_basis_fingerprint': null,
+        'prior_evaluation_freshness': 'STALE',
+        'change_reasons': ['PLANNING_BASIS_CHANGED'],
+      });
+      final errorJson = jsonEncode({
+        'code': 'PLANNING_EXECUTION_FAILED',
+        'message': 'The planning pipeline could not complete execution.',
+        'stage': 'planning',
+        'details': <Object?>[],
+      });
+      throw PlanApiFailure(
+        code: 'PLANNING_EXECUTION_FAILED',
+        stage: 'planning',
+        message: 'The planning pipeline could not complete execution.',
+        retryable: true,
+        statusCode: 500,
+        transportRequestJson: _transportRequest(currentEvaluationRequestJson),
+        transportResponseJson: jsonEncode({
+          'error': jsonDecode(errorJson),
+          'transition': transition.toJson(),
+        }),
+        transition: transition,
+        errorJson: errorJson,
+      );
+    }
+
+    if (mode == _ReevaluationMode.unchanged) {
+      final transition = ReevaluationTransitionWire.fromValue({
+        'kind': 'UNCHANGED',
+        'prior_evaluation_id': this.priorEvaluationId,
+        'prior_basis_fingerprint': priorBasisFingerprint,
+        'current_basis_fingerprint': priorBasisFingerprint,
+        'prior_evaluation_freshness': 'CURRENT',
+        'change_reasons': <String>[],
+      });
+      final raw = jsonEncode({
+        'transition': transition.toJson(),
+        'evaluation': null,
+      });
+      return PlanReevaluateTransportResult(
+        transportRequestJson: _transportRequest(currentEvaluationRequestJson),
+        transportResponseJson: raw,
+        evaluationRequestJson: currentEvaluationRequestJson,
+        success: PlanReevaluateSuccessWire.parse(raw),
+      );
+    }
+
+    final freshFingerprint = List.filled(64, 'd').join();
+    final freshRaw = _decisionResponse(
+      evaluationIdValue: _freshEvaluationId,
+      basisFingerprint: freshFingerprint,
+    );
+    final transition = ReevaluationTransitionWire.fromValue({
+      'kind': 'SUPERSEDED',
+      'prior_evaluation_id': this.priorEvaluationId,
+      'prior_basis_fingerprint': priorBasisFingerprint,
+      'current_basis_fingerprint': freshFingerprint,
+      'prior_evaluation_freshness': 'STALE',
+      'change_reasons': ['PLANNING_BASIS_CHANGED'],
+    });
+    final raw = jsonEncode({
+      'transition': transition.toJson(),
+      'evaluation': jsonDecode(freshRaw),
+    });
+    return PlanReevaluateTransportResult(
+      transportRequestJson: _transportRequest(currentEvaluationRequestJson),
+      transportResponseJson: raw,
+      evaluationRequestJson: currentEvaluationRequestJson,
+      success: PlanReevaluateSuccessWire.parse(raw),
+    );
+  }
+
+  String _transportRequest(String currentRequest) => jsonEncode({
+        'prior': {
+          'evaluation_id': priorEvaluationId,
+          'basis_fingerprint': priorBasisFingerprint,
+        },
+        'current': jsonDecode(currentRequest),
+      });
+
+  @override
+  void close() {}
 }
 
 final class _ControlledPlanApi implements PlanApiClient {
@@ -284,6 +581,40 @@ final class _FailOnceEvaluationRepository implements EvaluationRepository {
 
   @override
   Future<void> close() => delegate.close();
+}
+
+Future<Evaluation> _persistAndAcceptPrior(
+  DriftEvaluationRepository evaluations,
+  DriftSavedPlanRepository savedPlans,
+  AnalysisSnapshot snapshot,
+) async {
+  final prior = await evaluations.persistEvaluation(
+    analysisSnapshot: snapshot,
+    evaluationRequestJson: _priorRequest(),
+    evaluationResponseJson: jsonEncode(decisionFixture()),
+    planningWindowPolicyJson: jsonEncode({
+      'policy_version': 'planning-window-policy-v1',
+      'timezone': 'Asia/Jakarta',
+      'start_local': '09:00',
+      'end_local': '20:00',
+    }),
+  );
+  await savedPlans.acceptEvaluation(
+    evaluationId: prior.id,
+    candidateId: primaryId,
+    selectionSource: SelectionSource.primary,
+  );
+  return prior;
+}
+
+String _decisionResponse({
+  required String evaluationIdValue,
+  required String basisFingerprint,
+}) {
+  final raw = jsonEncode(decisionFixture())
+      .replaceAll(evaluationId, evaluationIdValue)
+      .replaceAll(List.filled(64, 'b').join(), basisFingerprint);
+  return raw;
 }
 
 Future<void> _waitFor(bool Function() condition) async {
