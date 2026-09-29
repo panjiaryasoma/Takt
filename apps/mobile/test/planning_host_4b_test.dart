@@ -143,7 +143,12 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        home: Scaffold(body: PlanningSetupScreen(host: host)),
+        home: AnimatedBuilder(
+          animation: host,
+          builder: (context, _) => Scaffold(
+            body: PlanningSetupScreen(host: host),
+          ),
+        ),
       ),
     );
 
@@ -176,7 +181,12 @@ void main() {
 
     await tester.pumpWidget(
       MaterialApp(
-        home: Scaffold(body: PlanningSetupScreen(host: host)),
+        home: AnimatedBuilder(
+          animation: host,
+          builder: (context, _) => Scaffold(
+            body: PlanningSetupScreen(host: host),
+          ),
+        ),
       ),
     );
     await tester.tap(find.text('Evaluate'));
