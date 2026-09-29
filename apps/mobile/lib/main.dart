@@ -9,6 +9,8 @@ import 'data/repositories/drift_analysis_repository.dart';
 import 'data/repositories/drift_schedule_repository.dart';
 import 'data/repositories/schedule_repository.dart';
 import 'models/commitment.dart';
+import 'monetization/revenuecat_bootstrap.dart';
+import 'monetization/revenuecat_service.dart';
 import 'models/decision_intent.dart';
 import 'models/evaluation_session.dart';
 import 'screens/analisis_kompetisi_screen.dart';
@@ -26,8 +28,15 @@ import 'viewmodels/jadwal_view_model.dart';
 import 'viewmodels/rencana_view_model.dart';
 import 'widgets/common.dart';
 
-void main() {
-  runApp(const TaktApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final monetization = await bootstrapRevenueCat();
+  if (monetization.configurationError != null) {
+    debugPrint(
+      'RevenueCat disabled: ${monetization.configurationError}',
+    );
+  }
+  runApp(TaktApp(revenueCatService: monetization.service));
 }
 
 class TaktApp extends StatelessWidget {
@@ -36,6 +45,7 @@ class TaktApp extends StatelessWidget {
     this.scheduleRepository,
     this.analysisRepository,
     this.apiClient,
+    this.revenueCatService,
     this.decisionSession,
     this.currentInputRevision = 0,
     this.onAcceptCandidate,
@@ -46,6 +56,7 @@ class TaktApp extends StatelessWidget {
   final ScheduleRepository? scheduleRepository;
   final AnalysisRepository? analysisRepository;
   final CompetitionApiClient? apiClient;
+  final RevenueCatService? revenueCatService;
   final EvaluationSession? decisionSession;
   final int currentInputRevision;
   final AcceptCandidateHandler? onAcceptCandidate;
@@ -56,6 +67,10 @@ class TaktApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        if (revenueCatService != null)
+          ChangeNotifierProvider<RevenueCatService>.value(
+            value: revenueCatService!,
+          ),
         ChangeNotifierProvider(
           create: (_) {
             final repository = scheduleRepository ??

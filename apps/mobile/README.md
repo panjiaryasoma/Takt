@@ -110,3 +110,15 @@ Never put RevenueCat secret `sk_` keys in the app or repository. Do not commit
 This branch keeps monetization at the access/presentation boundary. RevenueCat
 must not change planning inputs, solver feasibility, candidate validity, backend
 allowed actions, accepted-plan truth, or local domain persistence.
+
+
+### RevenueCat runtime foundation
+
+4C Block 2 uses the official `purchases_flutter` SDK. Startup configures RevenueCat
+once with the public key and no custom App User ID, so RevenueCat owns the anonymous
+identity. The runtime then reads `CustomerInfo` and resolves the canonical
+`default` / `$rc_lifetime` package from Offerings.
+
+Entitlement and offering refresh failures preserve the last trustworthy state.
+Missing offerings/packages stay explicitly empty; the app never invents a package.
+Purchase, restore, paywall UI, and final Decision Report gating remain later 4C work.
