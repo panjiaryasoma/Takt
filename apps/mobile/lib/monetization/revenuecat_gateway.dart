@@ -68,7 +68,13 @@ final class PurchasesRevenueCatGateway implements RevenueCatGateway {
       return null;
     }
 
-    final package = offering.getPackage(packageIdentifier);
+    rc.Package? package;
+    for (final candidate in offering.availablePackages) {
+      if (candidate.identifier == packageIdentifier) {
+        package = candidate;
+        break;
+      }
+    }
     if (package == null) {
       return null;
     }
