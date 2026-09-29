@@ -17,12 +17,12 @@ void main() {
     await tester.pumpWidget(TaktApp(scheduleRepository: repository));
     await tester.pumpAndSettle();
 
-    expect(find.text('Beranda'), findsOneWidget);
-    expect(find.text('Jadwal'), findsOneWidget);
-    expect(find.text('Analisis'), findsOneWidget);
-    expect(find.text('Rencana'), findsOneWidget);
-    expect(find.text('Ringkasan pekan ini'), findsOneWidget);
-    expect(find.text('Batas proyek / hari'), findsOneWidget);
+    expect(find.text('Home'), findsOneWidget);
+    expect(find.text('Schedule'), findsOneWidget);
+    expect(find.text('Analysis'), findsOneWidget);
+    expect(find.text('Plans'), findsOneWidget);
+    expect(find.text('This week at a glance'), findsOneWidget);
+    expect(find.text('Project limit / day'), findsOneWidget);
     expect(find.text('Tersedia'), findsNothing);
     expect(find.text('Welcome, Raka'), findsNothing);
     expect(tester.takeException(), isNull);
@@ -67,8 +67,8 @@ void main() {
       ),
     ));
     expect(tester.takeException(), isNull);
-    expect(find.textContaining('Tidak ada slot kosong'), findsNothing);
-    expect(find.textContaining('Rekomendasi belum tersedia'), findsOneWidget);
+    expect(find.textContaining('No available slot'), findsNothing);
+    expect(find.textContaining('Recommendation is not available yet'), findsOneWidget);
 
     expect(find.byKey(const Key('accept-candidate')), findsNothing);
     expect(submitted, isFalse);
