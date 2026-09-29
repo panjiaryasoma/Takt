@@ -18,7 +18,7 @@ final class PlanningInputException implements Exception {
   final String message;
 
   @override
-  String toString() => code + ': ' + message;
+  String toString() => '$code: $message';
 }
 
 final class PlanningAssembly {
@@ -206,7 +206,7 @@ final class PlanningRequestAssembler {
     } on Object {
       throw PlanningInputException(
         'PLANNING_INPUT_UNAVAILABLE',
-        'Unknown IANA timezone: ' + name,
+        'Unknown IANA timezone: $name',
       );
     }
   }
@@ -220,7 +220,7 @@ final class PlanningRequestAssembler {
     } on Object {
       throw PlanningInputException(
         'PLANNING_INPUT_UNAVAILABLE',
-        'Invalid persisted ' + field + '.',
+        'Invalid persisted $field.',
       );
     }
   }
@@ -229,7 +229,7 @@ final class PlanningRequestAssembler {
     if (value is! Map) {
       throw PlanningInputException(
         'PLANNING_INPUT_UNAVAILABLE',
-        field + ' must be an object.',
+        '$field must be an object.',
       );
     }
     return Map<String, dynamic>.from(value);
@@ -351,7 +351,7 @@ final class PlanningRequestAssembler {
     if (!sameWallClock(candidate)) {
       throw PlanningInputException(
         'PLANNING_INPUT_UNAVAILABLE',
-        field + ' falls in a nonexistent DST local time.',
+        '$field falls in a nonexistent DST local time.',
       );
     }
 
@@ -367,7 +367,7 @@ final class PlanningRequestAssembler {
     if (candidates.length != 1) {
       throw PlanningInputException(
         'PLANNING_INPUT_UNAVAILABLE',
-        field + ' is ambiguous at a DST transition.',
+        '$field is ambiguous at a DST transition.',
       );
     }
     return tz.TZDateTime.from(
@@ -387,17 +387,9 @@ final class PlanningRequestAssembler {
     final offsetMinutes = value.timeZoneOffset.inMinutes;
     final sign = offsetMinutes < 0 ? '-' : '+';
     final abs = offsetMinutes.abs();
-    final offset = sign + two(abs ~/ 60) + ':' + two(abs % 60);
-    return value.year.toString().padLeft(4, '0') +
-        '-' +
-        two(value.month) +
-        '-' +
-        two(value.day) +
-        'T' +
-        two(value.hour) +
-        ':' +
-        two(value.minute) +
-        ':00' +
-        offset;
+    final offset = '$sign${two(abs ~/ 60)}:${two(abs % 60)}';
+    return '${value.year.toString().padLeft(4, '0')}-'
+        '${two(value.month)}-${two(value.day)}T'
+        '${two(value.hour)}:${two(value.minute)}:00$offset';
   }
 }
