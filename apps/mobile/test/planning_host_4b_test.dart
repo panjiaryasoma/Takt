@@ -14,7 +14,6 @@ import 'package:takt_mobile/models/enums.dart';
 import 'package:takt_mobile/models/evaluation.dart';
 import 'package:takt_mobile/models/plan_evaluation_wire.dart';
 import 'package:takt_mobile/models/planning_input_draft.dart';
-import 'package:takt_mobile/models/reevaluation_transition.dart';
 import 'package:takt_mobile/models/reevaluation_wire.dart';
 import 'package:takt_mobile/viewmodels/planning_host_view_model.dart';
 
