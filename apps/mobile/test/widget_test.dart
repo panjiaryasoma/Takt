@@ -17,6 +17,6 @@ void main() {
     expect(find.text('Jadwal'), findsOneWidget);
     expect(find.text('Analisis'), findsOneWidget);
     expect(find.text('Rencana'), findsOneWidget);
-    expect(find.text('Kapasitas pekan ini'), findsOneWidget);
+    expect(find.text('Ringkasan pekan ini'), findsOneWidget);
   });
 }
