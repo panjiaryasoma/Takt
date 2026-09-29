@@ -82,7 +82,7 @@ class RencanaViewModel extends ChangeNotifier {
   }
 
   /// Setujui rencana → pindah ke history disetujui.
-  void setujui(String id, {String by = 'Anda'}) {
+  void setujui(String id, {String by = 'You'}) {
     final i = _entries.indexWhere((e) => e.id == id);
     if (i < 0) return;
     _entries[i] = _entries[i].copyWith(
