@@ -208,11 +208,8 @@ class _RekomendasiJadwalScreenState extends State<RekomendasiJadwalScreen> {
                             _vm.systemPrimaryCandidateId
                         ? 'System primary recommendation'
                         : 'Alternative $i',
-                    selected: _canAccessAlternatives
-                        ? _vm.selectedCandidateId ==
-                            planning.candidates[i].ref.candidateId
-                        : planning.candidates[i].ref.candidateId ==
-                            _vm.systemPrimaryCandidateId,
+                    selected: _vm.selectedCandidateId ==
+                        planning.candidates[i].ref.candidateId,
                     showChoose: _canAccessAlternatives &&
                         planning.candidates[i].ref.candidateId !=
                             _vm.systemPrimaryCandidateId &&
