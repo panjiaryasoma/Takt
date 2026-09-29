@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
@@ -374,6 +375,96 @@ void main() {
         'prior_source_artifacts',
       });
     });
+
+    test('PDF client rejects wrong media and source over 20 MiB', () async {
+      final responseBody = _responseBody('cmp-http-guard');
+      final recorder = _RecordingHttpClient(responseBody);
+      final client = HttpCompetitionApiClient(
+        baseUrl: 'https://example.test',
+        client: recorder,
+      );
+      addTearDown(client.close);
+
+      const source = AnalysisSourceMetadata(
+        sourceId: 'src-pdf-guard',
+        sourceType: SourceTypeWire.officialRules,
+      );
+
+      await expectLater(
+        client.analyzePdf(
+          competitionId: 'cmp-http-guard',
+          documentId: 'doc-image',
+          filename: 'image.png',
+          bytes: Uint8List.fromList([1]),
+          source: source,
+        ),
+        throwsA(
+          isA<AnalysisFailure>().having(
+            (error) => error.code,
+            'code',
+            'CLIENT_MEDIA_TYPE',
+          ),
+        ),
+      );
+
+      await expectLater(
+        client.analyzePdf(
+          competitionId: 'cmp-http-guard',
+          documentId: 'doc-large',
+          filename: 'large.pdf',
+          bytes: Uint8List(maxAnalysisSourceBytes + 1),
+          source: source,
+        ),
+        throwsA(
+          isA<AnalysisFailure>().having(
+            (error) => error.code,
+            'code',
+            'CLIENT_SOURCE_LIMIT',
+          ),
+        ),
+      );
+
+      expect(recorder.calls, 0);
+    });
+
+    test('unknown backend envelope fails safely without invented retry',
+        () async {
+      final recorder = _RecordingHttpClient(
+        '{"detail":"unexpected"}',
+        statusCode: 500,
+      );
+      final client = HttpCompetitionApiClient(
+        baseUrl: 'https://example.test',
+        client: recorder,
+      );
+      addTearDown(client.close);
+
+      const source = AnalysisSourceMetadata(
+        sourceId: 'src-error',
+        sourceType: SourceTypeWire.officialRules,
+      );
+
+      await expectLater(
+        client.analyzeUrl(
+          competitionId: 'cmp-error',
+          url: 'https://example.com/rules',
+          source: source,
+        ),
+        throwsA(
+          isA<AnalysisFailure>()
+              .having(
+                (error) => error.code,
+                'code',
+                'UNKNOWN_BACKEND_ERROR',
+              )
+              .having(
+                (error) => error.retryable,
+                'retryable',
+                isFalse,
+              ),
+        ),
+      );
+    });
   });
 
   group('2B local persistence', () {
@@ -541,11 +632,42 @@ void main() {
       expect(vm.phase, AnalysisPhase.requestError);
       expect(vm.canRetryRequest, isTrue);
       expect(api.calls, 1);
+      expect(repository.persistCalls, 0);
 
       await vm.retryRequest();
 
       expect(vm.phase, AnalysisPhase.ready);
       expect(api.calls, 2);
+      expect(repository.persistCalls, 1);
+    });
+
+
+    test('double submit is ignored while request is in flight', () async {
+      final api = _BlockingApiClient();
+      final repository = _MemoryAnalysisRepository();
+      final vm = AnalisisViewModel(
+        apiClient: api,
+        repository: repository,
+      );
+
+      final first = vm.analyzeUrl(
+        url: 'https://example.com/rules',
+        sourceType: SourceTypeWire.officialRules,
+        continuation: false,
+      );
+      await Future<void>.delayed(Duration.zero);
+
+      await vm.analyzeUrl(
+        url: 'https://example.com/faq',
+        sourceType: SourceTypeWire.officialFaq,
+        continuation: false,
+      );
+
+      expect(api.calls, 1);
+      api.complete();
+      await first;
+
+      expect(vm.phase, AnalysisPhase.ready);
       expect(repository.persistCalls, 1);
     });
 
@@ -735,9 +857,14 @@ CompetitionAnalysisTransportResult _transport(
 
 
 class _RecordingHttpClient extends http.BaseClient {
-  _RecordingHttpClient(this.responseBody);
+  _RecordingHttpClient(
+    this.responseBody, {
+    this.statusCode = 200,
+  });
 
   final String responseBody;
+  final int statusCode;
+  int calls = 0;
   String? method;
   Uri? url;
   Uint8List? bodyBytes;
@@ -746,6 +873,7 @@ class _RecordingHttpClient extends http.BaseClient {
 
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    calls += 1;
     method = request.method;
     url = request.url;
     if (request is http.MultipartRequest) {
@@ -757,8 +885,51 @@ class _RecordingHttpClient extends http.BaseClient {
     );
     return http.StreamedResponse(
       Stream<List<int>>.value(utf8.encode(responseBody)),
-      200,
+      statusCode,
       headers: const {'content-type': 'application/json'},
+    );
+  }
+}
+
+
+class _BlockingApiClient implements CompetitionApiClient {
+  final Completer<CompetitionAnalysisTransportResult> _completer =
+      Completer<CompetitionAnalysisTransportResult>();
+  int calls = 0;
+  String? competitionId;
+
+  @override
+  Future<CompetitionAnalysisTransportResult> analyzeUrl({
+    required String competitionId,
+    required String url,
+    required AnalysisSourceMetadata source,
+    AnalysisContinuationContext? continuation,
+  }) {
+    calls += 1;
+    this.competitionId = competitionId;
+    return _completer.future;
+  }
+
+  void complete() {
+    final id = competitionId;
+    if (id == null) throw StateError('request has not started');
+    _completer.complete(_transport(id, pretty: true));
+  }
+
+  @override
+  Future<CompetitionAnalysisTransportResult> analyzePdf({
+    required String competitionId,
+    required String documentId,
+    required String filename,
+    required Uint8List bytes,
+    required AnalysisSourceMetadata source,
+    AnalysisContinuationContext? continuation,
+  }) {
+    return analyzeUrl(
+      competitionId: competitionId,
+      url: documentId,
+      source: source,
+      continuation: continuation,
     );
   }
 }
