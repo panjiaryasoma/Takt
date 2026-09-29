@@ -28,7 +28,7 @@ class ProgresAnalisisScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const AppHeader(title: 'Progres Analisis'),
+          const AppHeader(title: 'Analysis Progress'),
           const HeaderDivider(),
           const SizedBox(height: 16),
           Container(
@@ -115,7 +115,7 @@ class ProgresAnalisisScreen extends StatelessWidget {
                       ),
                       SizedBox(width: 8),
                       Text(
-                        'Analisis belum selesai',
+                        'Analysis is not complete',
                         style: TextStyle(
                           color: C.white,
                           fontSize: 14,
@@ -151,19 +151,19 @@ class ProgresAnalisisScreen extends StatelessWidget {
                     )
                   else if (vm.canRetryPersistence)
                     _ActionButton(
-                      label: 'Coba simpan lagi',
+                      label: 'Retry save',
                       onTap: () {
                         vm.retryPersistence();
                       },
                     )
                   else if (vm.requiresFreshAnalysis)
                     _ActionButton(
-                      label: 'Mulai analisis baru',
+                      label: 'Start a new analysis',
                       onTap: onStartNewAnalysis,
                     )
                   else
                     _ActionButton(
-                      label: 'Kembali ke input',
+                      label: 'Back to input',
                       onTap: onBackToInput,
                     ),
                 ],
@@ -185,7 +185,7 @@ class ProgresAnalisisScreen extends StatelessWidget {
                   ),
                   alignment: Alignment.center,
                   child: Text(
-                    vm.selesai ? 'Baca Hasil' : 'Belum siap direview',
+                    vm.selesai ? 'View Results' : 'Not ready for review',
                     style: const TextStyle(
                       color: C.bg,
                       fontSize: 15,
