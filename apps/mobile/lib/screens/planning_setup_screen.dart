@@ -357,34 +357,38 @@ class _PlanningSetupScreenState extends State<PlanningSetupScreen> {
                     style: TextStyle(color: C.detailMuted),
                   ),
                 for (final task in _tasks)
-                  ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    title: Text(task.name),
-                    subtitle: Text(
-                      '${task.effortMinMinutes} / ${task.effortLikelyMinutes} / ${task.effortMaxMinutes} min\nID: ${task.taskId}',
-                    ),
-                    isThreeLine: true,
-                    trailing: Wrap(
-                      spacing: 4,
-                      children: [
-                        IconButton(
-                          tooltip: 'Edit task',
-                          onPressed: inputsLocked ? null : () => _editTask(task),
-                          icon: const Icon(Icons.edit_outlined),
-                        ),
-                        IconButton(
-                          tooltip: 'Delete task',
-                          onPressed: inputsLocked
-                              ? null
-                              : () => setState(() {
-                                    _tasks = _tasks
-                                        .where((item) =>
-                                            item.taskId != task.taskId)
-                                        .toList(growable: false);
-                                  }),
-                          icon: const Icon(Icons.delete_outline),
-                        ),
-                      ],
+                  Material(
+                    color: Colors.transparent,
+                    child: ListTile(
+                      contentPadding: EdgeInsets.zero,
+                      title: Text(task.name),
+                      subtitle: Text(
+                        '${task.effortMinMinutes} / ${task.effortLikelyMinutes} / ${task.effortMaxMinutes} min\nID: ${task.taskId}',
+                      ),
+                      isThreeLine: true,
+                      trailing: Wrap(
+                        spacing: 4,
+                        children: [
+                          IconButton(
+                            tooltip: 'Edit task',
+                            onPressed:
+                                inputsLocked ? null : () => _editTask(task),
+                            icon: const Icon(Icons.edit_outlined),
+                          ),
+                          IconButton(
+                            tooltip: 'Delete task',
+                            onPressed: inputsLocked
+                                ? null
+                                : () => setState(() {
+                                      _tasks = _tasks
+                                          .where((item) =>
+                                              item.taskId != task.taskId)
+                                          .toList(growable: false);
+                                    }),
+                            icon: const Icon(Icons.delete_outline),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 OutlinedButton.icon(
