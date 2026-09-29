@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:http/http.dart' as http;
 import 'package:takt_mobile/data/database/app_database.dart';
 import 'package:takt_mobile/data/remote/competition_api_client.dart';
 import 'package:takt_mobile/data/repositories/analysis_repository.dart';
@@ -245,6 +246,97 @@ void main() {
         'authority_rank': {'basis': 'official_rules'},
         'scope': <String, Object?>{},
         'freshness_metadata': <String, Object?>{},
+      });
+    });
+  });
+
+
+  group('2B concrete HTTP transport', () {
+    test('URL request sends exact contract and preserves original body',
+        () async {
+      final responseBody = _responseBody('cmp-http-url', pretty: true);
+      final recorder = _RecordingHttpClient(responseBody);
+      final client = HttpCompetitionApiClient(
+        baseUrl: 'https://example.test',
+        client: recorder,
+      );
+      addTearDown(client.close);
+
+      const source = AnalysisSourceMetadata(
+        sourceId: 'src-url',
+        sourceType: SourceTypeWire.officialRules,
+      );
+      final result = await client.analyzeUrl(
+        competitionId: 'cmp-http-url',
+        url: 'https://example.com/rules',
+        source: source,
+      );
+
+      expect(result.originalBody, responseBody);
+      expect(recorder.method, 'POST');
+      expect(
+        recorder.url?.path,
+        '/api/v1/competitions/analyze/url',
+      );
+      final requestJson =
+          jsonDecode(utf8.decode(recorder.bodyBytes!))
+              as Map<String, dynamic>;
+      expect(requestJson.keys.toSet(), {
+        'competition_id',
+        'url',
+        'source',
+        'previous_report_bundle',
+        'prior_source_artifacts',
+      });
+      expect(requestJson['previous_report_bundle'], isNull);
+      expect(requestJson['prior_source_artifacts'], isEmpty);
+    });
+
+    test('PDF multipart contains only metadata and one PDF file', () async {
+      final responseBody = _responseBody('cmp-http-pdf');
+      final recorder = _RecordingHttpClient(responseBody);
+      final client = HttpCompetitionApiClient(
+        baseUrl: 'https://example.test',
+        client: recorder,
+      );
+      addTearDown(client.close);
+
+      const source = AnalysisSourceMetadata(
+        sourceId: 'src-pdf',
+        sourceType: SourceTypeWire.officialOrganizer,
+      );
+      final result = await client.analyzePdf(
+        competitionId: 'cmp-http-pdf',
+        documentId: 'pdf:rules.pdf:abc',
+        filename: 'rules.pdf',
+        bytes: Uint8List.fromList([37, 80, 68, 70]),
+        source: source,
+      );
+
+      expect(result.originalBody, responseBody);
+      expect(recorder.method, 'POST');
+      expect(
+        recorder.url?.path,
+        '/api/v1/competitions/analyze/pdf',
+      );
+      expect(recorder.multipartFields.keys.toSet(), {'metadata'});
+      expect(recorder.multipartFiles, hasLength(1));
+      expect(recorder.multipartFiles.single.field, 'file');
+      expect(recorder.multipartFiles.single.filename, 'rules.pdf');
+      expect(
+        recorder.multipartFiles.single.contentType.toString(),
+        'application/pdf',
+      );
+
+      final metadata = jsonDecode(
+        recorder.multipartFields['metadata']!,
+      ) as Map<String, dynamic>;
+      expect(metadata.keys.toSet(), {
+        'competition_id',
+        'document_id',
+        'source',
+        'previous_report_bundle',
+        'prior_source_artifacts',
       });
     });
   });
@@ -568,6 +660,36 @@ CompetitionAnalysisTransportResult _transport(
     originalBody: body,
     response: CompetitionAnalyzeResponseWire.parse(body),
   );
+}
+
+
+class _RecordingHttpClient extends http.BaseClient {
+  _RecordingHttpClient(this.responseBody);
+
+  final String responseBody;
+  String? method;
+  Uri? url;
+  Uint8List? bodyBytes;
+  Map<String, String> multipartFields = {};
+  List<http.MultipartFile> multipartFiles = [];
+
+  @override
+  Future<http.StreamedResponse> send(http.BaseRequest request) async {
+    method = request.method;
+    url = request.url;
+    if (request is http.MultipartRequest) {
+      multipartFields = Map<String, String>.from(request.fields);
+      multipartFiles = List<http.MultipartFile>.from(request.files);
+    }
+    bodyBytes = Uint8List.fromList(
+      await request.finalize().toBytes(),
+    );
+    return http.StreamedResponse(
+      Stream<List<int>>.value(utf8.encode(responseBody)),
+      200,
+      headers: const {'content-type': 'application/json'},
+    );
+  }
 }
 
 class _FakeApiClient implements CompetitionApiClient {
