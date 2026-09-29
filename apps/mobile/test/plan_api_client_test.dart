@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:http/testing.dart';
 import 'package:takt_mobile/data/remote/plan_api_client.dart';
 import 'package:takt_mobile/models/enums.dart';
+import 'package:takt_mobile/models/reevaluation_wire.dart';
 
 import 'support/decision_fixture.dart';
 
@@ -84,6 +85,45 @@ void main() {
     client.close();
   });
 
+  test('re-evaluation transition rejects non-canonical change reason order', () {
+    expect(
+      () => ReevaluationTransitionWire.fromValue({
+        'kind': 'SUPERSEDED',
+        'prior_evaluation_id': evaluationId,
+        'prior_basis_fingerprint': List.filled(64, 'b').join(),
+        'current_basis_fingerprint': List.filled(64, 'c').join(),
+        'prior_evaluation_freshness': 'STALE',
+        'change_reasons': [
+          'PLANNING_BASIS_CHANGED',
+          'REPORT_BASIS_CHANGED',
+        ],
+      }),
+      throwsFormatException,
+    );
+  });
+
+  test('re-evaluation error rejects malformed public detail objects', () {
+    final raw = jsonEncode({
+      'error': {
+        'code': 'VALIDATION_ERROR',
+        'message': 'Invalid input.',
+        'stage': 'validation',
+        'details': [
+          {
+            'path': 'planning.workload',
+            'message': 'Invalid.',
+          },
+        ],
+      },
+      'transition': null,
+    });
+
+    expect(
+      () => PlanReevaluateErrorWire.parse(raw),
+      throwsFormatException,
+    );
+  });
+
   test('trusted re-evaluation failure carries exact transport request', () async {
     final priorResponseJson = jsonEncode(decisionFixture());
     const currentRequestJson = '{"current":true}';
@@ -91,7 +131,7 @@ void main() {
       'kind': 'SUPERSEDED',
       'prior_evaluation_id': evaluationId,
       'prior_basis_fingerprint': List.filled(64, 'b').join(),
-      'current_basis_fingerprint': null,
+      'current_basis_fingerprint': List.filled(64, 'c').join(),
       'prior_evaluation_freshness': 'STALE',
       'change_reasons': ['PLANNING_BASIS_CHANGED'],
     };
