@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -303,6 +304,83 @@ INSERT INTO analysis_snapshots (
       final active = await savedPlans.activeAcceptedBlocks();
       expect(active, hasLength(1));
       expect(active.single.savedPlanRevisionId, revision.id);
+    });
+
+    test('accepted plan, task progress, and blocks survive database restart',
+        () async {
+      final dir =
+          await Directory.systemTemp.createTemp('takt_4b_restart_');
+      final file = File('${dir.path}/takt.sqlite3');
+      addTearDown(() async {
+        if (await dir.exists()) await dir.delete(recursive: true);
+      });
+
+      final firstDb = AppDatabase.forTesting(NativeDatabase(file));
+      await firstDb.initialize();
+      final firstSnapshot = _analysisSnapshot();
+      await firstDb.customStatement(
+        '''
+INSERT INTO competitions (
+  id, created_at_epoch_ms, updated_at_epoch_ms
+) VALUES (?, ?, ?)
+''',
+        [firstSnapshot.competitionId, 1, 1],
+      );
+      await firstDb.customStatement(
+        '''
+INSERT INTO analysis_snapshots (
+  id, competition_id, report_version, assembly_material_fingerprint,
+  source_set_fingerprint, wire_fingerprint, report_changed,
+  response_json, cached_at_epoch_ms
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+''',
+        [
+          firstSnapshot.id,
+          firstSnapshot.competitionId,
+          firstSnapshot.reportVersion,
+          firstSnapshot.assemblyMaterialFingerprint,
+          null,
+          firstSnapshot.wireFingerprint,
+          1,
+          firstSnapshot.responseJson,
+          firstSnapshot.cachedAtEpochMs,
+        ],
+      );
+      final firstEvaluations = DriftEvaluationRepository(firstDb);
+      final firstPlans = DriftSavedPlanRepository(firstDb);
+      final evaluation = await firstEvaluations.persistEvaluation(
+        analysisSnapshot: firstSnapshot,
+        evaluationRequestJson: _evaluationRequest(),
+        evaluationResponseJson: jsonEncode(decisionFixture()),
+        planningWindowPolicyJson: _windowPolicyJson(),
+      );
+      final revision = await firstPlans.acceptEvaluation(
+        evaluationId: evaluation.id,
+        candidateId: primaryId,
+        selectionSource: SelectionSource.primary,
+      );
+      final initialDetail = await firstPlans.loadDetail(revision.savedPlanId);
+      await firstPlans.updateTaskProgress(
+        savedPlanTaskId: initialDetail!.tasks.single.task.id,
+        progressPercent: 65,
+        actualMinutes: 50,
+      );
+      await firstDb.close();
+
+      final secondDb = AppDatabase.forTesting(NativeDatabase(file));
+      addTearDown(secondDb.close);
+      await secondDb.initialize();
+      final secondPlans = DriftSavedPlanRepository(secondDb);
+      final summaries = await secondPlans.listSummaries();
+
+      expect(summaries, hasLength(1));
+      final detail = await secondPlans.loadDetail(summaries.single.plan.id);
+      expect(detail, isNotNull);
+      expect(detail!.summary.currentRevision.id, revision.id);
+      expect(detail.tasks.single.progress.progressPercent, 65);
+      expect(detail.tasks.single.progress.actualMinutes, 50);
+      expect(detail.acceptedCommitments, hasLength(1));
+      expect(await secondPlans.activeAcceptedBlocks(), hasLength(1));
     });
 
     test('database rejects half-formed SUPERSEDED transition', () async {
