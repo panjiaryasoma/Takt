@@ -227,6 +227,7 @@ class _RootShellState extends State<RootShell> {
 
   Future<void> _reevaluateSavedPlan(SavedPlanSummary summary) async {
     final analysis = context.read<AnalisisViewModel>();
+    final host = context.read<PlanningHostViewModel>();
     final snapshot = await analysis.latestSnapshotForCompetition(
       summary.plan.competitionId,
     );
@@ -242,7 +243,7 @@ class _RootShellState extends State<RootShell> {
       return;
     }
     await analysis.loadSnapshot(snapshot);
-    await context.read<PlanningHostViewModel>().startPlanning(snapshot);
+    await host.startPlanning(snapshot);
     if (!mounted) return;
     setState(() {
       _selectedSavedPlanId = null;
