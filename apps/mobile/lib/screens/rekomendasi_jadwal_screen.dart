@@ -115,12 +115,12 @@ class _RekomendasiJadwalScreenState extends State<RekomendasiJadwalScreen> {
           const Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Text('Rekomendasi Slot Pengerjaan',
+              Text('Rekomendasi Slot Pengerjaan',
                   style: TextStyle(
                       color: C.white,
                       fontSize: 15,
                       fontWeight: FontWeight.w700)),
-              const Row(
+              Row(
                 children: [
                   Icon(Icons.lock_clock_outlined,
                       color: C.detailMuted, size: 16),
