@@ -31,6 +31,20 @@ void main() {
       }
     });
 
+
+    test('rejects unsupported report policy version', () {
+      final raw = jsonDecode(_responseBody('cmp-version'))
+          as Map<String, dynamic>;
+      final bundle = raw['report_bundle'] as Map<String, dynamic>;
+      final ref = bundle['ref'] as Map<String, dynamic>;
+      ref['domain_schema_version'] = '99.0.0';
+
+      expect(
+        () => CompetitionAnalyzeResponseWire.parse(jsonEncode(raw)),
+        throwsFormatException,
+      );
+    });
+
     test('rejects unknown canonical state from backend response', () {
       final raw = jsonDecode(_responseBody('cmp-wire'))
           as Map<String, dynamic>;
@@ -468,15 +482,15 @@ String _responseBody(
         'unresolved_critical_fields': <String>[],
       },
       'ref': {
-        'domain_schema_version': '1',
+        'domain_schema_version': '3.0.0',
         'competition_id': competitionId,
         'report_version': 1,
-        'reconciliation_policy_version': '1',
-        'assembly_policy_version': '1',
+        'reconciliation_policy_version': 'reconciliation-v1',
+        'assembly_policy_version': 'canonical-v1',
         'assembly_material_fingerprint': 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
-        'source_set_fingerprint_version': '1',
+        'source_set_fingerprint_version': 'source-set-jcs-sha256-v1',
         'source_set_fingerprint': 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb',
-        'wire_fingerprint_version': '1',
+        'wire_fingerprint_version': 'report-wire-jcs-sha256-v1',
         'wire_fingerprint': 'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
       },
     },
