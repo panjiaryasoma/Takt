@@ -1,12 +1,18 @@
 /// Status satu langkah analisis.
 enum AnalysisStepState { waiting, process, done }
 
-/// Fase keseluruhan proses analisis AI.
-enum AnalysisPhase { idle, running, done, error }
+/// Fase real flow Hari 2B. Tidak ada fake progress/ETA.
+enum AnalysisPhase {
+  idle,
+  validating,
+  submitting,
+  persisting,
+  ready,
+  requestError,
+  persistenceError,
+}
 
-/// Satu langkah dalam pipeline analisis AI (mis. "Membaca sumber resmi").
-/// Nanti diisi dari progress event AI model temanmu; sekarang bisa diisi
-/// simulasi.
+/// Satu langkah presentation untuk state yang benar-benar diketahui client.
 class AnalysisStep {
   const AnalysisStep({
     required this.title,
