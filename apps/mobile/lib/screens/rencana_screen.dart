@@ -31,8 +31,8 @@ class RencanaScreen extends StatelessWidget {
 
   String _decidedLabel(SavedPlanEntry e) {
     final d = e.decidedAt;
-    if (d == null) return }''Anda'}';
-    return '${d.day} ${_bulanSingkat[d.month - 1]} · oleh ${e.decidedBy ?? 'Anda'}';
+    if (d == null) return e.decidedBy ?? 'You';
+    return '${d.day} ${_bulanSingkat[d.month - 1]} · by ${e.decidedBy ?? 'You'}';
   }
 
   @override
