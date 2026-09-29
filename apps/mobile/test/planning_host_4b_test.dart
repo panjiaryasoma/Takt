@@ -152,6 +152,8 @@ void main() {
       ),
     );
 
+    await tester.ensureVisible(find.text('Evaluate'));
+    await tester.pump();
     await tester.tap(find.text('Evaluate'));
     await tester.pump();
     for (var i = 0; i < 20 && api.lastEvaluationRequest == null; i++) {
@@ -191,6 +193,8 @@ void main() {
         ),
       ),
     );
+    await tester.ensureVisible(find.text('Evaluate'));
+    await tester.pump();
     await tester.tap(find.text('Evaluate'));
     await tester.pumpAndSettle();
 
