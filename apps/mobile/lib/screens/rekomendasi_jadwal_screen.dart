@@ -4,16 +4,20 @@ import '../models/decision_intent.dart';
 import '../models/decision_report_view_data.dart';
 import '../models/enums.dart';
 import '../models/evaluation_session.dart';
+import '../monetization/revenuecat_contract.dart';
+import '../monetization/revenuecat_service.dart';
 import '../theme/app_theme.dart';
 import '../viewmodels/decision_report_view_model.dart';
 
 /// Host-injected Decision Report; no repositories, input generation or HTTP.
 class RekomendasiJadwalScreen extends StatefulWidget {
   const RekomendasiJadwalScreen({super.key, required this.session,
-    required this.currentInputRevision, this.onAccept, this.onEditConstraints,
-    this.onIgnore, this.onBack});
+    required this.currentInputRevision, this.revenueCatService, this.onOpenPro,
+    this.onAccept, this.onEditConstraints, this.onIgnore, this.onBack});
   final EvaluationSession? session;
   final int currentInputRevision;
+  final RevenueCatService? revenueCatService;
+  final VoidCallback? onOpenPro;
   final AcceptCandidateHandler? onAccept;
   final ValueChanged<EditConstraintsIntent>? onEditConstraints;
   final ValueChanged<IgnoreRecommendationIntent>? onIgnore;
@@ -66,8 +70,21 @@ class _RekomendasiJadwalScreenState extends State<RekomendasiJadwalScreen> {
     super.dispose();
   }
 
+  bool get _canAccessAlternatives =>
+      widget.revenueCatService?.canAccess(PremiumFeature.alternativeCandidates) ?? false;
+
+  bool _prepareAccessibleSelection() {
+    if (_canAccessAlternatives) return true;
+    final primary = _vm.systemPrimaryCandidateId;
+    if (primary == null) return false;
+    if (_vm.selectedCandidateId == primary) return true;
+    if (_vm.handoffPending) return false;
+    return _vm.chooseCandidate(primary);
+  }
+
   Future<void> _accept() async {
     if (_openingConfirmation || widget.onAccept == null) return;
+    if (!_prepareAccessibleSelection()) return;
     final token = _vm.beginAccept();
     if (token == null) return;
     _openingConfirmation = true;
@@ -109,6 +126,11 @@ class _RekomendasiJadwalScreenState extends State<RekomendasiJadwalScreen> {
     if (!mounted) return;
     final handler = widget.onAccept;
     if (confirmed != true || handler == null) {
+      _vm.cancelConfirmation(token);
+      return;
+    }
+    if (!_canAccessAlternatives &&
+        token.selectionSource == SelectionSource.alternative) {
       _vm.cancelConfirmation(token);
       return;
     }
@@ -174,13 +196,43 @@ class _RekomendasiJadwalScreenState extends State<RekomendasiJadwalScreen> {
             if (planning != null && payload != null) ...[
               const Text('Times are shown in your device time zone.', style: TextStyle(color: C.detailMuted)),
               for (var i = 0; i < planning.candidates.length; i++)
-                _CandidateCard(key: Key('candidate-${planning.candidates[i].ref.candidateId}'),
-                  data: view.candidate(planning.candidates[i]),
-                  label: i == 0 ? 'System primary recommendation' : 'Alternative $i',
-                  selected: _vm.selectedCandidateId == planning.candidates[i].ref.candidateId,
-                  showChoose: planning.allowedActions.contains(RecommendationAction.chooseAlternative),
-                  onChoose: _vm.can(RecommendationAction.chooseAlternative)
-                      ? () => _vm.chooseCandidate(planning.candidates[i].ref.candidateId) : null),
+                if (planning.candidates[i].ref.candidateId ==
+                        _vm.systemPrimaryCandidateId ||
+                    _canAccessAlternatives)
+                  _CandidateCard(
+                    key: Key(
+                      'candidate-${planning.candidates[i].ref.candidateId}',
+                    ),
+                    data: view.candidate(planning.candidates[i]),
+                    label: planning.candidates[i].ref.candidateId ==
+                            _vm.systemPrimaryCandidateId
+                        ? 'System primary recommendation'
+                        : 'Alternative $i',
+                    selected: _canAccessAlternatives
+                        ? _vm.selectedCandidateId ==
+                            planning.candidates[i].ref.candidateId
+                        : planning.candidates[i].ref.candidateId ==
+                            _vm.systemPrimaryCandidateId,
+                    showChoose: _canAccessAlternatives &&
+                        planning.candidates[i].ref.candidateId !=
+                            _vm.systemPrimaryCandidateId &&
+                        planning.allowedActions.contains(
+                          RecommendationAction.chooseAlternative,
+                        ),
+                    onChoose: _canAccessAlternatives &&
+                            _vm.can(RecommendationAction.chooseAlternative)
+                        ? () => _vm.chooseCandidate(
+                              planning.candidates[i].ref.candidateId,
+                            )
+                        : null,
+                  ),
+              if (!_canAccessAlternatives &&
+                  planning.candidates.any(
+                    (candidate) =>
+                        candidate.ref.candidateId !=
+                        _vm.systemPrimaryCandidateId,
+                  ))
+                _PremiumAlternativesCard(onOpenPro: widget.onOpenPro),
               _ReportCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 _TextList(title: 'Primary recommendation rationale', lines: payload.rationale),
                 _TextList(title: 'Evaluation assumptions', lines: payload.assumptions.map((item) =>
@@ -193,7 +245,12 @@ class _RekomendasiJadwalScreenState extends State<RekomendasiJadwalScreen> {
             if (planning != null) ...[
               if (planning.allowedActions.contains(RecommendationAction.accept)) ...[
                 FilledButton(key: const Key('accept-candidate'),
-                    onPressed: widget.onAccept != null && _vm.can(RecommendationAction.accept) ? _accept : null,
+                    onPressed: widget.onAccept != null &&
+                            _vm.can(RecommendationAction.accept) &&
+                            (_canAccessAlternatives ||
+                                _vm.systemPrimaryCandidateId != null)
+                        ? _accept
+                        : null,
                     child: const Text('Accept this option')),
                 if (widget.onAccept == null) const Text('Plan acceptance is not available yet.', style: TextStyle(color: C.detailMuted)),
               ],
@@ -270,6 +327,40 @@ class _CandidateCard extends StatelessWidget {
           ],
         ]),
       ]),
+    );
+  }
+}
+
+class _PremiumAlternativesCard extends StatelessWidget {
+  const _PremiumAlternativesCard({this.onOpenPro});
+
+  final VoidCallback? onOpenPro;
+
+  @override
+  Widget build(BuildContext context) {
+    return _ReportCard(
+      child: Column(
+        key: const Key('alternatives-locked'),
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          const _Heading('Alternative Candidate Explorer · Takt Pro'),
+          const Text(
+            'Your primary recommendation stays available. Takt Pro unlocks '
+            'the additional valid candidate schedules returned by the same '
+            'backend evaluation.',
+            style: TextStyle(color: C.detailMuted),
+          ),
+          if (onOpenPro != null) ...[
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              key: const Key('open-pro-alternatives'),
+              onPressed: onOpenPro,
+              icon: const Icon(Icons.workspace_premium_outlined),
+              label: const Text('View Takt Pro'),
+            ),
+          ],
+        ],
+      ),
     );
   }
 }
