@@ -207,6 +207,14 @@ class CanonicalFieldWire {
         if (candidates.length < 2 || evidenceIds.length < 2) {
           throw FormatException('$path CONFLICT requires multiple evidence');
         }
+        final normalizedCandidates = candidates
+            .map((candidate) => _stableJson(candidate.normalizedValue))
+            .toSet();
+        if (normalizedCandidates.length < 2) {
+          throw FormatException(
+            '$path CONFLICT requires normalized candidate disagreement',
+          );
+        }
         return;
       case CanonicalFieldState.missing:
         if (value != null ||
@@ -842,4 +850,22 @@ void _expectKeys(
 
 bool _sameSet(Set<String> left, Set<String> right) {
   return left.length == right.length && left.containsAll(right);
+}
+
+
+String _stableJson(Object? value) {
+  Object? canonicalize(Object? item) {
+    if (item is Map) {
+      final keys = item.keys.map((key) => key.toString()).toList()..sort();
+      return <String, Object?>{
+        for (final key in keys) key: canonicalize(item[key]),
+      };
+    }
+    if (item is List) {
+      return item.map(canonicalize).toList(growable: false);
+    }
+    return item;
+  }
+
+  return jsonEncode(canonicalize(value));
 }
