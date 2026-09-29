@@ -340,6 +340,27 @@ void main() {
       expect(repository.persistCalls, 2);
     });
 
+
+    test('broken continuation context requires explicit fresh analysis',
+        () async {
+      final api = _ContextFailureApiClient();
+      final repository = _MemoryAnalysisRepository();
+      final vm = AnalisisViewModel(
+        apiClient: api,
+        repository: repository,
+      );
+
+      await vm.analyzeUrl(
+        url: 'https://example.com/rules',
+        sourceType: SourceTypeWire.officialRules,
+        continuation: false,
+      );
+
+      expect(vm.phase, AnalysisPhase.requestError);
+      expect(vm.requiresFreshAnalysis, isTrue);
+      expect(vm.canRetryRequest, isFalse);
+    });
+
     test('retryable request failure can retry the same request', () async {
       final api = _FakeApiClient(failFirstRequest: true);
       final repository = _MemoryAnalysisRepository();
@@ -580,6 +601,42 @@ class _FakeApiClient implements CompetitionApiClient {
     final result = _transport(competitionId, pretty: true);
     lastBody = result.originalBody;
     return result;
+  }
+
+  @override
+  Future<CompetitionAnalysisTransportResult> analyzePdf({
+    required String competitionId,
+    required String documentId,
+    required String filename,
+    required Uint8List bytes,
+    required AnalysisSourceMetadata source,
+    AnalysisContinuationContext? continuation,
+  }) {
+    return analyzeUrl(
+      competitionId: competitionId,
+      url: documentId,
+      source: source,
+      continuation: continuation,
+    );
+  }
+}
+
+
+class _ContextFailureApiClient implements CompetitionApiClient {
+  @override
+  Future<CompetitionAnalysisTransportResult> analyzeUrl({
+    required String competitionId,
+    required String url,
+    required AnalysisSourceMetadata source,
+    AnalysisContinuationContext? continuation,
+  }) async {
+    throw const AnalysisFailure(
+      code: 'ANALYSIS_CONTEXT_INVALID',
+      stage: 'analysis',
+      message: 'simulated context mismatch',
+      userMessage: 'simulated context mismatch',
+      retryable: false,
+    );
   }
 
   @override
