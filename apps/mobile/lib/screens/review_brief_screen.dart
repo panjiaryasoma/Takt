@@ -12,12 +12,14 @@ class ReviewBriefScreen extends StatelessWidget {
     this.onBack,
     this.onAddSource,
     this.onNewAnalysis,
+    this.onPlan,
   });
 
   final CompetitionAnalyzeResponseWire response;
   final VoidCallback? onBack;
   final VoidCallback? onAddSource;
   final VoidCallback? onNewAnalysis;
+  final VoidCallback? onPlan;
 
   @override
   Widget build(BuildContext context) {
@@ -147,6 +149,12 @@ class ReviewBriefScreen extends StatelessWidget {
             const SizedBox(height: 10),
           ],
           const SizedBox(height: 10),
+          _ActionButton(
+            label: 'Plan this competition',
+            filled: true,
+            onTap: onPlan,
+          ),
+          const SizedBox(height: 12),
           Row(
             children: [
               Expanded(
