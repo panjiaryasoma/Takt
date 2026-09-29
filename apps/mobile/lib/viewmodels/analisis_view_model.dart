@@ -16,11 +16,13 @@ class AnalisisViewModel extends ChangeNotifier {
   AnalisisViewModel({
     required CompetitionApiClient apiClient,
     required AnalysisRepository repository,
+    this.closeRepositoryOnDispose = true,
   })  : _apiClient = apiClient,
         _repository = repository;
 
   final CompetitionApiClient _apiClient;
   final AnalysisRepository _repository;
+  final bool closeRepositoryOnDispose;
 
   AnalysisPhase _phase = AnalysisPhase.idle;
   String? _competitionId;
@@ -385,7 +387,9 @@ class AnalisisViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _apiClient.close();
-    unawaited(_repository.close());
+    if (closeRepositoryOnDispose) {
+      unawaited(_repository.close());
+    }
     super.dispose();
   }
 }
