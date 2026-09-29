@@ -31,7 +31,7 @@ final class PlanApiFailure implements Exception {
   final String? errorJson;
 
   @override
-  String toString() => code + ': ' + message;
+  String toString() => '$code: $message';
 }
 
 final class PlanEvaluateTransportResult {
@@ -311,7 +311,7 @@ final class HttpPlanApiClient implements PlanApiClient {
       throw PlanApiFailure(
         code: 'LOCAL_CONTEXT_INVALID',
         stage: 'local',
-        message: field + ' is not valid JSON.',
+        message: '$field is not valid JSON.',
         retryable: false,
       );
     }
