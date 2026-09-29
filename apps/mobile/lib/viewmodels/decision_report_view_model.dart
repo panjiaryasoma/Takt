@@ -84,7 +84,9 @@ class DecisionReportViewModel extends ChangeNotifier {
 
   bool chooseCandidate(String candidateId) {
     if (!can(RecommendationAction.chooseAlternative) ||
-        planning?.candidate(candidateId) == null) return false;
+        planning?.candidate(candidateId) == null) {
+      return false;
+    }
     _confirmation = null;
     _selectedCandidateId = candidateId;
     _handoffFailed = false;
