@@ -673,7 +673,7 @@ final class PlanningHostViewModel extends ChangeNotifier {
     _phase = PlanningHostPhase.error;
     _failure = PlanningHostFailure(
       code: error.code,
-      message: _publicMessage(error.code, error.message),
+      message: _publicMessage(error.code),
       retryable: error.retryable,
     );
     notifyListeners();
@@ -700,7 +700,7 @@ final class PlanningHostViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  static String _publicMessage(String code, String fallback) {
+  static String _publicMessage(String code) {
     return switch (code) {
       'VALIDATION_ERROR' || 'PLANNING_INPUT_INVALID' =>
         'Some planning inputs are invalid. Review the setup and try again.',
@@ -714,6 +714,12 @@ final class PlanningHostViewModel extends ChangeNotifier {
         'This saved plan uses an older re-evaluation contract. A fresh baseline can be created explicitly.',
       'NETWORK' || 'TIMEOUT' =>
         'The planning service could not be reached. Try the request again.',
+      'RESPONSE_CONTRACT_INVALID' =>
+        'The planning service returned a response this app cannot use safely.',
+      'LOCAL_CONTEXT_INVALID' =>
+        'The local planning context is inconsistent. Reload the competition and try again.',
+      'UNKNOWN_BACKEND_ERROR' =>
+        'The planning service returned an unrecognized error response.',
       'AVAILABILITY_EXECUTION_FAILED' ||
       'SOLVER_EXECUTION_FAILED' ||
       'PLANNING_RUNTIME_UNAVAILABLE' ||
@@ -721,7 +727,7 @@ final class PlanningHostViewModel extends ChangeNotifier {
       'EVALUATION_INVARIANT_FAILED' ||
       'INTERNAL_ERROR' =>
         'The planning service could not complete this evaluation. Try again.',
-      _ => fallback,
+      _ => 'Planning could not be completed safely. Review the inputs or try again.',
     };
   }
 
