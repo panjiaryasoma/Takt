@@ -46,6 +46,12 @@ final class PlanningRequestAssembler {
     required List<ActiveAcceptedBlock> acceptedBlocks,
   }) {
     _ensureTimeZones();
+    if (draft.tasks.isEmpty) {
+      throw const PlanningInputException(
+        'PLANNING_INPUT_INVALID',
+        'At least one user-confirmed planning task is required.',
+      );
+    }
     if (analysisSnapshot.competitionId.trim().isEmpty) {
       throw const PlanningInputException(
         'PLANNING_INPUT_UNAVAILABLE',
