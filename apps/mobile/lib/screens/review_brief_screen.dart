@@ -240,29 +240,32 @@ class _CanonicalFieldCard extends StatelessWidget {
             ),
           ),
           if (field.evidenceIds.isNotEmpty)
-            Theme(
-              data: Theme.of(context).copyWith(
-                dividerColor: Colors.transparent,
-              ),
-              child: ExpansionTile(
-                dense: true,
-                iconColor: C.accent,
-                collapsedIconColor: C.navInactive,
-                title: const Text(
-                  'Lihat sumber',
-                  style: TextStyle(
-                    color: C.accent,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                  ),
+            Material(
+              color: Colors.transparent,
+              child: Theme(
+                data: Theme.of(context).copyWith(
+                  dividerColor: Colors.transparent,
                 ),
-                children: [
-                  for (final evidenceId in field.evidenceIds)
-                    _EvidenceRow(
-                      evidence: provenance.evidenceById(evidenceId),
-                      provenance: provenance,
+                child: ExpansionTile(
+                  dense: true,
+                  iconColor: C.accent,
+                  collapsedIconColor: C.navInactive,
+                  title: const Text(
+                    'Lihat sumber',
+                    style: TextStyle(
+                      color: C.accent,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
                     ),
-                ],
+                  ),
+                  children: [
+                    for (final evidenceId in field.evidenceIds)
+                      _EvidenceRow(
+                        evidence: provenance.evidenceById(evidenceId),
+                        provenance: provenance,
+                      ),
+                  ],
+                ),
               ),
             ),
         ],
