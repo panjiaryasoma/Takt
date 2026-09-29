@@ -17,6 +17,8 @@ void main() {
     await tester.pumpWidget(TaktApp(scheduleRepository: repository));
     await tester.pumpAndSettle();
 
+    expect(tester.widget<MaterialApp>(find.byType(MaterialApp)).locale,
+        const Locale('en'));
     expect(find.text('Home'), findsOneWidget);
     expect(find.text('Schedule'), findsOneWidget);
     expect(find.text('Analysis'), findsOneWidget);
