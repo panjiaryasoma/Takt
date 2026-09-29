@@ -15,12 +15,12 @@ import 'package:takt_mobile/models/recurrence_rule.dart';
 import 'package:takt_mobile/viewmodels/jadwal_view_model.dart';
 
 void main() {
-  test('fresh database initializes schedule plus analysis schema v2', () async {
+  test('fresh database initializes complete schema v3', () async {
     final db = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     await db.initialize();
 
-    expect(await db.userVersion(), 2);
+    expect(await db.userVersion(), 3);
     final tables = await db.customSelect(
       '''
 SELECT name FROM sqlite_master
@@ -30,7 +30,14 @@ WHERE type = 'table' AND name IN (
   'recurrence_exceptions',
   'planning_preferences',
   'competitions',
-  'analysis_snapshots'
+  'analysis_snapshots',
+  'evaluations',
+  'reevaluation_transitions',
+  'saved_plans',
+  'saved_plan_revisions',
+  'saved_plan_tasks',
+  'accepted_commitments',
+  'task_progress'
 )
 ORDER BY name
 ''',
@@ -44,6 +51,13 @@ ORDER BY name
         'planning_preferences',
         'competitions',
         'analysis_snapshots',
+        'evaluations',
+        'reevaluation_transitions',
+        'saved_plans',
+        'saved_plan_revisions',
+        'saved_plan_tasks',
+        'accepted_commitments',
+        'task_progress',
       },
     );
     await expectLater(
@@ -71,8 +85,19 @@ INSERT INTO commitments (
 
     final seed = AppDatabase.forTesting(NativeDatabase(file));
     await seed.initialize();
-    await seed.customStatement('DROP TABLE analysis_snapshots');
-    await seed.customStatement('DROP TABLE competitions');
+    for (final table in [
+      'task_progress',
+      'accepted_commitments',
+      'saved_plan_tasks',
+      'saved_plan_revisions',
+      'saved_plans',
+      'reevaluation_transitions',
+      'evaluations',
+      'analysis_snapshots',
+      'competitions',
+    ]) {
+      await seed.customStatement('DROP TABLE $table');
+    }
     await seed.customStatement('PRAGMA user_version = 1');
     await seed.customStatement(
       '''
@@ -100,7 +125,7 @@ INSERT INTO commitments (
     addTearDown(migrated.close);
     await migrated.initialize();
 
-    expect(await migrated.userVersion(), 2);
+    expect(await migrated.userVersion(), 3);
     final commitments = await migrated.customSelect(
       'SELECT id FROM commitments WHERE id = ?',
       variables: [const Variable<String>('cmt-v1')],
