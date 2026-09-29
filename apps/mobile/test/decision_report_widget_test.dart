@@ -120,7 +120,7 @@ void main() {
     expect(find.byKey(const Key('candidate-$primaryId')), findsOneWidget);
     expect(find.byKey(const Key('candidate-$alternativeId')), findsNothing);
     expect(find.byKey(const Key('alternatives-locked')), findsOneWidget);
-    expect(find.byKey(Key('choose-$alternativeId')), findsNothing);
+    expect(find.byKey(const Key('choose-$alternativeId')), findsNothing);
     expect(find.text('Remaining buffer: 180 min'), findsOneWidget);
     expect(find.text('Remaining buffer: 120 min'), findsNothing);
 
