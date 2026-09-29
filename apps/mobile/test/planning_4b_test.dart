@@ -286,7 +286,7 @@ INSERT INTO analysis_snapshots (
         'kind': 'SUPERSEDED',
         'prior_evaluation_id': evaluation.id,
         'prior_basis_fingerprint': evaluation.evaluationBasisFingerprint,
-        'current_basis_fingerprint': null,
+        'current_basis_fingerprint': List.filled(64, 'c').join(),
         'prior_evaluation_freshness': 'STALE',
         'change_reasons': ['PLANNING_BASIS_CHANGED'],
       });
@@ -304,6 +304,35 @@ INSERT INTO analysis_snapshots (
       final active = await savedPlans.activeAcceptedBlocks();
       expect(active, hasLength(1));
       expect(active.single.savedPlanRevisionId, revision.id);
+    });
+
+    test('Accept stays successful when post-commit summary refresh cannot render',
+        () async {
+      final request = jsonDecode(_evaluationRequest()) as Map<String, dynamic>;
+      final bundle = request['report_bundle'] as Map<String, dynamic>;
+      final report = bundle['report'] as Map<String, dynamic>;
+      final fields = report['canonical_fields'] as Map<String, dynamic>;
+      fields.remove('submission_deadline');
+
+      final evaluation = await evaluations.persistEvaluation(
+        analysisSnapshot: snapshot,
+        evaluationRequestJson: jsonEncode(request),
+        evaluationResponseJson: jsonEncode(decisionFixture()),
+        planningWindowPolicyJson: _windowPolicyJson(),
+      );
+
+      final revision = await savedPlans.acceptEvaluation(
+        evaluationId: evaluation.id,
+        candidateId: primaryId,
+        selectionSource: SelectionSource.primary,
+      );
+
+      expect(revision.evaluationId, evaluation.id);
+      final rows = await db.customSelect(
+        'SELECT id FROM saved_plan_revisions WHERE evaluation_id = ?',
+        variables: [Variable<String>(evaluation.id)],
+      ).get();
+      expect(rows, hasLength(1));
     });
 
     test('accepted plan, task progress, and blocks survive database restart',
