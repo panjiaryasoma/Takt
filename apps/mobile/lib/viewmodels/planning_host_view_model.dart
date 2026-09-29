@@ -162,6 +162,10 @@ final class PlanningHostViewModel extends ChangeNotifier {
     }
   }
 
+  void commitDraft(PlanningDraft next) {
+    _mutateDraft(next);
+  }
+
   void replaceReadiness(ReadinessContextDraft readiness) {
     _mutateDraft(_requireDraft().copyWith(readinessContext: readiness));
   }
