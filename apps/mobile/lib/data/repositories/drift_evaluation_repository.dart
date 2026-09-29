@@ -99,7 +99,17 @@ final class DriftEvaluationRepository implements EvaluationRepository {
       planningWindowPolicyJson,
       'planning window policy',
     );
-    PlanningWindowPolicyV1.fromJson(policy);
+    final parsedPolicy = PlanningWindowPolicyV1.fromJson(policy);
+    final planning = _object(request['planning'], 'planning');
+    final availability =
+        _object(planning['availability'], 'planning.availability');
+    final preferences =
+        _object(availability['preferences'], 'planning.availability.preferences');
+    if (preferences['timezone'] != parsedPolicy.timezone) {
+      throw const EvaluationIntegrityException(
+        'planning window policy timezone must match evaluated planning preferences',
+      );
+    }
 
     final evaluation = Evaluation(
       id: response.evaluationId,
