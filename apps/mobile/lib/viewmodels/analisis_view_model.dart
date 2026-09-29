@@ -2,181 +2,378 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../data/remote/competition_api_client.dart';
+import '../data/repositories/analysis_repository.dart';
+import '../models/analysis_failure.dart';
+import '../models/analysis_snapshot.dart';
 import '../models/analysis_step.dart';
+import '../models/competition_analysis_wire.dart';
+import '../utils/source_identity.dart';
 
-/// ViewModel proses analisis AI.
-///
-/// TITIK INTEGRASI AI: sekarang jalan pakai SIMULASI (timer) supaya UI hidup.
-/// Saat model AI temanmu siap, ganti [mulaiSimulasi] dengan stream/callback
-/// yang memanggil [terapkanProgress] / [setLangkah] dari progress event asli.
-/// View tidak perlu berubah — cukup baca [progress], [steps], [etaDetik], dll.
+typedef _RequestCommand = Future<CompetitionAnalysisTransportResult> Function();
+
 class AnalisisViewModel extends ChangeNotifier {
+  AnalisisViewModel({
+    required CompetitionApiClient apiClient,
+    required AnalysisRepository repository,
+  })  : _apiClient = apiClient,
+        _repository = repository;
+
+  final CompetitionApiClient _apiClient;
+  final AnalysisRepository _repository;
+
   AnalysisPhase _phase = AnalysisPhase.idle;
-
-  /// 0.0..1.0
-  double _progress = 0;
-
-  /// Estimasi sisa waktu (detik). null = tak diketahui.
-  int? _etaDetik;
-
-  String _statusText = 'Menyiapkan analisis…';
-  String? _konflikText;
-
-  List<AnalysisStep> _steps = const [
-    AnalysisStep(
-        title: 'Membaca sumber resmi', detail: 'Menunggu dokumen'),
-    AnalysisStep(title: 'Menyusun estimasi kerja'),
-    AnalysisStep(title: 'Mencocokkan kalender'),
-    AnalysisStep(title: 'Menilai risiko dan alternatif'),
-  ];
-
-  Timer? _timer;
-
-  // ---- Getter untuk View ---------------------------------------------------
+  String? _competitionId;
+  CompetitionAnalyzeResponseWire? _response;
+  String? _originalBody;
+  AnalysisFailure? _failure;
+  CompetitionAnalysisTransportResult? _pendingPersistence;
+  _RequestCommand? _lastRequest;
 
   AnalysisPhase get phase => _phase;
-  double get progress => _progress;
-  int? get etaDetik => _etaDetik;
-  String get statusText => _statusText;
-  String? get konflikText => _konflikText;
-  List<AnalysisStep> get steps => List.unmodifiable(_steps);
-  bool get selesai => _phase == AnalysisPhase.done;
-  int get persen => (_progress * 100).round();
+  String? get competitionId => _competitionId;
+  CompetitionAnalyzeResponseWire? get response => _response;
+  String? get originalBody => _originalBody;
+  AnalysisFailure? get failure => _failure;
 
-  // ---- Titik integrasi AI (dipanggil dari backend/stream nanti) -----------
+  bool get busy =>
+      _phase == AnalysisPhase.validating ||
+      _phase == AnalysisPhase.submitting ||
+      _phase == AnalysisPhase.persisting;
 
-  /// Perbarui progress & ETA dari event AI.
-  void terapkanProgress({
-    required double progress,
-    int? etaDetik,
-    String? statusText,
-  }) {
-    _progress = progress.clamp(0.0, 1.0);
-    _etaDetik = etaDetik;
-    if (statusText != null) _statusText = statusText;
-    if (_progress >= 1.0) {
-      _phase = AnalysisPhase.done;
-      _etaDetik = 0;
+  bool get selesai => _phase == AnalysisPhase.ready;
+
+  bool get canRetryRequest =>
+      _phase == AnalysisPhase.requestError &&
+      _failure?.retryable == true &&
+      _lastRequest != null;
+
+  bool get canRetryPersistence =>
+      _phase == AnalysisPhase.persistenceError &&
+      _pendingPersistence != null;
+
+  bool get requiresFreshAnalysis {
+    final code = _failure?.code;
+    return code == 'ANALYSIS_CONTEXT_INVALID' ||
+        code == 'REPORT_BUNDLE_INVALID' ||
+        code == 'UNSUPPORTED_REPORT_CONTRACT' ||
+        code == 'LOCAL_CONTEXT_MISSING' ||
+        code == 'LOCAL_CONTEXT_INVALID';
+  }
+
+  bool get hasCurrentCompetition =>
+      _competitionId != null && _response != null;
+
+  String get statusText {
+    switch (_phase) {
+      case AnalysisPhase.idle:
+        return 'Menunggu sumber kompetisi.';
+      case AnalysisPhase.validating:
+        return 'Menyiapkan sumber dan konteks analisis.';
+      case AnalysisPhase.submitting:
+        return 'Backend sedang memproses sumber.';
+      case AnalysisPhase.persisting:
+        return 'Menyimpan hasil analisis di perangkat.';
+      case AnalysisPhase.ready:
+        return 'Hasil tersimpan dan siap direview.';
+      case AnalysisPhase.requestError:
+      case AnalysisPhase.persistenceError:
+        return _failure?.userMessage ?? 'Analisis gagal.';
     }
-    notifyListeners();
   }
 
-  /// Ganti seluruh daftar langkah (mis. dari respons AI).
-  void setLangkah(List<AnalysisStep> steps) {
-    _steps = steps;
-    notifyListeners();
-  }
+  List<AnalysisStep> get steps {
+    AnalysisStepState stateFor(int index) {
+      final completed = switch (_phase) {
+        AnalysisPhase.idle => -1,
+        AnalysisPhase.validating => -1,
+        AnalysisPhase.submitting => 0,
+        AnalysisPhase.persisting => 1,
+        AnalysisPhase.ready => 3,
+        AnalysisPhase.requestError => 0,
+        AnalysisPhase.persistenceError => 1,
+      };
+      if (index <= completed) return AnalysisStepState.done;
 
-  /// Perbarui satu langkah berdasarkan indeks.
-  void updateLangkah(int index, AnalysisStep step) {
-    if (index < 0 || index >= _steps.length) return;
-    final next = [..._steps];
-    next[index] = step;
-    _steps = next;
-    notifyListeners();
-  }
-
-  void setKonflik(String? text) {
-    _konflikText = text;
-    notifyListeners();
-  }
-
-  // ---- Simulasi (dipakai sebelum AI model siap) ----------------------------
-
-  /// Jalankan simulasi progress bertahap. Aman dipanggil ulang.
-  void mulaiSimulasi() {
-    _timer?.cancel();
-    _phase = AnalysisPhase.running;
-    _progress = 0;
-    _etaDetik = 55;
-    _statusText = 'Membaca sumber resmi…';
-    _konflikText = null;
-    _steps = const [
-      AnalysisStep(
-          title: 'Membaca sumber resmi',
-          detail: '3 dokumen · provenance disimpan',
-          state: AnalysisStepState.process),
-      AnalysisStep(title: 'Menyusun estimasi kerja'),
-      AnalysisStep(title: 'Mencocokkan kalender'),
-      AnalysisStep(title: 'Menilai risiko dan alternatif'),
-    ];
-    notifyListeners();
-
-    const tick = Duration(milliseconds: 400);
-    _timer = Timer.periodic(tick, (t) {
-      // Naik ~3% per tick.
-      _progress = (_progress + 0.03).clamp(0.0, 1.0);
-      _etaDetik = ((1 - _progress) * 55).round();
-
-      // Pindahkan status langkah sesuai ambang progress.
-      _steps = _langkahUntuk(_progress);
-      _statusText = _statusUntuk(_progress);
-
-      if (_progress >= 1.0) {
-        _phase = AnalysisPhase.done;
-        _etaDetik = 0;
-        _konflikText =
-            'Halaman utama: 15 Nov · PDF: 12 Nov. Anda akan diminta meninjau.';
-        t.cancel();
-      }
-      notifyListeners();
-    });
-  }
-
-  void reset() {
-    _timer?.cancel();
-    _phase = AnalysisPhase.idle;
-    _progress = 0;
-    _etaDetik = null;
-    _statusText = 'Menyiapkan analisis…';
-    _konflikText = null;
-    notifyListeners();
-  }
-
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
-  }
-
-  // ---- Helper simulasi -----------------------------------------------------
-
-  List<AnalysisStep> _langkahUntuk(double p) {
-    AnalysisStepState s(double ambangSelesai, double ambangMulai) {
-      if (p >= ambangSelesai) return AnalysisStepState.done;
-      if (p >= ambangMulai) return AnalysisStepState.process;
+      final active = switch (_phase) {
+        AnalysisPhase.validating => 0,
+        AnalysisPhase.submitting => 1,
+        AnalysisPhase.persisting => 2,
+        AnalysisPhase.ready => -1,
+        AnalysisPhase.requestError => -1,
+        AnalysisPhase.persistenceError => -1,
+        AnalysisPhase.idle => -1,
+      };
+      if (index == active) return AnalysisStepState.process;
       return AnalysisStepState.waiting;
     }
 
     return [
       AnalysisStep(
-        title: 'Membaca sumber resmi',
-        detail: '3 dokumen · provenance disimpan',
-        state: s(0.25, 0.0),
+        title: 'Menyiapkan sumber',
+        detail: 'Validasi input dan metadata sumber',
+        state: stateFor(0),
       ),
       AnalysisStep(
-        title: 'Menyusun estimasi kerja',
-        detail: p >= 0.25 ? 'Estimasi effort dihitung' : '',
-        state: s(0.55, 0.25),
+        title: 'Memproses di backend',
+        detail: 'Ekstraksi dan reconciliation berjalan di server',
+        state: stateFor(1),
       ),
       AnalysisStep(
-        title: 'Mencocokkan kalender',
-        detail: p >= 0.55 ? 'Menggunakan kapasitas tersedia' : '',
-        state: s(0.85, 0.55),
+        title: 'Menyimpan hasil lokal',
+        detail: 'Raw response disimpan tanpa reconstruction',
+        state: stateFor(2),
       ),
       AnalysisStep(
-        title: 'Menilai risiko dan alternatif',
-        detail: p >= 0.85 ? 'Menyusun alternatif' : 'Belum dimulai',
-        state: s(1.0, 0.85),
+        title: 'Siap direview',
+        detail: 'Canonical report dan provenance tersedia',
+        state: stateFor(3),
       ),
     ];
   }
 
-  String _statusUntuk(double p) {
-    if (p < 0.25) return 'Membaca sumber resmi…';
-    if (p < 0.55) return 'Menyusun estimasi kerja…';
-    if (p < 0.85) return 'Memeriksa kelayakan terhadap kapasitas nyata Anda.';
-    if (p < 1.0) return 'Menilai risiko dan alternatif…';
-    return 'Analisis selesai.';
+  Future<void> analyzeUrl({
+    required String url,
+    required SourceTypeWire sourceType,
+    required bool continuation,
+  }) async {
+    if (busy) return;
+    _phase = AnalysisPhase.validating;
+    _failure = null;
+    notifyListeners();
+
+    try {
+      final competitionId = continuation
+          ? _requireCompetitionId()
+          : _newCompetitionId();
+      final context = continuation
+          ? await _continuationContext(competitionId)
+          : null;
+      final source = AnalysisSourceMetadata(
+        sourceId: SourceIdentity.urlSourceId(url),
+        sourceType: sourceType,
+      );
+
+      _competitionId = competitionId;
+      _lastRequest = () => _apiClient.analyzeUrl(
+            competitionId: competitionId,
+            url: url,
+            source: source,
+            continuation: context,
+          );
+      await _executeRequest();
+    } on AnalysisFailure catch (error) {
+      _setRequestFailure(error);
+    } on Object catch (error) {
+      _setRequestFailure(AnalysisFailure.contract(error));
+    }
+  }
+
+  Future<void> analyzePdf({
+    required String filename,
+    required Uint8List bytes,
+    required SourceTypeWire sourceType,
+    required bool continuation,
+  }) async {
+    if (busy) return;
+    _phase = AnalysisPhase.validating;
+    _failure = null;
+    notifyListeners();
+
+    try {
+      final competitionId = continuation
+          ? _requireCompetitionId()
+          : _newCompetitionId();
+      final context = continuation
+          ? await _continuationContext(competitionId)
+          : null;
+      final source = AnalysisSourceMetadata(
+        sourceId: SourceIdentity.pdfSourceId(bytes),
+        sourceType: sourceType,
+      );
+      final documentId = SourceIdentity.pdfDocumentId(filename, bytes);
+
+      _competitionId = competitionId;
+      _lastRequest = () => _apiClient.analyzePdf(
+            competitionId: competitionId,
+            documentId: documentId,
+            filename: filename,
+            bytes: bytes,
+            source: source,
+            continuation: context,
+          );
+      await _executeRequest();
+    } on AnalysisFailure catch (error) {
+      _setRequestFailure(error);
+    } on Object catch (error) {
+      _setRequestFailure(AnalysisFailure.contract(error));
+    }
+  }
+
+  Future<void> retryRequest() async {
+    if (!canRetryRequest) return;
+    await _executeRequest();
+  }
+
+  Future<void> retryPersistence() async {
+    final pending = _pendingPersistence;
+    if (!canRetryPersistence || pending == null) return;
+
+    _phase = AnalysisPhase.persisting;
+    _failure = null;
+    notifyListeners();
+    try {
+      await _repository.persistResponse(
+        originalBody: pending.originalBody,
+        response: pending.response,
+      );
+      _acceptPersisted(pending);
+    } on Object catch (error) {
+      _phase = AnalysisPhase.persistenceError;
+      _failure = AnalysisFailure.persistence(error);
+      notifyListeners();
+    }
+  }
+
+  Future<void> loadSnapshot(AnalysisSnapshot snapshot) async {
+    try {
+      final parsed =
+          CompetitionAnalyzeResponseWire.parse(snapshot.responseJson);
+      _competitionId = snapshot.competitionId;
+      _response = parsed;
+      _originalBody = snapshot.responseJson;
+      _pendingPersistence = null;
+      _lastRequest = null;
+      _failure = null;
+      _phase = AnalysisPhase.ready;
+      notifyListeners();
+    } on Object catch (error) {
+      _phase = AnalysisPhase.requestError;
+      _failure = AnalysisFailure.contract(error);
+      notifyListeners();
+    }
+  }
+
+  void resetForNewCompetition() {
+    if (busy) return;
+    _phase = AnalysisPhase.idle;
+    _competitionId = null;
+    _response = null;
+    _originalBody = null;
+    _failure = null;
+    _pendingPersistence = null;
+    _lastRequest = null;
+    notifyListeners();
+  }
+
+  Future<void> _executeRequest() async {
+    final command = _lastRequest;
+    if (command == null) return;
+
+    _phase = AnalysisPhase.submitting;
+    _failure = null;
+    _pendingPersistence = null;
+    notifyListeners();
+
+    try {
+      final result = await command();
+      _phase = AnalysisPhase.persisting;
+      _pendingPersistence = result;
+      notifyListeners();
+
+      try {
+        await _repository.persistResponse(
+          originalBody: result.originalBody,
+          response: result.response,
+        );
+        _acceptPersisted(result);
+      } on Object catch (error) {
+        _response = result.response;
+        _originalBody = result.originalBody;
+        _phase = AnalysisPhase.persistenceError;
+        _failure = AnalysisFailure.persistence(error);
+        notifyListeners();
+      }
+    } on AnalysisFailure catch (error) {
+      _setRequestFailure(error);
+    } on Object catch (error) {
+      _setRequestFailure(AnalysisFailure.contract(error));
+    }
+  }
+
+  void _acceptPersisted(
+    CompetitionAnalysisTransportResult result,
+  ) {
+    _competitionId = result.response.report.competitionId;
+    _response = result.response;
+    _originalBody = result.originalBody;
+    _pendingPersistence = null;
+    _failure = null;
+    _phase = AnalysisPhase.ready;
+    notifyListeners();
+  }
+
+  void _setRequestFailure(AnalysisFailure error) {
+    _phase = AnalysisPhase.requestError;
+    _failure = error;
+    _pendingPersistence = null;
+    notifyListeners();
+  }
+
+  Future<AnalysisContinuationContext> _continuationContext(
+    String competitionId,
+  ) async {
+    final snapshot =
+        await _repository.latestSnapshot(competitionId);
+    if (snapshot == null) {
+      throw const AnalysisFailure(
+        code: 'LOCAL_CONTEXT_MISSING',
+        stage: 'continuation',
+        message: 'No cached snapshot exists for continuation.',
+        userMessage:
+            'Konteks sumber sebelumnya tidak tersedia. Mulai analisis baru.',
+        retryable: false,
+      );
+    }
+    try {
+      return AnalysisContinuationContext.fromOriginalBody(
+        snapshot.responseJson,
+      );
+    } on Object catch (error) {
+      throw AnalysisFailure(
+        code: 'LOCAL_CONTEXT_INVALID',
+        stage: 'continuation',
+        message: 'Cached continuation response is invalid: $error',
+        userMessage:
+            'Konteks sumber sebelumnya rusak. Mulai analisis baru.',
+        retryable: false,
+      );
+    }
+  }
+
+  String _requireCompetitionId() {
+    final id = _competitionId;
+    if (id == null) {
+      throw const AnalysisFailure(
+        code: 'LOCAL_CONTEXT_MISSING',
+        stage: 'continuation',
+        message: 'No active competition identity exists.',
+        userMessage:
+            'Konteks kompetisi sebelumnya tidak tersedia. Mulai analisis baru.',
+        retryable: false,
+      );
+    }
+    return id;
+  }
+
+  String _newCompetitionId() {
+    return 'cmp-${DateTime.now().microsecondsSinceEpoch}';
+  }
+
+  @override
+  void dispose() {
+    _apiClient.close();
+    unawaited(_repository.close());
+    super.dispose();
   }
 }

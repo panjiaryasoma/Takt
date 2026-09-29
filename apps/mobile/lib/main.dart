@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import 'config/api_config.dart';
 import 'data/database/app_database.dart';
+import 'data/remote/competition_api_client.dart';
+import 'data/repositories/analysis_repository.dart';
+import 'data/repositories/drift_analysis_repository.dart';
 import 'data/repositories/drift_schedule_repository.dart';
 import 'data/repositories/schedule_repository.dart';
 import 'models/commitment.dart';
-import 'models/competition_brief.dart';
 import 'screens/analisis_kompetisi_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/jadwal_harian_screen.dart';
 import 'screens/jadwal_ringkasan_screen.dart';
 import 'screens/progres_analisis_screen.dart';
-import 'screens/rekomendasi_jadwal_screen.dart';
 import 'screens/rencana_screen.dart';
 import 'screens/review_brief_screen.dart';
 import 'screens/tambah_jadwal_screen.dart';
@@ -26,12 +28,24 @@ void main() {
 }
 
 class TaktApp extends StatelessWidget {
-  const TaktApp({super.key, this.scheduleRepository});
+  const TaktApp({
+    super.key,
+    this.scheduleRepository,
+    this.analysisRepository,
+    this.apiClient,
+  });
 
   final ScheduleRepository? scheduleRepository;
+  final AnalysisRepository? analysisRepository;
+  final CompetitionApiClient? apiClient;
 
   @override
   Widget build(BuildContext context) {
+    final analysisRepo = analysisRepository ??
+        DriftAnalysisRepository(AppDatabase.open());
+    final client = apiClient ??
+        HttpCompetitionApiClient(baseUrl: ApiConfig.baseUrl);
+
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(
@@ -41,7 +55,12 @@ class TaktApp extends StatelessWidget {
             return JadwalViewModel(repository)..initialize();
           },
         ),
-        ChangeNotifierProvider(create: (_) => AnalisisViewModel()),
+        ChangeNotifierProvider(
+          create: (_) => AnalisisViewModel(
+            apiClient: client,
+            repository: analysisRepo,
+          ),
+        ),
         ChangeNotifierProvider(create: (_) => RencanaViewModel()),
       ],
       child: MaterialApp(
@@ -67,10 +86,65 @@ class _RootShellState extends State<RootShell> {
   bool _showTambahJadwal = false;
   Commitment? _editingCommitment;
   int _analisisStep = 0;
-  bool _showRekomendasi = false;
-  CompetitionBrief? _briefAktif;
+  bool _addingSource = false;
 
-  CompetitionBrief get _brief => _briefAktif ??= CompetitionBrief.demo();
+  Widget _analysisBody() {
+    final vm = context.read<AnalisisViewModel>();
+    switch (_analisisStep) {
+      case 1:
+        return ProgresAnalisisScreen(
+          onReadResult: () => setState(() => _analisisStep = 2),
+          onBackToInput: () => setState(() => _analisisStep = 0),
+          onStartNewAnalysis: () {
+            vm.resetForNewCompetition();
+            setState(() {
+              _addingSource = false;
+              _analisisStep = 0;
+            });
+          },
+        );
+      case 2:
+        final response = vm.response;
+        if (response == null) {
+          return AnalisisKompetisiScreen(
+            continuation: false,
+            onSubmitted: () => setState(() => _analisisStep = 1),
+            onBack: () => setState(() => _navIndex = 0),
+          );
+        }
+        return ReviewBriefScreen(
+          response: response,
+          onBack: () => setState(() => _analisisStep = 1),
+          onAddSource: () => setState(() {
+            _addingSource = true;
+            _analisisStep = 0;
+          }),
+          onNewAnalysis: () {
+            vm.resetForNewCompetition();
+            setState(() {
+              _addingSource = false;
+              _analisisStep = 0;
+            });
+          },
+        );
+      case 0:
+      default:
+        return AnalisisKompetisiScreen(
+          continuation: _addingSource,
+          onSubmitted: () => setState(() => _analisisStep = 1),
+          onBack: () {
+            if (_addingSource && vm.response != null) {
+              setState(() {
+                _addingSource = false;
+                _analisisStep = 2;
+              });
+            } else {
+              setState(() => _navIndex = 0);
+            }
+          },
+        );
+    }
+  }
 
   Widget _body() {
     switch (_navIndex) {
@@ -95,7 +169,8 @@ class _RootShellState extends State<RootShell> {
         }
         return _jadwalTab == 0
             ? JadwalHarianScreen(
-                onSwitchTab: (index) => setState(() => _jadwalTab = index),
+                onSwitchTab: (index) =>
+                    setState(() => _jadwalTab = index),
                 onAdd: () => setState(() {
                   _editingCommitment = null;
                   _showTambahJadwal = true;
@@ -107,63 +182,18 @@ class _RootShellState extends State<RootShell> {
                 onBack: () => setState(() => _navIndex = 0),
               )
             : JadwalRingkasanScreen(
-                onSwitchTab: (index) => setState(() => _jadwalTab = index),
+                onSwitchTab: (index) =>
+                    setState(() => _jadwalTab = index),
               );
       case 2:
-        if (_showRekomendasi) {
-          return RekomendasiJadwalScreen(
-            brief: _brief,
-            onBack: () => setState(() => _showRekomendasi = false),
-            onSubmitDone: () => setState(() {
-              _showRekomendasi = false;
-              _analisisStep = 0;
-              _navIndex = 1;
-              _jadwalTab = 0;
-            }),
-          );
-        }
-        switch (_analisisStep) {
-          case 1:
-            return ProgresAnalisisScreen(
-              onReadResult: () => setState(() => _analisisStep = 2),
-            );
-          case 2:
-            return ReviewBriefScreen(
-              brief: _brief,
-              onBack: () => setState(() => _analisisStep = 1),
-              onTambahJadwal: () => setState(() => _showRekomendasi = true),
-              onSimpan: () {
-                context.read<RencanaViewModel>().simpan(
-                      competitionId: _brief.competitionId,
-                      title: _brief.nama,
-                      deadline: _brief.deadline,
-                    );
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('"${_brief.nama}" disimpan ke Rencana'),
-                    duration: const Duration(seconds: 2),
-                  ),
-                );
-                setState(() {
-                  _analisisStep = 0;
-                  _navIndex = 3;
-                });
-              },
-            );
-          case 0:
-          default:
-            return AnalisisKompetisiScreen(
-              onSubmit: () => setState(() => _analisisStep = 1),
-            );
-        }
+        return _analysisBody();
       case 3:
         return RencanaScreen(
-          onTinjau: (entry) => setState(() {
-            _navIndex = 2;
-            _analisisStep = 2;
-          }),
+          onTinjau: null,
           onCekJadwal: (entry) {
-            context.read<JadwalViewModel>().fokusKompetisi(entry.competitionId);
+            context
+                .read<JadwalViewModel>()
+                .fokusKompetisi(entry.competitionId);
             setState(() {
               _navIndex = 1;
               _jadwalTab = 0;
@@ -213,7 +243,10 @@ class _RootShellState extends State<RootShell> {
 }
 
 class _BottomNav extends StatelessWidget {
-  const _BottomNav({required this.activeIndex, required this.onTap});
+  const _BottomNav({
+    required this.activeIndex,
+    required this.onTap,
+  });
 
   final int activeIndex;
   final ValueChanged<int> onTap;
