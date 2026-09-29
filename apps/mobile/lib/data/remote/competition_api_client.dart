@@ -116,14 +116,12 @@ class HttpCompetitionApiClient implements CompetitionApiClient {
       );
     }
 
-    final payload = <String, Object?>{
-      'competition_id': competitionId,
-      'url': clean,
-      'source': source.toJson(),
-      'previous_report_bundle': continuation?.reportBundle,
-      'prior_source_artifacts':
-          continuation?.sourceArtifacts ?? const [],
-    };
+    final payload = buildUrlAnalysisPayload(
+      competitionId: competitionId,
+      url: clean,
+      source: source,
+      continuation: continuation,
+    );
     return _postJson(
       '/api/v1/competitions/analyze/url',
       payload,
@@ -158,14 +156,12 @@ class HttpCompetitionApiClient implements CompetitionApiClient {
       );
     }
 
-    final metadata = <String, Object?>{
-      'competition_id': competitionId,
-      'document_id': documentId,
-      'source': source.toJson(),
-      'previous_report_bundle': continuation?.reportBundle,
-      'prior_source_artifacts':
-          continuation?.sourceArtifacts ?? const [],
-    };
+    final metadata = buildPdfAnalysisMetadata(
+      competitionId: competitionId,
+      documentId: documentId,
+      source: source,
+      continuation: continuation,
+    );
 
     final boundary =
         '----takt-${DateTime.now().microsecondsSinceEpoch}-${Random().nextInt(1 << 32)}';
@@ -303,4 +299,37 @@ class HttpCompetitionApiClient implements CompetitionApiClient {
   }
 
   void close() => _client.close(force: true);
+}
+
+
+Map<String, Object?> buildUrlAnalysisPayload({
+  required String competitionId,
+  required String url,
+  required AnalysisSourceMetadata source,
+  AnalysisContinuationContext? continuation,
+}) {
+  return {
+    'competition_id': competitionId,
+    'url': url,
+    'source': source.toJson(),
+    'previous_report_bundle': continuation?.reportBundle,
+    'prior_source_artifacts':
+        continuation?.sourceArtifacts ?? const [],
+  };
+}
+
+Map<String, Object?> buildPdfAnalysisMetadata({
+  required String competitionId,
+  required String documentId,
+  required AnalysisSourceMetadata source,
+  AnalysisContinuationContext? continuation,
+}) {
+  return {
+    'competition_id': competitionId,
+    'document_id': documentId,
+    'source': source.toJson(),
+    'previous_report_bundle': continuation?.reportBundle,
+    'prior_source_artifacts':
+        continuation?.sourceArtifacts ?? const [],
+  };
 }
