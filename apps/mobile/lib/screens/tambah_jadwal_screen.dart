@@ -29,8 +29,8 @@ class _TambahJadwalScreenState extends State<TambahJadwalScreen> {
   DateTime _tanggal = DateTime.now();
   TimeOfDay _mulai = const TimeOfDay(hour: 13, minute: 0);
   TimeOfDay _selesai = const TimeOfDay(hour: 15, minute: 0);
-  static const _monthShort = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
-  static const _namaHari = ['Sen','Sel','Rab','Kam','Jum','Sab','Min'];
+  static const _monthShort = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  static const _namaHari = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 
   @override
   void initState() {
@@ -119,19 +119,19 @@ class _TambahJadwalScreenState extends State<TambahJadwalScreen> {
         const SizedBox(height:14),
         Text(widget.isEditing ? 'Edit Schedule' : 'Add Schedule', style: const TextStyle(color:C.white,fontSize:24)),
         const SizedBox(height:24),
-        _FieldCard(label:'Judul Jadwal', child:_input(_titleCtrl,'Kelas Metode Riset')),
+        _FieldCard(label:'Schedule Title', child:_input(_titleCtrl,'Research Methods Class')),
         const SizedBox(height:16),
-        _FieldCard(label:'Category', child:_input(_categoryCtrl,'Kuliah, kerja, tim, lomba')),
+        _FieldCard(label:'Category', child:_input(_categoryCtrl,'Class, work, team, competition')),
         const SizedBox(height:16),
         _FieldCard(label:'Schedule Pattern', child:Row(children:[_Chip(label:'Recurring',active:_pola==_PolaJadwal.rutin,onTap:()=>setState(()=>_pola=_PolaJadwal.rutin)),const SizedBox(width:10),_Chip(label:'One-time',active:_pola==_PolaJadwal.sekali,onTap:()=>setState(()=>_pola=_PolaJadwal.sekali))])),
         const SizedBox(height:16),
         _FieldCard(label:'Time Type', child:Row(children:[_Chip(label:'FIXED',active:_type==CommitmentType.fixed,onTap:()=>setState(()=>_type=CommitmentType.fixed)),const SizedBox(width:10),_Chip(label:'FLEXIBLE',active:_type==CommitmentType.flexible,onTap:()=>setState(()=>_type=CommitmentType.flexible))])),
         const SizedBox(height:16),
         if (_pola == _PolaJadwal.rutin)
-          _FieldCard(label:'Setiap hari',child:Wrap(spacing:8,runSpacing:8,children:List.generate(7,(index){final weekday=index+1;final active=_hari.contains(weekday);return _Chip(label:_namaHari[index],active:active,onTap:()=>setState((){if(active){_hari.remove(weekday);}else{_hari.add(weekday);}}));})))
+          _FieldCard(label:'Every day',child:Wrap(spacing:8,runSpacing:8,children:List.generate(7,(index){final weekday=index+1;final active=_hari.contains(weekday);return _Chip(label:_namaHari[index],active:active,onTap:()=>setState((){if(active){_hari.remove(weekday);}else{_hari.add(weekday);}}));})))
         else _FieldCard(label:'Date', child:_TapValue(value:_tanggalLabel,onTap:_pilihTanggal)),
         const SizedBox(height:16),
-        Row(children:[Expanded(child:_FieldCard(label:'Dari jam',child:_TapValue(value:_hhmm(_mulai),onTap:()=>_pilihWaktu(mulai:true)))),const SizedBox(width:16),Expanded(child:_FieldCard(label:'Sampai jam',child:_TapValue(value:_hhmm(_selesai),onTap:()=>_pilihWaktu(mulai:false))))]),
+        Row(children:[Expanded(child:_FieldCard(label:'From',child:_TapValue(value:_hhmm(_mulai),onTap:()=>_pilihWaktu(mulai:true)))),const SizedBox(width:16),Expanded(child:_FieldCard(label:'To',child:_TapValue(value:_hhmm(_selesai),onTap:()=>_pilihWaktu(mulai:false))))]),
         const SizedBox(height:24),
         GestureDetector(onTap:vm.isSaving?null:_simpan,child:Container(padding:const EdgeInsets.symmetric(vertical:18),decoration:BoxDecoration(color:C.accent,borderRadius:BorderRadius.circular(14)),alignment:Alignment.center,child:vm.isSaving?const SizedBox(width:20,height:20,child:CircularProgressIndicator(strokeWidth:2,color:C.bg)):Text(widget.isEditing?'Save Changes':'Add Schedule',style:const TextStyle(color:C.bg,fontSize:16,fontWeight:FontWeight.w700)))),
         const SizedBox(height:12),
