@@ -35,6 +35,58 @@ void main() {
     expect(tester.takeException(), isNull);
   });
 
+
+  testWidgets('submit stays disabled until the selected source is valid',
+      (tester) async {
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.dark,
+        home: const Scaffold(
+          body: AnalisisKompetisiScreen(
+            continuation: false,
+          ),
+        ),
+      ),
+    );
+
+    GestureDetector submitGesture() {
+      return tester.widget<GestureDetector>(
+        find
+            .ancestor(
+              of: find.text('Submit & Mulai Analisis'),
+              matching: find.byType(GestureDetector),
+            )
+            .first,
+      );
+    }
+
+    expect(submitGesture().onTap, isNull);
+
+    await tester.tap(find.text('Masukkan Link'));
+    await tester.pump();
+    expect(submitGesture().onTap, isNull);
+
+    await tester.tap(find.byType(DropdownButton<SourceTypeWire>));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Peraturan resmi').last);
+    await tester.pumpAndSettle();
+
+    await tester.enterText(
+      find.byType(TextField),
+      'not-a-url',
+    );
+    await tester.pump();
+    expect(submitGesture().onTap, isNull);
+
+    await tester.enterText(
+      find.byType(TextField),
+      'https://example.com/rules',
+    );
+    await tester.pump();
+    expect(submitGesture().onTap, isNotNull);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('processing screen never invents percent or ETA',
       (tester) async {
     final vm = AnalisisViewModel(
