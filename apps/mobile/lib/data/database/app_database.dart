@@ -7,8 +7,8 @@ import 'package:path_provider/path_provider.dart';
 
 /// Thin Drift wrapper for Takt's local-first SQLite store.
 ///
-/// Issue 1B deliberately creates only the schedule slice of the final physical
-/// schema. Later issues can migrate this same database from v1 -> v2 -> v3.
+/// v1 contains the Hari 1B schedule slice. v2 adds only Hari 2B competition
+/// analysis snapshots while preserving the schedule tables byte-for-byte.
 class AppDatabase extends GeneratedDatabase {
   AppDatabase(super.executor);
 
@@ -18,7 +18,7 @@ class AppDatabase extends GeneratedDatabase {
       AppDatabase(executor);
 
   @override
-  int get schemaVersion => 1;
+  int get schemaVersion => 2;
 
   @override
   Iterable<TableInfo<Table, dynamic>> get allTables => const [];
@@ -29,13 +29,22 @@ class AppDatabase extends GeneratedDatabase {
   @override
   MigrationStrategy get migration => MigrationStrategy(
         onCreate: (_) async {
-          for (final statement in _schemaV1Statements) {
+          for (final statement in [
+            ..._schemaV1Statements,
+            ..._schemaV2Statements,
+          ]) {
             await customStatement(statement);
           }
         },
-        onUpgrade: (_, from, to) {
+        onUpgrade: (_, from, to) async {
+          if (from == 1 && to == 2) {
+            for (final statement in _schemaV2Statements) {
+              await customStatement(statement);
+            }
+            return;
+          }
           throw StateError(
-            'Unsupported Takt database migration $from -> $to. ',
+            'Unsupported Takt database migration $from -> $to.',
           );
         },
         beforeOpen: (_) async {
@@ -145,5 +154,39 @@ CREATE TABLE planning_preferences (
   '''
 CREATE INDEX idx_recurrence_exception_rule_start
 ON recurrence_exceptions(recurrence_rule_id, original_start_at_epoch_ms)
+''',
+];
+
+
+const _schemaV2Statements = <String>[
+  '''
+CREATE TABLE competitions (
+    id TEXT PRIMARY KEY CHECK (length(trim(id)) > 0),
+    created_at_epoch_ms INTEGER NOT NULL,
+    updated_at_epoch_ms INTEGER NOT NULL
+)
+''',
+  '''
+CREATE TABLE analysis_snapshots (
+    id TEXT PRIMARY KEY CHECK (length(trim(id)) > 0),
+    competition_id TEXT NOT NULL,
+    report_version INTEGER NOT NULL CHECK (report_version >= 1),
+    assembly_material_fingerprint TEXT NOT NULL CHECK (
+      length(assembly_material_fingerprint) = 64
+    ),
+    source_set_fingerprint TEXT CHECK (
+      source_set_fingerprint IS NULL OR length(source_set_fingerprint) = 64
+    ),
+    wire_fingerprint TEXT NOT NULL CHECK (length(wire_fingerprint) = 64),
+    report_changed INTEGER NOT NULL CHECK (report_changed IN (0, 1)),
+    response_json TEXT NOT NULL CHECK (length(response_json) > 0),
+    cached_at_epoch_ms INTEGER NOT NULL,
+    FOREIGN KEY (competition_id) REFERENCES competitions(id)
+      ON UPDATE CASCADE ON DELETE CASCADE
+)
+''',
+  '''
+CREATE INDEX idx_analysis_snapshot_competition_cached
+ON analysis_snapshots(competition_id, cached_at_epoch_ms DESC, id DESC)
 ''',
 ];
