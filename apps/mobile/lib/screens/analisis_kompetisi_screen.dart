@@ -41,6 +41,28 @@ class _AnalisisKompetisiScreenState
     _urlController.dispose();
     super.dispose();
   }
+  bool get _urlIsValid {
+    final uri = Uri.tryParse(_urlController.text.trim());
+    return uri != null &&
+        (uri.scheme == 'http' || uri.scheme == 'https') &&
+        uri.host.isNotEmpty;
+  }
+
+  bool get _pdfIsValid {
+    final file = _picked;
+    final bytes = file?.bytes;
+    return file != null &&
+        bytes != null &&
+        bytes.isNotEmpty &&
+        file.size > 0 &&
+        file.size <= maxAnalysisSourceBytes;
+  }
+
+  bool get _canSubmit {
+    if (_submitting || _sourceType == null) return false;
+    return _mode == 0 ? _pdfIsValid : _urlIsValid;
+  }
+
 
   Future<void> _pickFile() async {
     final result = await FilePicker.platform.pickFiles(
@@ -233,9 +255,9 @@ class _AnalisisKompetisiScreenState
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: GestureDetector(
-              onTap: _submitting ? null : _submit,
+              onTap: _canSubmit ? _submit : null,
               child: Opacity(
-                opacity: _submitting ? 0.55 : 1,
+                opacity: _canSubmit ? 1 : 0.45,
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   decoration: BoxDecoration(
@@ -401,6 +423,9 @@ class _AnalisisKompetisiScreenState
         enabled: !_submitting,
         keyboardType: TextInputType.url,
         autocorrect: false,
+        onChanged: (_) => setState(() {
+          _error = null;
+        }),
         style: const TextStyle(
           color: C.white,
           fontSize: 13,
