@@ -76,7 +76,7 @@ INSERT INTO commitments (
   });
 
 
-  test('v1 to v2 migration preserves existing commitments', () async {
+  test('v1 to v3 migration preserves existing commitments', () async {
     final dir = await Directory.systemTemp.createTemp('takt_v1_migration_');
     final file = File('${dir.path}/takt.sqlite3');
     addTearDown(() async {
@@ -142,6 +142,82 @@ ORDER BY name
     expect(
       analysisTables.map((row) => row.data['name']),
       ['analysis_snapshots', 'competitions'],
+    );
+  });
+
+  test('v2 to v3 migration preserves analysis snapshots', () async {
+    final dir = await Directory.systemTemp.createTemp('takt_v2_migration_');
+    final file = File('${dir.path}/takt.sqlite3');
+    addTearDown(() async {
+      if (await dir.exists()) await dir.delete(recursive: true);
+    });
+
+    final seed = AppDatabase.forTesting(NativeDatabase(file));
+    await seed.initialize();
+    for (final table in [
+      'task_progress',
+      'accepted_commitments',
+      'saved_plan_tasks',
+      'saved_plan_revisions',
+      'saved_plans',
+      'reevaluation_transitions',
+      'evaluations',
+    ]) {
+      await seed.customStatement('DROP TABLE $table');
+    }
+    await seed.customStatement('PRAGMA user_version = 2');
+    await seed.customStatement(
+      '''
+INSERT INTO competitions (
+  id, created_at_epoch_ms, updated_at_epoch_ms
+) VALUES (?, ?, ?)
+''',
+      ['cmp-v2', 1, 1],
+    );
+    await seed.customStatement(
+      '''
+INSERT INTO analysis_snapshots (
+  id, competition_id, report_version, assembly_material_fingerprint,
+  source_set_fingerprint, wire_fingerprint, report_changed,
+  response_json, cached_at_epoch_ms
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+''',
+      [
+        'snapshot-v2',
+        'cmp-v2',
+        1,
+        List.filled(64, 'a').join(),
+        null,
+        List.filled(64, 'b').join(),
+        1,
+        '{}',
+        1,
+      ],
+    );
+    await seed.close();
+
+    final migrated = AppDatabase.forTesting(NativeDatabase(file));
+    addTearDown(migrated.close);
+    await migrated.initialize();
+
+    expect(await migrated.userVersion(), 3);
+    final snapshots = await migrated.customSelect(
+      'SELECT id FROM analysis_snapshots WHERE id = ?',
+      variables: [const Variable<String>('snapshot-v2')],
+    ).get();
+    expect(snapshots, hasLength(1));
+
+    final v3Tables = await migrated.customSelect(
+      '''
+SELECT name FROM sqlite_master
+WHERE type = 'table'
+AND name IN ('evaluations', 'saved_plans', 'task_progress')
+ORDER BY name
+''',
+    ).get();
+    expect(
+      v3Tables.map((row) => row.data['name']).toList(),
+      ['evaluations', 'saved_plans', 'task_progress'],
     );
   });
 
