@@ -55,7 +55,7 @@ class JadwalTabs extends StatelessWidget {
         children: [
           tab('Daily Schedule', 0),
           const SizedBox(width: 4),
-          tab('Ringkasan Pekan', 1),
+          tab('Weekly Summary', 1),
         ],
       ),
     );
@@ -76,13 +76,13 @@ class JadwalHarianScreen extends StatelessWidget {
   final VoidCallback? onBack;
   final ValueChanged<Commitment>? onEdit;
 
-  static const _dayHeaders = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
+  static const _dayHeaders = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   static const _monthNames = [
-    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
   ];
   static const _dayNames = [
-    'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu',
+    'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
   ];
 
   static Color _dotFor(Commitment commitment) {
@@ -98,9 +98,9 @@ class JadwalHarianScreen extends StatelessWidget {
       "${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}";
 
   static String _duration(int minutes) {
-    if (minutes % 60 == 0) return '${minutes ~/ 60} jam';
-    if (minutes < 60) return '$minutes menit';
-    return '${minutes ~/ 60} jam ${minutes % 60} menit';
+    if (minutes % 60 == 0) return '${minutes ~/ 60} hr';
+    if (minutes < 60) return '$minutes min';
+    return '${minutes ~/ 60} hr ${minutes % 60} min';
   }
 
   static List<List<int?>> _weeks(DateTime month) {
@@ -222,7 +222,7 @@ class JadwalHarianScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           AppHeader(
-            title: 'Jadwal Saya',
+            title: 'My Schedule',
             trailing: AddButton(onTap: vm.isSaving ? null : onAdd),
             onBack: onBack,
           ),
@@ -401,7 +401,7 @@ class JadwalHarianScreen extends StatelessWidget {
                 SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Kalender tidak akan diubah otomatis. Takt hanya membaca kapasitas yang Anda konfirmasi.',
+                    'Your calendar will not be changed automatically. Takt only reads the capacity you confirm.',
                     style: TextStyle(color: C.detailMuted, fontSize: 12),
                   ),
                 ),
@@ -503,7 +503,7 @@ class _ActivityCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  item.isRecurring ? '$duration · rutin' : duration,
+                  item.isRecurring ? '$duration · recurring' : duration,
                   style: const TextStyle(color: C.detailMuted, fontSize: 11),
                 ),
               ],
@@ -524,7 +524,7 @@ class _ActivityCard extends StatelessWidget {
               itemBuilder: (_) => const [
                 PopupMenuItem(
                   value: 'move',
-                  child: Text('Geser tanggal ini'),
+                  child: Text('Move this occurrence'),
                 ),
                 PopupMenuItem(
                   value: 'cancel',
