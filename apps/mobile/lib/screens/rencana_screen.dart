@@ -1,45 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../data/repositories/saved_plan_repository.dart';
 import '../theme/app_theme.dart';
-import '../viewmodels/rencana_view_model.dart';
+import '../viewmodels/saved_plans_view_model.dart';
 import '../widgets/common.dart';
 
-/// RencanaScreen — "Rencana tersimpan".
-/// Section: Rencana tersimpan (Tinjau) + History Rencana Disetujui (Cek Jadwal).
-/// Data dari [RencanaViewModel].
 class RencanaScreen extends StatelessWidget {
-  const RencanaScreen({super.key, this.onTinjau, this.onCekJadwal});
+  const RencanaScreen({
+    super.key,
+    this.onOpen,
+  });
 
-  /// Tinjau rencana tersimpan (baca lagi hasil analisis). Membawa entry-nya.
-  final void Function(SavedPlanEntry entry)? onTinjau;
-
-  /// Cek jadwal lomba yang sudah disetujui (highlight di kalender).
-  final void Function(SavedPlanEntry entry)? onCekJadwal;
-
-  static const _bulan = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
-  ];
-  static const _bulanSingkat = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
-    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
-  ];
-
-  String _deadlineLabel(DateTime d) =>
-      'Before ${d.day} ${_bulan[d.month - 1]} ${d.year}';
-
-  String _decidedLabel(SavedPlanEntry e) {
-    final d = e.decidedAt;
-    if (d == null) return e.decidedBy ?? 'You';
-    return '${d.day} ${_bulanSingkat[d.month - 1]} · by ${e.decidedBy ?? 'You'}';
-  }
+  final ValueChanged<SavedPlanSummary>? onOpen;
 
   @override
   Widget build(BuildContext context) {
-    final vm = context.watch<RencanaViewModel>();
-    final tersimpan = vm.tersimpan;
-    final disetujui = vm.disetujui;
+    final vm = context.watch<SavedPlansViewModel>();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -47,46 +24,32 @@ class RencanaScreen extends StatelessWidget {
         const AppHeader(title: 'Saved Plans'),
         const HeaderDivider(),
         const SizedBox(height: 20),
+        if (vm.loading) const LinearProgressIndicator(minHeight: 2),
         Expanded(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          child: RefreshIndicator(
+            onRefresh: vm.refresh,
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
               children: [
-                const _Title('Saved Plans'),
-                const SizedBox(height: 12),
-                if (tersimpan.isEmpty)
-                  const _Empty(
-                    icon: Icons.eco_outlined,
+                if (vm.error != null)
+                  _MessageCard(
+                    icon: Icons.error_outline,
+                    text: vm.error!,
+                  ),
+                if (!vm.loading && vm.items.isEmpty)
+                  const _MessageCard(
+                    icon: Icons.inventory_2_outlined,
                     text:
-                        'No saved plans yet. Save one from an analysis result.',
-                  )
-                else
-                  ...tersimpan.map((e) => Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _SavedCard(
-                          title: e.title,
-                          subtitle: _deadlineLabel(e.deadline),
-                          onTap: () => onTinjau?.call(e),
-                        ),
-                      )),
-                const SizedBox(height: 24),
-                const _Title('Accepted Plan History'),
-                const SizedBox(height: 12),
-                if (disetujui.isEmpty)
-                  const _Empty(
-                    icon: Icons.check_circle_outline,
-                    text: 'No accepted plans yet.',
-                  )
-                else
-                  ...disetujui.map((e) => Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: _HistoryCard(
-                          title: e.title,
-                          meta: _decidedLabel(e),
-                          onTap: () => onCekJadwal?.call(e),
-                        ),
-                      )),
+                        'No accepted plans yet. Evaluate a competition and explicitly accept a candidate first.',
+                  ),
+                for (final item in vm.items)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _PlanCard(
+                      item: item,
+                      onTap: () => onOpen?.call(item),
+                    ),
+                  ),
               ],
             ),
           ),
@@ -96,204 +59,142 @@ class RencanaScreen extends StatelessWidget {
   }
 }
 
-class _Title extends StatelessWidget {
-  const _Title(this.text);
-  final String text;
+class _PlanCard extends StatelessWidget {
+  const _PlanCard({
+    required this.item,
+    required this.onTap,
+  });
+
+  final SavedPlanSummary item;
+  final VoidCallback onTap;
 
   @override
-  Widget build(BuildContext context) => Text(
-        text,
-        style: const TextStyle(
-            color: C.white, fontSize: 18, fontWeight: FontWeight.w700),
+  Widget build(BuildContext context) {
+    final revision = item.currentRevision;
+    final accepted = revision.acceptedAt;
+    final deadline = item.deadline.toLocal();
+
+    return Material(
+      color: C.card,
+      borderRadius: BorderRadius.circular(14),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(14),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Icon(
+                    Icons.fact_check_outlined,
+                    color: C.accent,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      item.title,
+                      style: const TextStyle(
+                        color: C.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ),
+                  _StatusBadge(stale: item.stale),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'Revision ${revision.revisionNumber} · ${revision.selectedCandidateId}',
+                style: const TextStyle(color: C.detailMuted),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Accepted ${_dateTime(accepted)}',
+                style: const TextStyle(color: C.detailMuted),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Deadline ${_dateTime(deadline)}',
+                style: const TextStyle(color: C.detailMuted),
+              ),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerRight,
+                child: FilledButton.tonal(
+                  onPressed: onTap,
+                  child: const Text('Open plan'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StatusBadge extends StatelessWidget {
+  const _StatusBadge({required this.stale});
+  final bool stale;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+        decoration: BoxDecoration(
+          color: C.bg,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: stale ? C.padat : C.accent),
+        ),
+        child: Text(
+          stale ? 'STALE' : 'CURRENT',
+          style: TextStyle(
+            color: stale ? C.padat : C.accent,
+            fontSize: 10,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
       );
 }
 
-class _Empty extends StatelessWidget {
-  const _Empty({required this.icon, required this.text});
+class _MessageCard extends StatelessWidget {
+  const _MessageCard({
+    required this.icon,
+    required this.text,
+  });
+
   final IconData icon;
   final String text;
 
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: C.card,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: C.bg,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            alignment: Alignment.center,
-            child: Icon(icon, color: C.accent, size: 22),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Text(
-              text,
-              style: const TextStyle(color: C.detailMuted, fontSize: 13),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Card "Rencana tersimpan": ikon daun + judul + subtitle + tombol Tinjau.
-class _SavedCard extends StatelessWidget {
-  const _SavedCard({
-    required this.title,
-    required this.subtitle,
-    this.onTap,
-  });
-
-  final String title;
-  final String subtitle;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: C.card,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: C.bg,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            alignment: Alignment.center,
-            child: const Icon(Icons.eco_outlined, color: C.accent, size: 22),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: const TextStyle(
-                        color: C.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700)),
-                const SizedBox(height: 2),
-                Text(subtitle,
-                    style: const TextStyle(
-                        color: C.detailMuted, fontSize: 12, height: 1.3)),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          _PillButton(
-            label: 'Review',
-            icon: Icons.info_outline,
-            onTap: onTap,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// Card "History Rencana Disetujui": ikon check + judul + meta + Cek Jadwal.
-class _HistoryCard extends StatelessWidget {
-  const _HistoryCard({required this.title, required this.meta, this.onTap});
-
-  final String title;
-  final String meta;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: C.card,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 44,
-            height: 44,
-            decoration: BoxDecoration(
-              color: C.bg,
-              borderRadius: BorderRadius.circular(12),
-            ),
-            alignment: Alignment.center,
-            child: const Icon(Icons.check_circle_outline,
-                color: C.accent, size: 22),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(title,
-                    style: const TextStyle(
-                        color: C.white,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w700)),
-                const SizedBox(height: 2),
-                Text(meta,
-                    style: const TextStyle(
-                        color: C.detailMuted, fontSize: 12)),
-              ],
-            ),
-          ),
-          const SizedBox(width: 10),
-          _PillButton(label: 'View Schedule', onTap: onTap),
-        ],
-      ),
-    );
-  }
-}
-
-/// Tombol pill accent kecil (opsional dengan ikon).
-class _PillButton extends StatelessWidget {
-  const _PillButton({required this.label, this.icon, this.onTap});
-
-  final String label;
-  final IconData? icon;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 9),
+  Widget build(BuildContext context) => Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: C.accent,
-          borderRadius: BorderRadius.circular(999),
+          color: C.card,
+          borderRadius: BorderRadius.circular(14),
         ),
         child: Row(
-          mainAxisSize: MainAxisSize.min,
           children: [
-            if (icon != null) ...[
-              Icon(icon, color: C.accentText, size: 15),
-              const SizedBox(width: 5),
-            ],
-            Text(label,
-                style: const TextStyle(
-                    color: C.accentText,
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700)),
+            Icon(icon, color: C.accent),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                text,
+                style: const TextStyle(color: C.detailMuted),
+              ),
+            ),
           ],
         ),
-      ),
-    );
-  }
+      );
+}
+
+String _dateTime(DateTime value) {
+  final local = value.toLocal();
+  String two(int v) => v.toString().padLeft(2, '0');
+  return '${two(local.day)}/${two(local.month)}/${local.year} '
+      '${two(local.hour)}:${two(local.minute)}';
 }

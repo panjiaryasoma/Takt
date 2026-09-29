@@ -94,7 +94,7 @@ void main() {
   test('edit emits identity only; ignore dismisses without changing response', () {
     final vm = model();
     addTearDown(vm.dispose);
-    final response = vm.session!.originalResponseJson;
+    final response = vm.session!.evaluationResponseJson;
     vm.beginAccept();
     final edit = vm.editConstraints()!;
     expect(edit.inputRevision, 3);
@@ -104,7 +104,7 @@ void main() {
     expect(ignore.sessionId, vm.session!.sessionId);
     expect(vm.selectedCandidateId, isNull);
     expect(vm.isDismissed, isTrue);
-    expect(vm.session!.originalResponseJson, response);
+    expect(vm.session!.evaluationResponseJson, response);
     expect(vm.beginAccept(), isNull);
     expect(vm.ignore(), isNull);
   });

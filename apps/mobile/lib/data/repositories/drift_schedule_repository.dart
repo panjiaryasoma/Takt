@@ -10,9 +10,13 @@ import '../database/app_database.dart';
 import 'schedule_repository.dart';
 
 class DriftScheduleRepository implements ScheduleRepository {
-  DriftScheduleRepository(this._db);
+  DriftScheduleRepository(
+    this._db, {
+    this.closeDatabaseOnDispose = true,
+  });
 
   final AppDatabase _db;
+  final bool closeDatabaseOnDispose;
   final StreamController<ScheduleState> _changes =
       StreamController<ScheduleState>.broadcast();
 
@@ -313,6 +317,8 @@ INSERT INTO recurrence_rules (
     if (_closed) return;
     _closed = true;
     await _changes.close();
-    await _db.close();
+    if (closeDatabaseOnDispose) {
+      await _db.close();
+    }
   }
 }
