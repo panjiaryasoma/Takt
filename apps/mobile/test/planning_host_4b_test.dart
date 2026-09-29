@@ -154,8 +154,10 @@ void main() {
 
     await tester.tap(find.text('Evaluate'));
     await tester.pump();
-    await _waitFor(() => api.lastEvaluationRequest != null);
-    await tester.pump();
+    for (var i = 0; i < 20 && api.lastEvaluationRequest == null; i++) {
+      await tester.pump();
+    }
+    expect(api.lastEvaluationRequest, isNotNull);
 
     final fields = tester.widgetList<TextField>(find.byType(TextField)).toList();
     expect(fields, isNotEmpty);
