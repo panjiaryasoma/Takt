@@ -115,7 +115,7 @@ class HomeScreen extends StatelessWidget {
                 const Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    'Availability dihitung backend saat evaluasi rencana.',
+                    'Waktu luang dihitung saat evaluasi rencana.',
                     style: TextStyle(color: C.detailMuted, fontSize: 11),
                   ),
                 ),

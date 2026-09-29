@@ -54,7 +54,7 @@ class _RekomendasiJadwalScreenState extends State<RekomendasiJadwalScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       const SnackBar(
         content: Text(
-          'Rekomendasi belum tersedia sampai Decision Report backend terhubung.',
+          'Rekomendasi belum tersedia di versi ini. Jadwal Anda belum berubah.',
         ),
       ),
     );
@@ -88,8 +88,8 @@ class _RekomendasiJadwalScreenState extends State<RekomendasiJadwalScreen> {
               style: TextStyle(color: C.white, fontSize: 24)),
           const SizedBox(height: 4),
           const Text(
-            'Judul & deskripsi berasal dari brief. Slot pengerjaan akan tampil '
-            'setelah Decision Report backend terhubung.',
+            'Judul dan deskripsi berasal dari brief kompetisi. '
+            'Rekomendasi waktu pengerjaan belum tersedia di versi ini.',
             style: TextStyle(color: C.detailMuted, fontSize: 12, height: 1.4),
           ),
           const SizedBox(height: 20),
@@ -112,8 +112,11 @@ class _RekomendasiJadwalScreenState extends State<RekomendasiJadwalScreen> {
           const SizedBox(height: 16),
 
           // Rekomendasi slot AI
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          const Wrap(
+            alignment: WrapAlignment.spaceBetween,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            spacing: 12,
+            runSpacing: 8,
             children: [
               Text('Rekomendasi Slot Pengerjaan',
                   style: TextStyle(
@@ -121,11 +124,12 @@ class _RekomendasiJadwalScreenState extends State<RekomendasiJadwalScreen> {
                       fontSize: 15,
                       fontWeight: FontWeight.w700)),
               Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(Icons.lock_clock_outlined,
                       color: C.detailMuted, size: 16),
                   SizedBox(width: 4),
-                  Text('Menunggu backend',
+                  Text('Belum tersedia',
                       style: TextStyle(color: C.detailMuted, fontSize: 13)),
                 ],
               ),
@@ -144,8 +148,8 @@ class _RekomendasiJadwalScreenState extends State<RekomendasiJadwalScreen> {
                 borderRadius: BorderRadius.circular(14),
               ),
               child: const Text(
-                'Rekomendasi belum tersedia. Hari 3B akan menampilkan candidate '
-                'window dari backend tanpa membuat scheduler kedua di Flutter.',
+                'Rekomendasi belum tersedia di versi ini. '
+                'Anda tetap bisa menambahkan jadwal sendiri lewat tab Jadwal.',
                 style: TextStyle(color: C.detailMuted, fontSize: 13),
               ),
             )
