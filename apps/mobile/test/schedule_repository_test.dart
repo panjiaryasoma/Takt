@@ -21,6 +21,31 @@ void main() {
     await db.initialize();
 
     expect(await db.userVersion(), 2);
+    final tables = await db.customSelect(
+      '''
+SELECT name FROM sqlite_master
+WHERE type = 'table' AND name IN (
+  'commitments',
+  'recurrence_rules',
+  'recurrence_exceptions',
+  'planning_preferences',
+  'competitions',
+  'analysis_snapshots'
+)
+ORDER BY name
+''',
+    ).get();
+    expect(
+      tables.map((row) => row.data['name']).toSet(),
+      {
+        'commitments',
+        'recurrence_rules',
+        'recurrence_exceptions',
+        'planning_preferences',
+        'competitions',
+        'analysis_snapshots',
+      },
+    );
     await expectLater(
       db.customStatement(
         '''
