@@ -44,6 +44,7 @@ void main() {
 class TaktApp extends StatefulWidget {
   const TaktApp({
     super.key,
+    this.database,
     this.scheduleRepository,
     this.analysisRepository,
     this.apiClient,
@@ -57,6 +58,7 @@ class TaktApp extends StatefulWidget {
     this.onIgnoreRecommendation,
   });
 
+  final AppDatabase? database;
   final ScheduleRepository? scheduleRepository;
   final AnalysisRepository? analysisRepository;
   final CompetitionApiClient? apiClient;
@@ -90,10 +92,10 @@ class _TaktAppState extends State<TaktApp> {
         widget.analysisRepository == null ||
         widget.evaluationRepository == null ||
         widget.savedPlanRepository == null;
-    if (needsDatabase) {
+    if (needsDatabase && widget.database == null) {
       _ownedDatabase = AppDatabase.open();
     }
-    final database = _ownedDatabase;
+    final database = widget.database ?? _ownedDatabase;
 
     _scheduleRepository = widget.scheduleRepository ??
         DriftScheduleRepository(
