@@ -177,6 +177,14 @@ class CanonicalFieldWire {
       candidates: candidates,
       evidenceIds: _strings(map['evidence_ids'], '$path.evidence_ids'),
     );
+    final candidateEvidence = <String>{
+      for (final candidate in candidates) ...candidate.evidenceIds,
+    };
+    if (!result.evidenceIds.toSet().containsAll(candidateEvidence)) {
+      throw FormatException(
+        '$path canonical evidence must retain candidate evidence',
+      );
+    }
     result._validate(path);
     return result;
   }
@@ -597,35 +605,126 @@ class CompetitionAnalyzeResponseWire {
         in _list(root['source_artifacts'], 'source_artifacts')
             .asMap()
             .entries) {
-      final artifact =
-          _object(entry.value, 'source_artifacts[${entry.key}]');
+      final path = 'source_artifacts[${entry.key}]';
+      final artifact = _object(entry.value, path);
       _expectKeys(
         artifact,
         const {'source', 'candidate_reports', 'extraction_runs'},
-        'source_artifacts[${entry.key}]',
+        path,
       );
       final source = SourceRecordWire.fromJson(
         artifact['source'],
-        path: 'source_artifacts[${entry.key}].source',
+        path: '$path.source',
       );
       if (!artifactIds.add(source.sourceId)) {
         throw const FormatException('Duplicate source artifact ID');
       }
-      if (_list(
+
+      final reports = _list(
         artifact['candidate_reports'],
-        'source_artifacts[${entry.key}].candidate_reports',
-      ).isEmpty) {
+        '$path.candidate_reports',
+      );
+      if (reports.isEmpty) {
         throw const FormatException(
           'Source artifact must keep candidate reports',
         );
       }
-      if (_list(
+      for (final reportEntry in reports.asMap().entries) {
+        final reportPath =
+            '$path.candidate_reports[${reportEntry.key}]';
+        final report = _object(reportEntry.value, reportPath);
+        _expectKeys(
+          report,
+          const {'source_id', 'extraction_path', 'fields', 'evidence'},
+          reportPath,
+        );
+        if (_string(report['source_id'], '$reportPath.source_id') !=
+            source.sourceId) {
+          throw FormatException('$reportPath source_id mismatch');
+        }
+        final extractionPath = _string(
+          report['extraction_path'],
+          '$reportPath.extraction_path',
+        );
+        if (!const {'native', 'ocr', 'vision'}
+            .contains(extractionPath)) {
+          throw FormatException(
+            '$reportPath has unsupported extraction path',
+          );
+        }
+        for (final fieldEntry
+            in _list(report['fields'], '$reportPath.fields')
+                .asMap()
+                .entries) {
+          final fieldMap = _object(
+            fieldEntry.value,
+            '$reportPath.fields[${fieldEntry.key}]',
+          );
+          final fieldName = _string(
+            fieldMap['field_name'],
+            '$reportPath.fields[${fieldEntry.key}].field_name',
+          );
+          CandidateFieldWire.fromJson(
+            fieldMap,
+            fieldName: fieldName,
+            path: '$reportPath.fields[${fieldEntry.key}]',
+          );
+        }
+        for (final evidenceEntry
+            in _list(report['evidence'], '$reportPath.evidence')
+                .asMap()
+                .entries) {
+          final evidence = EvidenceSpanWire.fromJson(
+            evidenceEntry.value,
+            path:
+                '$reportPath.evidence[${evidenceEntry.key}]',
+          );
+          if (evidence.sourceId != source.sourceId ||
+              evidence.extractionPath != extractionPath) {
+            throw FormatException(
+              '$reportPath evidence continuity mismatch',
+            );
+          }
+        }
+      }
+
+      final runs = _list(
         artifact['extraction_runs'],
-        'source_artifacts[${entry.key}].extraction_runs',
-      ).isEmpty) {
+        '$path.extraction_runs',
+      );
+      if (runs.isEmpty) {
         throw const FormatException(
           'Source artifact must keep extraction runs',
         );
+      }
+      for (final runEntry in runs.asMap().entries) {
+        final runPath = '$path.extraction_runs[${runEntry.key}]';
+        final run = _object(runEntry.value, runPath);
+        _expectKeys(
+          run,
+          const {
+            'source_id',
+            'snapshot_id',
+            'extraction_path',
+            'extractor_version',
+          },
+          runPath,
+        );
+        if (_string(run['source_id'], '$runPath.source_id') !=
+            source.sourceId) {
+          throw FormatException('$runPath source_id mismatch');
+        }
+        _string(run['snapshot_id'], '$runPath.snapshot_id');
+        _string(run['extractor_version'], '$runPath.extractor_version');
+        final pathValue = _string(
+          run['extraction_path'],
+          '$runPath.extraction_path',
+        );
+        if (!const {'native', 'ocr', 'vision'}.contains(pathValue)) {
+          throw FormatException(
+            '$runPath has unsupported extraction path',
+          );
+        }
       }
     }
 
