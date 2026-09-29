@@ -40,9 +40,10 @@ Host contract:
 
 - Own authoritative inputs, request generation, late-response rejection and active
   session replacement. Pair the exact request/response and check report/snapshot
-  identity before publishing `EvaluationSession.fromRaw(...)`.
-- `fromRaw` is the only session constructor. The original request is opaque to 3B;
-  the original response is parsed internally into deeply immutable DTOs.
+  identity before publishing `EvaluationSession.fromEvaluationSnapshot(...)`.
+- `fromEvaluationSnapshot` is the only session construction path. 4B persists and
+  reloads the paired evaluation request/response before publication; 3B parses the
+  response internally into deeply immutable DTOs.
 - Push the current input revision into the component when authoritative inputs
   change. Invalidated sessions cannot regain action authority without replacement.
 - Replacing a session cancels pending confirmation even at the same input revision.
@@ -60,93 +61,28 @@ the user selects an alternative. Only backend-allowed actions are rendered; miss
 host handlers disable Accept/Edit rather than silently pretending success.
 Timestamps are shown in device local time with explicit UTC offsets.
 
-HTTP, planning-input assembly, workload/availability generation, authoritative
-constraint mutation, persistence, Saved Plans and re-evaluation remain 4B work.
-Issue #7 component behavior can be tested here; real edit-to-evaluate and the
-Technical MVP end-to-end remain dependent on that host.
+## 4B Planning Integration
 
-Verification: `flutter analyze`, `flutter test`, `flutter build apk --debug`, and
-the existing backend regression suite. Results must be associated with the tested
-commit, not inherited from an earlier baseline.
+4B is the production host around the 3B Decision Report. It now owns:
 
-## RevenueCat configuration contract
+- explicit readiness, workload, timezone, planning-hours, daily-capacity, focus,
+  and buffer inputs;
+- deterministic `/api/v1/plans/evaluate` and `/api/v1/plans/re-evaluate`
+  transport, including exact re-evaluation wrapper persistence;
+- IANA-timezone work-window expansion with fail-closed DST gap/fold handling;
+- persist-before-publish evaluation sessions and late-response rejection;
+- schema v3 cumulative migration from v1/v2;
+- atomic Accept persistence into Saved Plans, revisions, task snapshots,
+  accepted work blocks, and task progress;
+- stale-transition handling where the old accepted plan stays visible until the
+  user accepts a fresh revision;
+- read-only accepted work blocks in Daily and Weekly My Schedule views;
+- explicit compatibility fallback for unsupported historical re-evaluation
+  contracts.
 
-RevenueCat is a mobile-owned access dependency. It must never change deadline,
-eligibility, source-conflict, feasibility, solver, or recommendation truth.
+The user still owns the decision. Suggestions are not commitments until Accept is
+confirmed, and Ignore does not mutate persistence.
 
-The canonical identifiers are:
-
-```text
-entitlement: pro
-Test Store product: takt_pro_lifetime_v1
-Offering identifier: default
-lifetime package: $rc_lifetime
-premium feature: alternative_candidates
-```
-
-The Shipaton demo path uses RevenueCat Test Store on Android. Google Play
-provider setup and credentials are deferred.
-
-Create an ignored local Test Store config from the committed example:
-
-```bash
-cp config/revenuecat.test.example.json config/revenuecat.test.local.json
-```
-
-Replace the placeholder with the RevenueCat public Test Store SDK key, then
-run the debug build with:
-
-```bash
-flutter run --debug \
-  --dart-define-from-file=config/revenuecat.test.local.json
-```
-
-Test Store config is intentionally rejected for profile and release builds.
-Production Android config accepts only a public `goog_` SDK key.
-
-Never put RevenueCat secret `sk_` keys in the app or repository. Do not commit
-`*.local.json` config files.
-
-This branch keeps monetization at the access/presentation boundary. RevenueCat
-must not change planning inputs, solver feasibility, candidate validity, backend
-allowed actions, accepted-plan truth, or local domain persistence.
-
-
-### RevenueCat runtime foundation
-
-4C Block 2 uses the official `purchases_flutter` SDK. Startup configures RevenueCat
-once with the public key and no custom App User ID, so RevenueCat owns the anonymous
-identity. The runtime then reads `CustomerInfo` and resolves the canonical
-`default` / `$rc_lifetime` package from Offerings.
-
-Entitlement and offering refresh failures preserve the last trustworthy state.
-Missing offerings/packages stay explicitly empty; the app never invents a package.
-Purchase, restore, paywall UI, and final Decision Report gating remain later 4C work.
-
-
-### RevenueCat purchase and restore flow
-
-The Home screen exposes a **Takt Pro** entry point when RevenueCat configuration
-is available. The custom purchase screen resolves the canonical
-`default` / `$rc_lifetime` package from RevenueCat before purchase and uses
-the official `Purchases.purchase(PurchaseParams.package(...))` flow.
-
-Purchase outcomes are explicit:
-- success activates access only when the returned CustomerInfo contains `pro`;
-- cancellation is non-fatal and leaves existing access unchanged;
-- pending purchase is shown as pending and does not invent premium access;
-- failures preserve the last trustworthy entitlement state.
-
-Restore uses `Purchases.restorePurchases()` and applies the returned
-CustomerInfo. A successful restore with no `pro` entitlement remains a valid
-non-premium state.
-
-For the Test Store demo:
-
-```powershell
-flutter run --dart-define-from-file=config/revenuecat.test.local.json
-```
-
-Open **Home → Takt Pro**, complete the Test Store lifetime purchase, then verify
-that the screen reports the active `pro` entitlement. Do not commit the local
-config file or any store/server credentials.
+Verification is `flutter analyze`, `flutter test`, `flutter build apk --debug`,
+plus the backend Ruff/pytest regression suite. Results must be associated with the
+tested commit, not inherited from an earlier baseline.

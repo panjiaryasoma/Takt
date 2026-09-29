@@ -1,52 +1,56 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'config/api_config.dart';
 import 'data/database/app_database.dart';
 import 'data/remote/competition_api_client.dart';
+import 'data/remote/plan_api_client.dart';
 import 'data/repositories/analysis_repository.dart';
 import 'data/repositories/drift_analysis_repository.dart';
+import 'data/repositories/drift_evaluation_repository.dart';
+import 'data/repositories/drift_saved_plan_repository.dart';
 import 'data/repositories/drift_schedule_repository.dart';
+import 'data/repositories/evaluation_repository.dart';
+import 'data/repositories/saved_plan_repository.dart';
 import 'data/repositories/schedule_repository.dart';
 import 'models/commitment.dart';
-import 'monetization/revenuecat_bootstrap.dart';
-import 'monetization/revenuecat_service.dart';
 import 'models/decision_intent.dart';
 import 'models/evaluation_session.dart';
 import 'screens/analisis_kompetisi_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/jadwal_harian_screen.dart';
 import 'screens/jadwal_ringkasan_screen.dart';
+import 'screens/planning_setup_screen.dart';
 import 'screens/progres_analisis_screen.dart';
-import 'screens/premium_access_screen.dart';
 import 'screens/rencana_screen.dart';
 import 'screens/rekomendasi_jadwal_screen.dart';
 import 'screens/review_brief_screen.dart';
+import 'screens/saved_plan_detail_screen.dart';
 import 'screens/tambah_jadwal_screen.dart';
 import 'theme/app_theme.dart';
 import 'viewmodels/analisis_view_model.dart';
 import 'viewmodels/jadwal_view_model.dart';
-import 'viewmodels/rencana_view_model.dart';
+import 'viewmodels/planning_host_view_model.dart';
+import 'viewmodels/saved_plan_detail_view_model.dart';
+import 'viewmodels/saved_plans_view_model.dart';
 import 'widgets/common.dart';
 
-Future<void> main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  final monetization = await bootstrapRevenueCat();
-  if (monetization.configurationError != null) {
-    debugPrint(
-      'RevenueCat disabled: ${monetization.configurationError}',
-    );
-  }
-  runApp(TaktApp(revenueCatService: monetization.service));
+void main() {
+  runApp(const TaktApp());
 }
 
-class TaktApp extends StatelessWidget {
+class TaktApp extends StatefulWidget {
   const TaktApp({
     super.key,
+    this.database,
     this.scheduleRepository,
     this.analysisRepository,
     this.apiClient,
-    this.revenueCatService,
+    this.planApiClient,
+    this.evaluationRepository,
+    this.savedPlanRepository,
     this.decisionSession,
     this.currentInputRevision = 0,
     this.onAcceptCandidate,
@@ -54,10 +58,16 @@ class TaktApp extends StatelessWidget {
     this.onIgnoreRecommendation,
   });
 
+  final AppDatabase? database;
   final ScheduleRepository? scheduleRepository;
   final AnalysisRepository? analysisRepository;
   final CompetitionApiClient? apiClient;
-  final RevenueCatService? revenueCatService;
+  final PlanApiClient? planApiClient;
+  final EvaluationRepository? evaluationRepository;
+  final SavedPlanRepository? savedPlanRepository;
+
+  /// Legacy 3B injection remains available for isolated component tests.
+  /// Production navigation uses [PlanningHostViewModel].
   final EvaluationSession? decisionSession;
   final int currentInputRevision;
   final AcceptCandidateHandler? onAcceptCandidate;
@@ -65,27 +75,102 @@ class TaktApp extends StatelessWidget {
   final ValueChanged<IgnoreRecommendationIntent>? onIgnoreRecommendation;
 
   @override
+  State<TaktApp> createState() => _TaktAppState();
+}
+
+class _TaktAppState extends State<TaktApp> {
+  AppDatabase? _ownedDatabase;
+  late final ScheduleRepository _scheduleRepository;
+  late final AnalysisRepository _analysisRepository;
+  late final EvaluationRepository _evaluationRepository;
+  late final SavedPlanRepository _savedPlanRepository;
+
+  @override
+  void initState() {
+    super.initState();
+    final needsDatabase = widget.scheduleRepository == null ||
+        widget.analysisRepository == null ||
+        widget.evaluationRepository == null ||
+        widget.savedPlanRepository == null;
+    if (needsDatabase && widget.database == null) {
+      _ownedDatabase = AppDatabase.open();
+    }
+    final database = widget.database ?? _ownedDatabase;
+
+    _scheduleRepository = widget.scheduleRepository ??
+        DriftScheduleRepository(
+          database!,
+          closeDatabaseOnDispose: false,
+        );
+    _analysisRepository = widget.analysisRepository ??
+        DriftAnalysisRepository(
+          database!,
+          closeDatabaseOnDispose: false,
+        );
+    _evaluationRepository = widget.evaluationRepository ??
+        DriftEvaluationRepository(
+          database!,
+          closeDatabaseOnDispose: false,
+        );
+    _savedPlanRepository = widget.savedPlanRepository ??
+        DriftSavedPlanRepository(
+          database!,
+          closeDatabaseOnDispose: false,
+        );
+  }
+
+  @override
+  void dispose() {
+    final database = _ownedDatabase;
+    if (database != null) {
+      unawaited(database.close());
+    }
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
-        if (revenueCatService != null)
-          ChangeNotifierProvider<RevenueCatService>.value(
-            value: revenueCatService!,
-          ),
         ChangeNotifierProvider(
-          create: (_) {
-            final repository = scheduleRepository ??
-                DriftScheduleRepository(AppDatabase.open());
-            return JadwalViewModel(repository)..initialize();
-          },
+          create: (_) => JadwalViewModel(
+            _scheduleRepository,
+            savedPlanRepository: _savedPlanRepository,
+            closeScheduleRepositoryOnDispose:
+                widget.scheduleRepository == null,
+            closeSavedPlanRepositoryOnDispose: false,
+          )..initialize(),
         ),
         ChangeNotifierProvider(
           create: (_) => AnalisisViewModel(
-            apiClient: apiClient ?? HttpCompetitionApiClient(baseUrl: ApiConfig.baseUrl),
-            repository: analysisRepository ?? DriftAnalysisRepository(AppDatabase.open()),
+            apiClient: widget.apiClient ??
+                HttpCompetitionApiClient(baseUrl: ApiConfig.baseUrl),
+            repository: _analysisRepository,
+            closeRepositoryOnDispose: widget.analysisRepository == null,
           ),
         ),
-        ChangeNotifierProvider(create: (_) => RencanaViewModel()),
+        ChangeNotifierProvider(
+          create: (_) => SavedPlansViewModel(
+            _savedPlanRepository,
+            closeRepositoryOnDispose: widget.savedPlanRepository == null,
+          )..initialize(),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => SavedPlanDetailViewModel(_savedPlanRepository),
+        ),
+        ChangeNotifierProvider(
+          create: (_) => PlanningHostViewModel(
+            apiClient: widget.planApiClient ??
+                HttpPlanApiClient(baseUrl: ApiConfig.baseUrl),
+            scheduleRepository: _scheduleRepository,
+            evaluationRepository: _evaluationRepository,
+            savedPlanRepository: _savedPlanRepository,
+            closeScheduleRepositoryOnDispose: false,
+            closeEvaluationRepositoryOnDispose:
+                widget.evaluationRepository == null,
+            closeSavedPlanRepositoryOnDispose: false,
+          ),
+        ),
       ],
       child: MaterialApp(
         title: 'Takt',
@@ -93,12 +178,11 @@ class TaktApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: AppTheme.dark,
         home: RootShell(
-          revenueCatEnabled: revenueCatService != null,
-          decisionSession: decisionSession,
-          currentInputRevision: currentInputRevision,
-          onAcceptCandidate: onAcceptCandidate,
-          onEditConstraints: onEditConstraints,
-          onIgnoreRecommendation: onIgnoreRecommendation,
+          decisionSession: widget.decisionSession,
+          currentInputRevision: widget.currentInputRevision,
+          onAcceptCandidate: widget.onAcceptCandidate,
+          onEditConstraints: widget.onEditConstraints,
+          onIgnoreRecommendation: widget.onIgnoreRecommendation,
         ),
       ),
     );
@@ -108,7 +192,6 @@ class TaktApp extends StatelessWidget {
 class RootShell extends StatefulWidget {
   const RootShell({
     super.key,
-    this.revenueCatEnabled = false,
     this.decisionSession,
     this.currentInputRevision = 0,
     this.onAcceptCandidate,
@@ -116,9 +199,6 @@ class RootShell extends StatefulWidget {
     this.onIgnoreRecommendation,
   });
 
-  final bool revenueCatEnabled;
-
-  /// 4B publishes its active, paired session; navigation does not build inputs.
   final EvaluationSession? decisionSession;
   final int currentInputRevision;
   final AcceptCandidateHandler? onAcceptCandidate;
@@ -136,6 +216,7 @@ class _RootShellState extends State<RootShell> {
   Commitment? _editingCommitment;
   int _analisisStep = 0;
   bool _addingSource = false;
+  String? _selectedSavedPlanId;
 
   @override
   void initState() {
@@ -154,34 +235,168 @@ class _RootShellState extends State<RootShell> {
         _navIndex = 2;
         _analisisStep = 3;
       } else if (_analisisStep == 3) {
-        _analisisStep = context.read<AnalisisViewModel>().response == null ? 0 : 2;
+        _analisisStep =
+            context.read<AnalisisViewModel>().response == null ? 0 : 2;
       }
     }
   }
 
   void _closeDecision() => setState(() {
-    _analisisStep = context.read<AnalisisViewModel>().response == null ? 0 : 2;
-  });
+        _analisisStep =
+            context.read<AnalisisViewModel>().response == null ? 0 : 2;
+      });
 
-  Future<void> _openPremiumAccess() {
-    return Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => const PremiumAccessScreen(),
+  Future<void> _refreshAcceptedProjections() async {
+    final savedPlans = context.read<SavedPlansViewModel>();
+    final schedule = context.read<JadwalViewModel>();
+    var failed = false;
+    try {
+      await savedPlans.refresh();
+    } on Object {
+      failed = true;
+    }
+    try {
+      await schedule.refreshAcceptedPlans();
+    } on Object {
+      failed = true;
+    }
+    if (!failed || !mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text(
+          'Plan accepted. Some local views could not refresh yet.',
+        ),
       ),
     );
   }
 
+  Future<void> _openPlanningFromCurrentAnalysis() async {
+    final analysis = context.read<AnalisisViewModel>();
+    final snapshot = analysis.activeSnapshot;
+    if (snapshot == null) return;
+    final host = context.read<PlanningHostViewModel>();
+    await host.startPlanning(snapshot);
+    if (!mounted) return;
+    if (host.phase != PlanningHostPhase.setup) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            host.failure?.message ?? 'Planning context could not be prepared.',
+          ),
+        ),
+      );
+      return;
+    }
+    setState(() {
+      _navIndex = 2;
+      _analisisStep = 4;
+    });
+  }
+
+  Future<void> _reevaluateSavedPlan(SavedPlanSummary summary) async {
+    final analysis = context.read<AnalisisViewModel>();
+    final host = context.read<PlanningHostViewModel>();
+    final snapshot = await analysis.latestSnapshotForCompetition(
+      summary.plan.competitionId,
+    );
+    if (!mounted) return;
+    if (snapshot == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'The latest persisted analysis for this competition is unavailable.',
+          ),
+        ),
+      );
+      return;
+    }
+    await analysis.loadSnapshot(snapshot);
+    await host.startPlanning(snapshot);
+    if (!mounted) return;
+    if (host.phase != PlanningHostPhase.setup) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            host.failure?.message ?? 'Planning context could not be prepared.',
+          ),
+        ),
+      );
+      return;
+    }
+    setState(() {
+      _selectedSavedPlanId = null;
+      _navIndex = 2;
+      _analisisStep = 4;
+    });
+  }
+
+  void _viewSavedPlanSchedule(SavedPlanSummary summary) {
+    context
+        .read<JadwalViewModel>()
+        .fokusKompetisi(summary.plan.competitionId);
+    setState(() {
+      _selectedSavedPlanId = null;
+      _navIndex = 1;
+      _jadwalTab = 0;
+      _showTambahJadwal = false;
+      _editingCommitment = null;
+    });
+  }
+
   Widget _analysisBody() {
-    final vm = context.read<AnalisisViewModel>();
-    switch (_analisisStep) {
+    final vm = context.watch<AnalisisViewModel>();
+    final host = context.watch<PlanningHostViewModel>();
+    final injected = widget.decisionSession != null;
+    final effectiveStep = !injected &&
+            host.phase == PlanningHostPhase.decision &&
+            host.activeSession != null
+        ? 3
+        : _analisisStep;
+
+    switch (effectiveStep) {
+      case 4:
+        final draft = host.draft;
+        if (draft == null) {
+          return ReviewBriefScreen(
+            response: vm.response!,
+            onBack: () => setState(() => _analisisStep = 2),
+            onPlan: _openPlanningFromCurrentAnalysis,
+          );
+        }
+        return PlanningSetupScreen(
+          host: host,
+          onBack: () => setState(() => _analisisStep = 2),
+          onDecisionReady: () => setState(() => _analisisStep = 3),
+        );
       case 3:
+        final session = widget.decisionSession ?? host.activeSession;
+        final revision =
+            injected ? widget.currentInputRevision : host.inputRevision;
         return RekomendasiJadwalScreen(
-          session: widget.decisionSession,
-          currentInputRevision: widget.currentInputRevision,
-          onAccept: widget.onAcceptCandidate,
-          onEditConstraints: widget.onEditConstraints,
+          session: session,
+          currentInputRevision: revision,
+          onAccept: widget.onAcceptCandidate ??
+              (session, intent) async {
+                await host.accept(session, intent);
+                await _refreshAcceptedProjections();
+                if (!mounted) return;
+                setState(() {
+                  _selectedSavedPlanId = host.savedPlan?.id;
+                  _navIndex = 3;
+                  _analisisStep = 2;
+                });
+              },
+          onEditConstraints: widget.onEditConstraints ??
+              (intent) {
+                host.beginEditConstraints(intent);
+                setState(() => _analisisStep = 4);
+              },
           onIgnore: (intent) {
-            widget.onIgnoreRecommendation?.call(intent);
+            if (widget.onIgnoreRecommendation != null) {
+              widget.onIgnoreRecommendation!.call(intent);
+            } else {
+              host.ignore(intent);
+            }
             _closeDecision();
           },
           onBack: _closeDecision,
@@ -221,6 +436,9 @@ class _RootShellState extends State<RootShell> {
               _analisisStep = 0;
             });
           },
+          onPlan: vm.activeSnapshot == null
+              ? null
+              : _openPlanningFromCurrentAnalysis,
         );
       case 0:
       default:
@@ -239,6 +457,23 @@ class _RootShellState extends State<RootShell> {
           },
         );
     }
+  }
+
+  Widget _plansBody() {
+    final selected = _selectedSavedPlanId;
+    if (selected != null) {
+      return SavedPlanDetailScreen(
+        savedPlanId: selected,
+        viewModel: context.read<SavedPlanDetailViewModel>(),
+        onBack: () => setState(() => _selectedSavedPlanId = null),
+        onReevaluate: _reevaluateSavedPlan,
+        onViewSchedule: _viewSavedPlanSchedule,
+      );
+    }
+    return RencanaScreen(
+      onOpen: (summary) =>
+          setState(() => _selectedSavedPlanId = summary.plan.id),
+    );
   }
 
   Widget _body() {
@@ -274,6 +509,10 @@ class _RootShellState extends State<RootShell> {
                   _editingCommitment = commitment;
                   _showTambahJadwal = true;
                 }),
+                onOpenSavedPlan: (savedPlanId) => setState(() {
+                  _selectedSavedPlanId = savedPlanId;
+                  _navIndex = 3;
+                }),
                 onBack: () => setState(() => _navIndex = 0),
               )
             : JadwalRingkasanScreen(
@@ -283,24 +522,10 @@ class _RootShellState extends State<RootShell> {
       case 2:
         return _analysisBody();
       case 3:
-        return RencanaScreen(
-          onTinjau: null,
-          onCekJadwal: (entry) {
-            context
-                .read<JadwalViewModel>()
-                .fokusKompetisi(entry.competitionId);
-            setState(() {
-              _navIndex = 1;
-              _jadwalTab = 0;
-              _showTambahJadwal = false;
-              _editingCommitment = null;
-            });
-          },
-        );
+        return _plansBody();
       case 0:
       default:
         return HomeScreen(
-          onOpenPro: widget.revenueCatEnabled ? _openPremiumAccess : null,
           onLihatJadwal: () => setState(() {
             _navIndex = 1;
             _jadwalTab = 0;
@@ -326,13 +551,19 @@ class _RootShellState extends State<RootShell> {
       ),
       bottomNavigationBar: _BottomNav(
         activeIndex: _navIndex,
-        onTap: (index) => setState(() {
-          _navIndex = index;
-          if (index == 1) {
-            _showTambahJadwal = false;
-            _editingCommitment = null;
+        onTap: (index) {
+          if (index == 3) {
+            unawaited(context.read<SavedPlansViewModel>().refresh());
           }
-        }),
+          setState(() {
+            _navIndex = index;
+            if (index != 3) _selectedSavedPlanId = null;
+            if (index == 1) {
+              _showTambahJadwal = false;
+              _editingCommitment = null;
+            }
+          });
+        },
       ),
     );
   }

@@ -10,6 +10,7 @@ class Evaluation {
     required this.evaluatedAtEpochMs,
     required this.requestJson,
     required this.responseJson,
+    required this.planningWindowPolicyJson,
     required this.evaluationBasisFingerprint,
     required this.readinessStatus,
     this.feasibilityStatus,
@@ -22,6 +23,7 @@ class Evaluation {
   final int evaluatedAtEpochMs;
   final String requestJson;
   final String responseJson;
+  final String planningWindowPolicyJson;
   final String evaluationBasisFingerprint;
   final ReadinessStatus readinessStatus;
 
@@ -40,6 +42,8 @@ class Evaluation {
         evaluatedAtEpochMs: m['evaluated_at_epoch_ms']! as int,
         requestJson: m['request_json']! as String,
         responseJson: m['response_json']! as String,
+        planningWindowPolicyJson:
+            m['planning_window_policy_json']! as String,
         evaluationBasisFingerprint:
             m['evaluation_basis_fingerprint']! as String,
         readinessStatus:
@@ -56,6 +60,7 @@ class Evaluation {
         'evaluated_at_epoch_ms': evaluatedAtEpochMs,
         'request_json': requestJson,
         'response_json': responseJson,
+        'planning_window_policy_json': planningWindowPolicyJson,
         'evaluation_basis_fingerprint': evaluationBasisFingerprint,
         'readiness_status': readinessStatus.wire,
         'feasibility_status': feasibilityStatus?.wire,

@@ -8,11 +8,14 @@ export 'recurrence_rule.dart';
 export 'recurrence_exception.dart';
 export 'planning_preferences.dart';
 export 'schedule_occurrence.dart';
+export 'planning_input_draft.dart';
+export 'active_accepted_block.dart';
 
 export 'competition.dart';
 export 'analysis_snapshot.dart';
 export 'evaluation.dart';
 export 'reevaluation_transition.dart';
+export 'reevaluation_wire.dart';
 
 export 'saved_plan.dart';
 export 'saved_plan_revision.dart';

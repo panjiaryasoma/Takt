@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../models/active_accepted_block.dart';
 import '../models/enums.dart';
 import '../models/schedule_occurrence.dart';
 import '../theme/app_theme.dart';
@@ -45,6 +46,7 @@ class JadwalRingkasanScreen extends StatelessWidget {
 
   static Map<String, List<_Task>> _tasksForWeek(
     List<ScheduleOccurrence> occurrences,
+    List<ActiveAcceptedBlock> acceptedBlocks,
   ) {
     final result = <String, List<_Task>>{
       for (final day in _days) day: <_Task>[],
@@ -63,6 +65,20 @@ class JadwalRingkasanScreen extends StatelessWidget {
         ),
       );
     }
+    for (final block in acceptedBlocks) {
+      final start = block.startAt;
+      final end = block.endAt;
+      final startHour = start.hour + start.minute / 60.0;
+      final endHour = end.hour + end.minute / 60.0;
+      result[_days[start.weekday - 1]]!.add(
+        _Task(
+          block.taskName,
+          startHour,
+          endHour,
+          C.accent,
+        ),
+      );
+    }
     for (final tasks in result.values) {
       tasks.sort((a, b) => a.start.compareTo(b.start));
     }
@@ -77,13 +93,15 @@ class JadwalRingkasanScreen extends StatelessWidget {
         .subtract(Duration(days: selected.weekday - 1));
     final nextMonday = monday.add(const Duration(days: 7));
     final occurrences = vm.occurrencesBetween(monday, nextMonday);
-    final tasks = _tasksForWeek(occurrences);
+    final acceptedBlocks = vm.acceptedBlocksBetween(monday, nextMonday);
+    final tasks = _tasksForWeek(occurrences, acceptedBlocks);
     final fixedCount = occurrences
         .where((item) => item.commitment.type == CommitmentType.fixed)
         .length;
     final competitionCount = occurrences
-        .where((item) => item.commitment.source.startsWith('lomba:'))
-        .length;
+            .where((item) => item.commitment.source.startsWith('lomba:'))
+            .length +
+        acceptedBlocks.length;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(10, 0, 10, 24),
@@ -168,7 +186,7 @@ class JadwalRingkasanScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                if (occurrences.isEmpty)
+                if (occurrences.isEmpty && acceptedBlocks.isEmpty)
                   const Padding(
                     padding: EdgeInsets.only(top: 8),
                     child: Text(

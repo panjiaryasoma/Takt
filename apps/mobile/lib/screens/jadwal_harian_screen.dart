@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../models/active_accepted_block.dart';
 import '../models/commitment.dart';
 import '../models/schedule_occurrence.dart';
 import '../theme/app_theme.dart';
@@ -69,12 +70,14 @@ class JadwalHarianScreen extends StatelessWidget {
     this.onAdd,
     this.onBack,
     this.onEdit,
+    this.onOpenSavedPlan,
   });
 
   final ValueChanged<int> onSwitchTab;
   final VoidCallback? onAdd;
   final VoidCallback? onBack;
   final ValueChanged<Commitment>? onEdit;
+  final ValueChanged<String>? onOpenSavedPlan;
 
   static const _dayHeaders = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   static const _monthNames = [
@@ -212,6 +215,7 @@ class JadwalHarianScreen extends StatelessWidget {
     final vm = context.watch<JadwalViewModel>();
     final selected = vm.selectedDate;
     final items = vm.itemsForSelectedDate;
+    final acceptedItems = vm.acceptedItemsForSelectedDate;
     final eventDays = vm.eventDaysOfMonth(selected);
     final header =
         '${_dayNames[selected.weekday - 1]}, ${selected.day} ${_monthNames[selected.month - 1]}';
@@ -356,7 +360,7 @@ class JadwalHarianScreen extends StatelessWidget {
             _RetryCard(message: vm.errorMessage!, onRetry: vm.retry)
           else if (vm.isLoading)
             const Center(child: CircularProgressIndicator(color: C.accent))
-          else if (items.isEmpty)
+          else if (items.isEmpty && acceptedItems.isEmpty)
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 20),
               padding: const EdgeInsets.symmetric(vertical: 28),
@@ -370,7 +374,7 @@ class JadwalHarianScreen extends StatelessWidget {
                 style: TextStyle(color: C.detailMuted, fontSize: 13),
               ),
             )
-          else
+          else ...[
             for (final item in items) ...[
               _ActivityCard(
                 item: item,
@@ -388,6 +392,16 @@ class JadwalHarianScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
             ],
+            for (final block in acceptedItems) ...[
+              _AcceptedPlanCard(
+                block: block,
+                time: _hhmm(block.startAt),
+                duration: _duration(block.durationMinutes),
+                onTap: () => onOpenSavedPlan?.call(block.savedPlanId),
+              ),
+              const SizedBox(height: 16),
+            ],
+          ],
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 20),
             padding: const EdgeInsets.all(16),
@@ -412,6 +426,85 @@ class JadwalHarianScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+class _AcceptedPlanCard extends StatelessWidget {
+  const _AcceptedPlanCard({
+    required this.block,
+    required this.time,
+    required this.duration,
+    required this.onTap,
+  });
+
+  final ActiveAcceptedBlock block;
+  final String time;
+  final String duration;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Material(
+        color: C.card,
+        borderRadius: BorderRadius.circular(16),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: onTap,
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            child: Row(
+              children: [
+                Container(
+                  width: 10,
+                  height: 10,
+                  decoration: const BoxDecoration(
+                    color: C.accent,
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                SizedBox(
+                  width: 44,
+                  child: Text(
+                    time,
+                    style: const TextStyle(
+                      color: C.white,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        block.taskName,
+                        style: const TextStyle(
+                          color: C.white,
+                          fontSize: 13,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '$duration · accepted plan · read only',
+                        style: const TextStyle(
+                          color: C.detailMuted,
+                          fontSize: 11,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(
+                  Icons.chevron_right,
+                  color: C.accent,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
 }
 
 class _RetryCard extends StatelessWidget {
