@@ -303,6 +303,7 @@ class _PlanningSetupScreenState extends State<PlanningSetupScreen> {
   Widget build(BuildContext context) {
     final host = widget.host;
     final busy = host.busy;
+    final inputsLocked = host.inputsLocked;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 28),
@@ -316,7 +317,7 @@ class _PlanningSetupScreenState extends State<PlanningSetupScreen> {
             title: 'Readiness details',
             child: Column(
               children: [
-                _Field(controller: _age, label: 'Age (optional)', numeric: true),
+                _Field(controller: _age, label: 'Age (optional)', numeric: true, enabled: !inputsLocked),
                 DropdownButtonFormField<bool?>(
                   initialValue: _studentStatus,
                   decoration: const InputDecoration(labelText: 'Student status'),
@@ -325,12 +326,12 @@ class _PlanningSetupScreenState extends State<PlanningSetupScreen> {
                     DropdownMenuItem(value: true, child: Text('Student')),
                     DropdownMenuItem(value: false, child: Text('Not a student')),
                   ],
-                  onChanged: busy
+                  onChanged: inputsLocked
                       ? null
                       : (value) => setState(() => _studentStatus = value),
                 ),
-                _Field(controller: _country, label: 'Country (optional)'),
-                _Field(controller: _scope, label: 'Selected scope (optional)'),
+                _Field(controller: _country, label: 'Country (optional)', enabled: !inputsLocked),
+                _Field(controller: _scope, label: 'Selected scope (optional)', enabled: !inputsLocked),
                 SwitchListTile(
                   contentPadding: EdgeInsets.zero,
                   title: const Text('Require technology information'),
@@ -368,12 +369,12 @@ class _PlanningSetupScreenState extends State<PlanningSetupScreen> {
                       children: [
                         IconButton(
                           tooltip: 'Edit task',
-                          onPressed: busy ? null : () => _editTask(task),
+                          onPressed: inputsLocked ? null : () => _editTask(task),
                           icon: const Icon(Icons.edit_outlined),
                         ),
                         IconButton(
                           tooltip: 'Delete task',
-                          onPressed: busy
+                          onPressed: inputsLocked
                               ? null
                               : () => setState(() {
                                     _tasks = _tasks
@@ -387,7 +388,7 @@ class _PlanningSetupScreenState extends State<PlanningSetupScreen> {
                     ),
                   ),
                 OutlinedButton.icon(
-                  onPressed: busy ? null : _addTask,
+                  onPressed: inputsLocked ? null : _addTask,
                   icon: const Icon(Icons.add),
                   label: const Text('Add task'),
                 ),
@@ -398,7 +399,7 @@ class _PlanningSetupScreenState extends State<PlanningSetupScreen> {
             title: 'Planning constraints',
             child: Column(
               children: [
-                _Field(controller: _timezone, label: 'IANA timezone'),
+                _Field(controller: _timezone, label: 'IANA timezone', enabled: !inputsLocked),
                 Row(
                   children: [
                     Expanded(
@@ -406,6 +407,7 @@ class _PlanningSetupScreenState extends State<PlanningSetupScreen> {
                         controller: _startLocal,
                         label: 'Planning hours start',
                         hint: '08:00',
+                        enabled: !inputsLocked,
                       ),
                     ),
                     const SizedBox(width: 10),
@@ -414,6 +416,7 @@ class _PlanningSetupScreenState extends State<PlanningSetupScreen> {
                         controller: _endLocal,
                         label: 'Planning hours end',
                         hint: '22:00',
+                        enabled: !inputsLocked,
                       ),
                     ),
                   ],
@@ -422,22 +425,25 @@ class _PlanningSetupScreenState extends State<PlanningSetupScreen> {
                   controller: _dailyLimit,
                   label: 'Daily project limit (minutes)',
                   numeric: true,
+                  enabled: !inputsLocked,
                 ),
                 _Field(
                   controller: _focus,
                   label: 'Preferred focus duration (minutes)',
                   numeric: true,
+                  enabled: !inputsLocked,
                 ),
                 _Field(
                   controller: _buffer,
                   label: 'Buffer target (minutes)',
                   numeric: true,
+                  enabled: !inputsLocked,
                 ),
                 if (host.hasAcceptedPlan)
                   Align(
                     alignment: Alignment.centerLeft,
                     child: TextButton(
-                      onPressed: busy
+                      onPressed: inputsLocked
                           ? null
                           : () async {
                               await host.useCurrentDefaults();
@@ -551,18 +557,21 @@ class _Field extends StatelessWidget {
     required this.label,
     this.numeric = false,
     this.hint,
+    this.enabled = true,
   });
 
   final TextEditingController controller;
   final String label;
   final bool numeric;
   final String? hint;
+  final bool enabled;
 
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.only(bottom: 10),
         child: TextField(
           controller: controller,
+          enabled: enabled,
           keyboardType: numeric ? TextInputType.number : TextInputType.text,
           decoration: InputDecoration(labelText: label, hintText: hint),
         ),
