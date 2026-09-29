@@ -25,6 +25,7 @@ class AnalisisViewModel extends ChangeNotifier {
   AnalysisPhase _phase = AnalysisPhase.idle;
   String? _competitionId;
   CompetitionAnalyzeResponseWire? _response;
+  AnalysisSnapshot? _activeSnapshot;
   String? _originalBody;
   AnalysisFailure? _failure;
   CompetitionAnalysisTransportResult? _pendingPersistence;
@@ -33,6 +34,7 @@ class AnalisisViewModel extends ChangeNotifier {
   AnalysisPhase get phase => _phase;
   String? get competitionId => _competitionId;
   CompetitionAnalyzeResponseWire? get response => _response;
+  AnalysisSnapshot? get activeSnapshot => _activeSnapshot;
   String? get originalBody => _originalBody;
   AnalysisFailure? get failure => _failure;
 
@@ -223,11 +225,11 @@ class AnalisisViewModel extends ChangeNotifier {
     _failure = null;
     notifyListeners();
     try {
-      await _repository.persistResponse(
+      final snapshot = await _repository.persistResponse(
         originalBody: pending.originalBody,
         response: pending.response,
       );
-      _acceptPersisted(pending);
+      _acceptPersisted(pending, snapshot);
     } on Object catch (error) {
       _phase = AnalysisPhase.persistenceError;
       _failure = AnalysisFailure.persistence(error);
@@ -241,6 +243,7 @@ class AnalisisViewModel extends ChangeNotifier {
           CompetitionAnalyzeResponseWire.parse(snapshot.responseJson);
       _competitionId = snapshot.competitionId;
       _response = parsed;
+      _activeSnapshot = snapshot;
       _originalBody = snapshot.responseJson;
       _pendingPersistence = null;
       _lastRequest = null;
@@ -259,6 +262,7 @@ class AnalisisViewModel extends ChangeNotifier {
     _phase = AnalysisPhase.idle;
     _competitionId = null;
     _response = null;
+    _activeSnapshot = null;
     _originalBody = null;
     _failure = null;
     _pendingPersistence = null;
@@ -282,11 +286,11 @@ class AnalisisViewModel extends ChangeNotifier {
       notifyListeners();
 
       try {
-        await _repository.persistResponse(
+        final snapshot = await _repository.persistResponse(
           originalBody: result.originalBody,
           response: result.response,
         );
-        _acceptPersisted(result);
+        _acceptPersisted(result, snapshot);
       } on Object catch (error) {
         _response = result.response;
         _originalBody = result.originalBody;
@@ -303,9 +307,11 @@ class AnalisisViewModel extends ChangeNotifier {
 
   void _acceptPersisted(
     CompetitionAnalysisTransportResult result,
+    AnalysisSnapshot snapshot,
   ) {
     _competitionId = result.response.report.competitionId;
     _response = result.response;
+    _activeSnapshot = snapshot;
     _originalBody = result.originalBody;
     _pendingPersistence = null;
     _failure = null;
