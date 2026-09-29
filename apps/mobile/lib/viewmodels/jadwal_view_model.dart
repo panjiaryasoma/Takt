@@ -52,13 +52,13 @@ class JadwalViewModel extends ChangeNotifier {
         },
         onError: (Object error, StackTrace stackTrace) {
           _isLoading = false;
-          _errorMessage = 'Gagal membaca jadwal lokal.';
+          _errorMessage = 'Failed to read the local schedule.';
           notifyListeners();
         },
       );
     } catch (_) {
       _isLoading = false;
-      _errorMessage = 'Gagal membuka database jadwal.';
+      _errorMessage = 'Failed to open the schedule database.';
       notifyListeners();
     }
   }
@@ -79,14 +79,14 @@ class JadwalViewModel extends ChangeNotifier {
         },
         onError: (Object error, StackTrace stackTrace) {
           _isLoading = false;
-          _errorMessage = 'Gagal membaca jadwal lokal.';
+          _errorMessage = 'Failed to read the local schedule.';
           notifyListeners();
         },
       );
       _isLoading = false;
     } catch (_) {
       _isLoading = false;
-      _errorMessage = 'Jadwal masih belum bisa dimuat.';
+      _errorMessage = 'The schedule still could not be loaded.';
     }
     notifyListeners();
   }
@@ -477,7 +477,7 @@ class JadwalViewModel extends ChangeNotifier {
       await action();
       return true;
     } catch (_) {
-      _errorMessage = 'Perubahan jadwal gagal disimpan. Coba lagi.';
+      _errorMessage = 'Failed to save schedule changes. Try again.';
       return false;
     } finally {
       _isSaving = false;
