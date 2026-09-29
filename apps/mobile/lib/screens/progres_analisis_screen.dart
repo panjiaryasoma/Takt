@@ -11,10 +11,12 @@ class ProgresAnalisisScreen extends StatelessWidget {
     super.key,
     this.onReadResult,
     this.onBackToInput,
+    this.onStartNewAnalysis,
   });
 
   final VoidCallback? onReadResult;
   final VoidCallback? onBackToInput;
+  final VoidCallback? onStartNewAnalysis;
 
   @override
   Widget build(BuildContext context) {
@@ -44,16 +46,22 @@ class ProgresAnalisisScreen extends StatelessWidget {
                 SizedBox(
                   width: 70,
                   height: 70,
-                  child: vm.selesai
+                  child: failure != null
                       ? const Icon(
-                          Icons.check_circle,
+                          Icons.error_outline,
                           color: C.bg,
                           size: 64,
                         )
-                      : const CircularProgressIndicator(
-                          color: C.bg,
-                          strokeWidth: 6,
-                        ),
+                      : vm.selesai
+                          ? const Icon(
+                              Icons.check_circle,
+                              color: C.bg,
+                              size: 64,
+                            )
+                          : const CircularProgressIndicator(
+                              color: C.bg,
+                              strokeWidth: 6,
+                            ),
                 ),
                 const SizedBox(height: 16),
                 Text(
@@ -147,6 +155,11 @@ class ProgresAnalisisScreen extends StatelessWidget {
                       onTap: () {
                         vm.retryPersistence();
                       },
+                    )
+                  else if (vm.requiresFreshAnalysis)
+                    _ActionButton(
+                      label: 'Mulai analisis baru',
+                      onTap: onStartNewAnalysis,
                     )
                   else
                     _ActionButton(
