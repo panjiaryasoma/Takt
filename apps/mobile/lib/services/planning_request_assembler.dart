@@ -73,7 +73,7 @@ final class PlanningRequestAssembler {
     final deadline = _submissionDeadline(report);
     final location = _location(draft.windowPolicy.timezone);
     final nowLocal = tz.TZDateTime.from(_now().toUtc(), location);
-    final horizonStart = _localBoundary(
+    final localDayStart = _localBoundary(
       location,
       nowLocal.year,
       nowLocal.month,
@@ -82,24 +82,21 @@ final class PlanningRequestAssembler {
       field: 'planning horizon start',
     );
     final horizonEnd = tz.TZDateTime.from(deadline.toUtc(), location);
-    if (!horizonStart.toUtc().isBefore(horizonEnd.toUtc())) {
-      throw const PlanningInputException(
-        'PLANNING_INPUT_UNAVAILABLE',
-        'The submission deadline is before the planning horizon.',
-      );
-    }
+    final horizonStart = localDayStart.toUtc().isBefore(horizonEnd.toUtc())
+        ? localDayStart
+        : tz.TZDateTime.from(
+            horizonEnd.toUtc().subtract(const Duration(minutes: 1)),
+            location,
+          );
 
+    // An empty expansion is meaningful: the user-confirmed work policy may
+    // genuinely provide no usable time before the deadline. Never replace it
+    // with a hidden fallback window. Deadline truth itself remains server-owned.
     final windows = _expandWindows(
       draft.windowPolicy,
       horizonStart: horizonStart,
       horizonEnd: horizonEnd,
     );
-    if (windows.isEmpty) {
-      throw const PlanningInputException(
-        'PLANNING_INPUT_UNAVAILABLE',
-        'The planning window policy produced no usable work windows.',
-      );
-    }
 
     final rulesByCommitment = <String, RecurrenceRule>{
       for (final rule in schedule.recurrenceRules) rule.commitmentId: rule,
@@ -263,6 +260,14 @@ final class PlanningRequestAssembler {
       throw const PlanningInputException(
         'PLANNING_INPUT_UNAVAILABLE',
         'The canonical submission deadline is invalid.',
+      );
+    }
+    if (parsed.second != 0 ||
+        parsed.millisecond != 0 ||
+        parsed.microsecond != 0) {
+      throw const PlanningInputException(
+        'PLANNING_INPUT_UNAVAILABLE',
+        'The canonical submission deadline is not minute-aligned.',
       );
     }
     return parsed;
