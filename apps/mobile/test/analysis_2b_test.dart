@@ -3,7 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
-import 'package:drift/drift.dart';
+import 'package:drift/drift.dart' show Variable;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -570,7 +570,7 @@ void main() {
 
       final competitions = await secondDb.customSelect(
         'SELECT id FROM competitions WHERE id = ?',
-        variables: [Variable<String>('cmp-restart')],
+        variables: [const Variable<String>('cmp-restart')],
       ).get();
       expect(competitions, hasLength(1));
     });
@@ -1013,6 +1013,8 @@ class _BlockingApiClient implements CompetitionApiClient {
     );
   }
 
+  @override
+  void close() {}
 }
 
 class _FakeApiClient implements CompetitionApiClient {
@@ -1106,16 +1108,18 @@ class _ContextFailureApiClient implements CompetitionApiClient {
       continuation: continuation,
     );
   }
+
+  @override
+  void close() {}
 }
 
 class _MemoryAnalysisRepository implements AnalysisRepository {
   _MemoryAnalysisRepository({
     this.failNextPersist = false,
-    this.corruptLatestOnRead = false,
   });
 
   bool failNextPersist;
-  bool corruptLatestOnRead;
+  bool corruptLatestOnRead = false;
   int persistCalls = 0;
   bool closed = false;
   String? lastPersistedBody;
