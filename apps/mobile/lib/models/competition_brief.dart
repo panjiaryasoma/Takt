@@ -43,38 +43,38 @@ class CompetitionBrief {
   /// Data contoh sebelum AI model tersedia.
   factory CompetitionBrief.demo() => CompetitionBrief(
         competitionId: 'demo-hackathon-ai-2026',
-        nama: 'Hackathon Nasional AI 2026',
-        penyelenggara: 'Kementerian Kominfo x Telkom Indonesia',
-        format: 'Tim (3-5 orang)',
+        nama: 'National AI Hackathon 2026',
+        penyelenggara: 'Ministry of Communication and Informatics x Telkom Indonesia',
+        format: 'Team (3-5 people)',
         deskripsi:
-            'Kompetisi pengembangan solusi AI untuk permasalahan publik di '
-            'Indonesia. Peserta membangun prototipe aplikasi berbasis AI dalam '
-            'waktu 48 jam.',
+            'A competition to build AI solutions for public-sector problems in '
+            'Indonesia. Participants build an AI-based application prototype within '
+            '48 hours.',
         output: const [
-          'Proposal solusi (PDF)',
-          'Prototipe aplikasi',
-          'Video demo (3 menit)',
-          'Slide presentasi',
+          'Solution proposal (PDF)',
+          'Application prototype',
+          'Demo video (3 minutes)',
+          'Presentation slides',
         ],
         rundown: const [
-          BriefTahap('Pendaftaran & Pengumpulan Proposal', '1-15 Okt 2026'),
-          BriefTahap('Penyisihan (Review Proposal)', '20-25 Okt 2026'),
-          BriefTahap('Babak Semifinal (48 Jam Hackathon)', '5-7 Nov 2026'),
-          BriefTahap('Grand Final & Presentasi', '20 Nov 2026'),
+          BriefTahap('Registration & Proposal Submission', '1-15 Oct 2026'),
+          BriefTahap('Qualification Round (Proposal Review)', '20-25 Oct 2026'),
+          BriefTahap('Semifinal Round (48-Hour Hackathon)', '5-7 Nov 2026'),
+          BriefTahap('Grand Final & Presentation', '20 Nov 2026'),
         ],
         deadline: DateTime(2026, 10, 15),
-        deadlineLabel: 'Deadline Penyisihan: 15 Oktober 2026',
+        deadlineLabel: 'Qualification deadline: 15 October 2026',
         sisaHari: 18,
         analisaJadwal: const [
           BriefAnalisa(severity: BriefSeverity.tinggi,
-              text: 'Status jadwal saat ini: Padat'),
+              text: 'Current schedule status: Busy'),
           BriefAnalisa(severity: BriefSeverity.sedang,
-              text: 'Jadwal bentrok: 2 kegiatan bentrok di minggu yang sama'),
+              text: 'Schedule conflict: 2 activities overlap in the same week'),
           BriefAnalisa(severity: BriefSeverity.sedang,
               text:
-                  'Estimasi beban kerja: Tinggi – perlu alokasi 15-20 jam/minggu'),
+                  'Estimated workload: High – requires 15-20 hours/week'),
           BriefAnalisa(severity: BriefSeverity.aman,
-              text: 'Rekomendasi: Bisa diambil jika mengurangi 1 kegiatan lain'),
+              text: 'Recommendation: Feasible if one other activity is reduced'),
         ],
       );
 
