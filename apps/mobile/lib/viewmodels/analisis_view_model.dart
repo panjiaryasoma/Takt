@@ -237,6 +237,12 @@ class AnalisisViewModel extends ChangeNotifier {
     }
   }
 
+  Future<AnalysisSnapshot?> latestSnapshotForCompetition(
+    String competitionId,
+  ) {
+    return _repository.latestSnapshot(competitionId);
+  }
+
   Future<void> loadSnapshot(AnalysisSnapshot snapshot) async {
     try {
       final parsed =
