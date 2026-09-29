@@ -39,13 +39,13 @@ Map<String, dynamic> decisionFixture({
       };
   Map<String, Object> next(int hour) => {
         ...window(hour),
-        'task_name': 'Buat prototype',
+        'task_name': 'Build prototype',
       };
   Map<String, Object> candidate(String id, int hour, int buffer) => {
         'ref': ref(id),
         'work_blocks': [window(hour)],
         'buffer_minutes': buffer,
-        'assumptions': ['Estimasi pekerjaan sudah dikonfirmasi.'],
+        'assumptions': ['Work estimates have been confirmed.'],
       };
 
   // Round-trip gives every test its own nested mutable copy for adversarial edits.
@@ -142,13 +142,13 @@ Map<String, dynamic> decisionFixture({
                             'buffer_minutes': 120,
                             'recommended_next_work': next(13),
                             'suggested_windows': [window(13)],
-                            'tradeoffs': ['Selesai 60 menit lebih lambat.'],
+                            'tradeoffs': ['Finishes 60 minutes later.'],
                           },
                       ],
                       'rationale': ['Required work fits at the likely estimate.'],
                       'tradeoffs': <String>[],
                       'assumptions': [
-                        {'task_id': 'task-draft', 'description': 'Satu orang bekerja.'},
+                        {'task_id': 'task-draft', 'description': 'Single-person work.'},
                       ],
                     },
                     'trace': {
