@@ -26,6 +26,7 @@ android/.gradle/
 android/local.properties
 
 # IDE / OS
+.kiro/settings/
 .vscode/
 .idea/
 .DS_Store
