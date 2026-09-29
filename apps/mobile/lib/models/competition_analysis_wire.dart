@@ -831,7 +831,8 @@ class CompetitionAnalyzeResponseWire {
           run['extraction_path'],
           '$runPath.extraction_path',
         );
-        if (!const {'native', 'ocr', 'vision'}.contains(pathValue)) {
+        if (!const {'native', 'ocr', 'vision', 'manual'}
+            .contains(pathValue)) {
           throw FormatException(
             '$runPath has unsupported extraction path',
           );
