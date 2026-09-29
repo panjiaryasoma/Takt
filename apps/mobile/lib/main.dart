@@ -18,11 +18,14 @@ import 'data/repositories/schedule_repository.dart';
 import 'models/commitment.dart';
 import 'models/decision_intent.dart';
 import 'models/evaluation_session.dart';
+import 'monetization/revenuecat_bootstrap.dart';
+import 'monetization/revenuecat_service.dart';
 import 'screens/analisis_kompetisi_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/jadwal_harian_screen.dart';
 import 'screens/jadwal_ringkasan_screen.dart';
 import 'screens/planning_setup_screen.dart';
+import 'screens/premium_access_screen.dart';
 import 'screens/progres_analisis_screen.dart';
 import 'screens/rencana_screen.dart';
 import 'screens/rekomendasi_jadwal_screen.dart';
@@ -37,8 +40,13 @@ import 'viewmodels/saved_plan_detail_view_model.dart';
 import 'viewmodels/saved_plans_view_model.dart';
 import 'widgets/common.dart';
 
-void main() {
-  runApp(const TaktApp());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final monetization = await bootstrapRevenueCat();
+  if (monetization.configurationError != null) {
+    debugPrint('RevenueCat disabled: ${monetization.configurationError}');
+  }
+  runApp(TaktApp(revenueCatService: monetization.service));
 }
 
 class TaktApp extends StatefulWidget {
@@ -51,6 +59,7 @@ class TaktApp extends StatefulWidget {
     this.planApiClient,
     this.evaluationRepository,
     this.savedPlanRepository,
+    this.revenueCatService,
     this.decisionSession,
     this.currentInputRevision = 0,
     this.onAcceptCandidate,
@@ -65,6 +74,7 @@ class TaktApp extends StatefulWidget {
   final PlanApiClient? planApiClient;
   final EvaluationRepository? evaluationRepository;
   final SavedPlanRepository? savedPlanRepository;
+  final RevenueCatService? revenueCatService;
 
   /// Legacy 3B injection remains available for isolated component tests.
   /// Production navigation uses [PlanningHostViewModel].
@@ -132,6 +142,10 @@ class _TaktAppState extends State<TaktApp> {
   Widget build(BuildContext context) {
     return MultiProvider(
       providers: [
+        if (widget.revenueCatService != null)
+          ChangeNotifierProvider<RevenueCatService>.value(
+            value: widget.revenueCatService!,
+          ),
         ChangeNotifierProvider(
           create: (_) => JadwalViewModel(
             _scheduleRepository,
@@ -178,6 +192,7 @@ class _TaktAppState extends State<TaktApp> {
         debugShowCheckedModeBanner: false,
         theme: AppTheme.dark,
         home: RootShell(
+          revenueCatEnabled: widget.revenueCatService != null,
           decisionSession: widget.decisionSession,
           currentInputRevision: widget.currentInputRevision,
           onAcceptCandidate: widget.onAcceptCandidate,
@@ -192,6 +207,7 @@ class _TaktAppState extends State<TaktApp> {
 class RootShell extends StatefulWidget {
   const RootShell({
     super.key,
+    this.revenueCatEnabled = false,
     this.decisionSession,
     this.currentInputRevision = 0,
     this.onAcceptCandidate,
@@ -199,6 +215,7 @@ class RootShell extends StatefulWidget {
     this.onIgnoreRecommendation,
   });
 
+  final bool revenueCatEnabled;
   final EvaluationSession? decisionSession;
   final int currentInputRevision;
   final AcceptCandidateHandler? onAcceptCandidate;
@@ -245,6 +262,14 @@ class _RootShellState extends State<RootShell> {
         _analisisStep =
             context.read<AnalisisViewModel>().response == null ? 0 : 2;
       });
+
+  Future<void> _openPremiumAccess() {
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const PremiumAccessScreen(),
+      ),
+    );
+  }
 
   Future<void> _refreshAcceptedProjections() async {
     final savedPlans = context.read<SavedPlansViewModel>();
@@ -375,6 +400,10 @@ class _RootShellState extends State<RootShell> {
         return RekomendasiJadwalScreen(
           session: session,
           currentInputRevision: revision,
+          revenueCatService: widget.revenueCatEnabled
+              ? context.watch<RevenueCatService>()
+              : null,
+          onOpenPro: widget.revenueCatEnabled ? _openPremiumAccess : null,
           onAccept: widget.onAcceptCandidate ??
               (session, intent) async {
                 await host.accept(session, intent);
@@ -526,6 +555,7 @@ class _RootShellState extends State<RootShell> {
       case 0:
       default:
         return HomeScreen(
+          onOpenPro: widget.revenueCatEnabled ? _openPremiumAccess : null,
           onLihatJadwal: () => setState(() {
             _navIndex = 1;
             _jadwalTab = 0;

@@ -8,9 +8,14 @@ import '../widgets/common.dart';
 /// HomeScreen — Figma node 11:1262 ("Home").
 /// Ringkasan jadwal lokal. Availability authoritative dihitung backend saat evaluasi.
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key, this.onLihatJadwal});
+  const HomeScreen({
+    super.key,
+    this.onLihatJadwal,
+    this.onOpenPro,
+  });
 
   final VoidCallback? onLihatJadwal;
+  final VoidCallback? onOpenPro;
 
   static int _scheduledThisWeek(JadwalViewModel vm) {
     final now = DateTime.now();
@@ -79,6 +84,17 @@ class HomeScreen extends StatelessWidget {
             ),
           ),
           const HeaderDivider(),
+          if (onOpenPro != null) ...[
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: OutlinedButton.icon(
+                onPressed: onOpenPro,
+                icon: const Icon(Icons.workspace_premium_outlined),
+                label: const Text('Takt Pro'),
+              ),
+            ),
+          ],
           if (vm.isLoading) const LinearProgressIndicator(minHeight: 2),
           const SizedBox(height: 16),
           SectionHeading(

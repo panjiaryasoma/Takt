@@ -76,3 +76,53 @@ docs/03_EVALUATION_AND_DOMAIN_RULES/SOURCE_SCHEMA.md
 ```
 
 Key invariant: recommendation is advisory; commitment requires explicit user action.
+
+
+## RevenueCat / Takt Pro
+
+RevenueCat is an access boundary only. It does not change Takt's competition
+facts, readiness, feasibility, planning inputs, solver output, recommendation
+truth, or persisted accepted-plan history.
+
+Canonical 4C identifiers:
+
+```text
+entitlement: pro
+Test Store product: takt_pro_lifetime_v1
+offering: default
+package: $rc_lifetime
+premium feature: alternative_candidates
+```
+
+For the Shipaton Android demo, copy the committed example into an ignored local
+configuration file and insert the RevenueCat public Test Store SDK key:
+
+```bash
+cd apps/mobile
+cp config/revenuecat.test.example.json config/revenuecat.test.local.json
+flutter run --debug \
+  --dart-define-from-file=config/revenuecat.test.local.json
+```
+
+Test Store configuration is accepted only for debug builds. Production Android
+configuration accepts only a public `goog_` SDK key. Secret `sk_` keys must
+never be embedded in the client or committed to the repository.
+
+The free experience keeps the primary recommendation and all domain facts
+available. An active `pro` entitlement unlocks the Alternative Candidate
+Explorer, including viewing and selecting additional valid candidates returned
+by the same backend evaluation. Unknown or initial entitlement failures fail
+closed. Refresh failures preserve the last trustworthy entitlement state.
+
+Purchase and restore use RevenueCat's official Flutter SDK. The demo path uses
+the RevenueCat Test Store; Google Play production setup remains a separate
+deployment concern.
+
+Mobile regression gate:
+
+```bash
+cd apps/mobile
+flutter analyze
+flutter test
+flutter build apk --debug
+```

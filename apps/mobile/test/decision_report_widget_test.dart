@@ -6,10 +6,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:takt_mobile/data/database/app_database.dart';
 import 'package:takt_mobile/data/repositories/drift_analysis_repository.dart';
 import 'package:takt_mobile/data/repositories/drift_schedule_repository.dart';
+import 'package:takt_mobile/config/revenuecat_config.dart';
 import 'package:takt_mobile/main.dart';
 import 'package:takt_mobile/models/decision_intent.dart';
 import 'package:takt_mobile/models/enums.dart';
 import 'package:takt_mobile/models/evaluation_session.dart';
+import 'package:takt_mobile/monetization/revenuecat_contract.dart';
+import 'package:takt_mobile/monetization/revenuecat_gateway.dart';
+import 'package:takt_mobile/monetization/revenuecat_service.dart';
 import 'package:takt_mobile/screens/rekomendasi_jadwal_screen.dart';
 import 'package:takt_mobile/theme/app_theme.dart';
 
@@ -17,12 +21,15 @@ import 'support/decision_fixture.dart';
 
 Widget report(EvaluationSession? session, {int revision = 3,
     AcceptCandidateHandler? onAccept, ValueChanged<EditConstraintsIntent>? onEdit,
-    ValueChanged<IgnoreRecommendationIntent>? onIgnore, double scale = 1}) => MaterialApp(
+    ValueChanged<IgnoreRecommendationIntent>? onIgnore,
+    RevenueCatService? revenueCatService, VoidCallback? onOpenPro,
+    double scale = 1}) => MaterialApp(
   theme: AppTheme.dark,
   home: Builder(builder: (context) => MediaQuery(
     data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)),
     child: Scaffold(body: RekomendasiJadwalScreen(session: session,
-        currentInputRevision: revision, onAccept: onAccept,
+        currentInputRevision: revision, revenueCatService: revenueCatService,
+        onOpenPro: onOpenPro, onAccept: onAccept,
         onEditConstraints: onEdit, onIgnore: onIgnore)),
   )),
 );
@@ -37,11 +44,14 @@ Future<void> tapKey(WidgetTester tester, String key) async {
 
 void main() {
   testWidgets('phone layout separates readiness, feasibility, primary and selected alternative', (tester) async {
+    final service = await _initializedRevenueCat(active: true);
+    addTearDown(service.dispose);
     tester.view.physicalSize = const Size(360, 800);
     tester.view.devicePixelRatio = 1;
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
-    await tester.pumpWidget(report(testSession(), scale: 1.5, onAccept: (_, _) async {}));
+    await tester.pumpWidget(report(testSession(), scale: 1.5,
+        revenueCatService: service, onAccept: (_, _) async {}));
     expect(find.text('Readiness'), findsOneWidget);
     expect(find.text('Feasibility'), findsOneWidget);
     expect(find.text('Tight capacity'), findsOneWidget);
@@ -63,10 +73,13 @@ void main() {
   });
 
   testWidgets('confirmation hands off the exact alternative/session once with no persistence claim', (tester) async {
+    final service = await _initializedRevenueCat(active: true);
+    addTearDown(service.dispose);
     final session = testSession();
     final gate = Completer<void>();
     final calls = <(EvaluationSession, AcceptCandidateIntent)>[];
-    await tester.pumpWidget(report(session, onAccept: (s, intent) {
+    await tester.pumpWidget(report(session, revenueCatService: service,
+        onAccept: (s, intent) {
       calls.add((s, intent));
       return gate.future;
     }));
@@ -87,6 +100,127 @@ void main() {
     expect(find.byKey(const Key('handoff-complete')), findsOneWidget);
     expect(find.text('Saved'), findsNothing);
     expect(find.text('Added to calendar'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('free keeps primary visible and locks alternative candidates',
+      (tester) async {
+    final service = await _initializedRevenueCat(active: false);
+    addTearDown(service.dispose);
+    var openedPro = 0;
+
+    await tester.pumpWidget(report(
+      testSession(),
+      revenueCatService: service,
+      onOpenPro: () => openedPro++,
+      onAccept: (_, _) async {},
+    ));
+
+    expect(find.text('System primary recommendation'), findsOneWidget);
+    expect(find.byKey(const Key('candidate-$primaryId')), findsOneWidget);
+    expect(find.byKey(const Key('candidate-$alternativeId')), findsNothing);
+    expect(find.byKey(const Key('alternatives-locked')), findsOneWidget);
+    expect(find.byKey(const Key('choose-$alternativeId')), findsNothing);
+    expect(find.text('Remaining buffer: 180 min'), findsOneWidget);
+    expect(find.text('Remaining buffer: 120 min'), findsNothing);
+
+    await tapKey(tester, 'open-pro-alternatives');
+    expect(openedPro, 1);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('loading and first entitlement error fail closed',
+      (tester) async {
+    final gate = Completer<RevenueCatCustomerSnapshot>();
+    final loadingGateway = _DecisionRevenueCatGateway(
+      active: true,
+      customerInfoFuture: gate.future,
+    );
+    final loading = _revenueCatService(loadingGateway);
+    addTearDown(loading.dispose);
+    final initializing = loading.initialize();
+
+    expect(loading.entitlement.sync, EntitlementSync.loading);
+    await tester.pumpWidget(
+      report(testSession(), revenueCatService: loading),
+    );
+    expect(find.byKey(const Key('candidate-$alternativeId')), findsNothing);
+    expect(find.byKey(const Key('alternatives-locked')), findsOneWidget);
+
+    gate.complete(
+      const RevenueCatCustomerSnapshot(activeEntitlementIds: {}),
+    );
+    await initializing;
+
+    final failed = await _initializedRevenueCat(
+      active: true,
+      customerInfoError: StateError('simulated CustomerInfo failure'),
+    );
+    addTearDown(failed.dispose);
+    expect(failed.entitlement.sync, EntitlementSync.error);
+
+    await tester.pumpWidget(
+      report(testSession(), revenueCatService: failed),
+    );
+    expect(find.byKey(const Key('candidate-$alternativeId')), findsNothing);
+    expect(find.byKey(const Key('alternatives-locked')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('entitlement loss cannot confirm a previously selected alternative',
+      (tester) async {
+    final gateway = _DecisionRevenueCatGateway(active: true);
+    final service = _revenueCatService(gateway);
+    addTearDown(service.dispose);
+    await service.initialize();
+
+    final calls = <AcceptCandidateIntent>[];
+    await tester.pumpWidget(report(
+      testSession(),
+      revenueCatService: service,
+      onAccept: (_, intent) async => calls.add(intent),
+    ));
+
+    await tapKey(tester, 'choose-$alternativeId');
+    await tapKey(tester, 'accept-candidate');
+    expect(find.text('Your selected alternative'), findsOneWidget);
+
+    gateway.active = false;
+    await service.refreshEntitlement();
+    await tester.pump();
+
+    await tapKey(tester, 'confirm-accept');
+    expect(calls, isEmpty);
+    expect(find.byKey(const Key('handoff-pending')), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('TaktApp wires Home Takt Pro entry to RevenueCat provider',
+      (tester) async {
+    final database = AppDatabase.forTesting(NativeDatabase.memory());
+    final schedule = DriftScheduleRepository(
+      database,
+      closeDatabaseOnDispose: false,
+    );
+    final service = await _initializedRevenueCat(active: false);
+    addTearDown(service.dispose);
+    addTearDown(schedule.close);
+    addTearDown(database.close);
+
+    await tester.pumpWidget(
+      TaktApp(
+        database: database,
+        scheduleRepository: schedule,
+        revenueCatService: service,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Takt Pro'));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Unlock Takt Pro'), findsOneWidget);
+    expect(find.text(r'Get lifetime access · $0.99'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -242,4 +376,90 @@ void main() {
     expect(find.text('Decision Report'), findsNothing);
     expect(tester.takeException(), isNull);
   });
+}
+
+RevenueCatService _revenueCatService(_DecisionRevenueCatGateway gateway) {
+  return RevenueCatService(
+    config: RevenueCatConfig.validate(
+      appEnv: 'test_store',
+      apiKey: 'test_decision_report_public_key',
+      buildMode: AppBuildMode.debug,
+    ),
+    gateway: gateway,
+  );
+}
+
+Future<RevenueCatService> _initializedRevenueCat({
+  required bool active,
+  Object? customerInfoError,
+}) async {
+  final service = _revenueCatService(
+    _DecisionRevenueCatGateway(
+      active: active,
+      customerInfoError: customerInfoError,
+    ),
+  );
+  await service.initialize();
+  return service;
+}
+
+final class _DecisionRevenueCatGateway implements RevenueCatGateway {
+  _DecisionRevenueCatGateway({
+    required this.active,
+    this.customerInfoError,
+    this.customerInfoFuture,
+  });
+
+  bool active;
+  final Object? customerInfoError;
+  final Future<RevenueCatCustomerSnapshot>? customerInfoFuture;
+
+  @override
+  Future<void> configure({required String apiKey}) async {}
+
+  @override
+  Future<RevenueCatCustomerSnapshot> getCustomerInfo() async {
+    final future = customerInfoFuture;
+    if (future != null) {
+      return future;
+    }
+    final error = customerInfoError;
+    if (error != null) {
+      throw error;
+    }
+    return RevenueCatCustomerSnapshot(
+      activeEntitlementIds: active ? const {'pro'} : const {},
+    );
+  }
+
+  @override
+  Future<RevenueCatPackageSnapshot?> getPackage({
+    required String offeringIdentifier,
+    required String packageIdentifier,
+  }) async {
+    return const RevenueCatPackageSnapshot(
+      offeringIdentifier: 'default',
+      packageIdentifier: r'$rc_lifetime',
+      productIdentifier: 'takt_pro_lifetime_v1',
+      priceString: r'$0.99',
+    );
+  }
+
+  @override
+  Future<RevenueCatCustomerSnapshot> purchasePackage({
+    required String offeringIdentifier,
+    required String packageIdentifier,
+  }) async {
+    active = true;
+    return const RevenueCatCustomerSnapshot(
+      activeEntitlementIds: {'pro'},
+    );
+  }
+
+  @override
+  Future<RevenueCatCustomerSnapshot> restorePurchases() async {
+    return RevenueCatCustomerSnapshot(
+      activeEntitlementIds: active ? const {'pro'} : const {},
+    );
+  }
 }
