@@ -25,7 +25,7 @@ class JadwalRingkasanScreen extends StatelessWidget {
   static const int _startHour = 7;
   static const int _endHour = 22;
   static const int _slots = _endHour - _startHour;
-  static const _days = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
+  static const _days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
   static Color _colorFor(ScheduleOccurrence item) {
     if (item.commitment.source.startsWith('lomba:')) return C.accent;
@@ -90,7 +90,7 @@ class JadwalRingkasanScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const AppHeader(title: 'Jadwal Saya'),
+          const AppHeader(title: 'My Schedule'),
           const HeaderDivider(),
           if (vm.isLoading) const LinearProgressIndicator(minHeight: 2),
           const SizedBox(height: 16),
@@ -107,7 +107,7 @@ class JadwalRingkasanScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Gantt Chart Pekan Ini',
+                  'This Week Gantt Chart',
                   style: TextStyle(
                     color: C.white,
                     fontSize: 13,
@@ -119,11 +119,11 @@ class JadwalRingkasanScreen extends StatelessWidget {
                   spacing: 10,
                   runSpacing: 6,
                   children: [
-                    _Legend(color: C.dotBlue, label: 'Kuliah'),
-                    _Legend(color: C.dotPurple, label: 'Tim'),
+                    _Legend(color: C.dotBlue, label: 'Class'),
+                    _Legend(color: C.dotPurple, label: 'Team'),
                     _Legend(color: C.sibuk, label: 'Fixed'),
                     _Legend(color: C.dotGreen, label: 'Flexible'),
-                    _Legend(color: C.accent, label: 'Lomba'),
+                    _Legend(color: C.accent, label: 'Competition'),
                   ],
                 ),
                 const SizedBox(height: 12),
@@ -157,7 +157,7 @@ class JadwalRingkasanScreen extends StatelessWidget {
                           child: Text(
                             day,
                             style: TextStyle(
-                              color: day == 'Sab' ? C.accent : C.white,
+                              color: day == 'Sat' ? C.accent : C.white,
                               fontSize: 10,
                               fontWeight: FontWeight.w500,
                             ),
@@ -191,7 +191,7 @@ class JadwalRingkasanScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Text(
-                  'Ringkasan Pekan',
+                  'Weekly Summary',
                   style: TextStyle(
                     color: C.white,
                     fontSize: 13,
@@ -205,16 +205,16 @@ class JadwalRingkasanScreen extends StatelessWidget {
                       icon: Icons.lock_clock_outlined,
                       color: C.dotBlue,
                       value: '$fixedCount',
-                      label: 'Jadwal fixed',
-                      hint: 'Waktu yang tidak boleh digeser',
+                      label: 'Fixed schedules',
+                      hint: 'Time blocks that cannot be moved',
                     ),
                     const SizedBox(width: 12),
                     _SummaryTile(
                       icon: Icons.emoji_events_rounded,
                       color: C.accent,
                       value: '$competitionCount',
-                      label: 'Lomba',
-                      hint: 'Commitment lomba pekan ini',
+                      label: 'Competition',
+                      hint: 'Competition commitments this week',
                     ),
                   ],
                 ),
