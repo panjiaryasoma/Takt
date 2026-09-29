@@ -91,3 +91,14 @@ enum SelectionSource {
       SelectionSource.values.firstWhere((e) => e.wire == value,
           orElse: () => throw StateError('Unknown selection source: $value'));
 }
+
+/// Public decision actions; their availability is supplied by the backend.
+enum RecommendationAction {
+  accept('ACCEPT'),
+  chooseAlternative('CHOOSE_ALTERNATIVE'),
+  editConstraints('EDIT_CONSTRAINTS'),
+  ignore('IGNORE');
+
+  const RecommendationAction(this.wire);
+  final String wire;
+}

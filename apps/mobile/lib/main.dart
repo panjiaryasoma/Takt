@@ -9,12 +9,15 @@ import 'data/repositories/drift_analysis_repository.dart';
 import 'data/repositories/drift_schedule_repository.dart';
 import 'data/repositories/schedule_repository.dart';
 import 'models/commitment.dart';
+import 'models/decision_intent.dart';
+import 'models/evaluation_session.dart';
 import 'screens/analisis_kompetisi_screen.dart';
 import 'screens/home_screen.dart';
 import 'screens/jadwal_harian_screen.dart';
 import 'screens/jadwal_ringkasan_screen.dart';
 import 'screens/progres_analisis_screen.dart';
 import 'screens/rencana_screen.dart';
+import 'screens/rekomendasi_jadwal_screen.dart';
 import 'screens/review_brief_screen.dart';
 import 'screens/tambah_jadwal_screen.dart';
 import 'theme/app_theme.dart';
@@ -33,19 +36,24 @@ class TaktApp extends StatelessWidget {
     this.scheduleRepository,
     this.analysisRepository,
     this.apiClient,
+    this.decisionSession,
+    this.currentInputRevision = 0,
+    this.onAcceptCandidate,
+    this.onEditConstraints,
+    this.onIgnoreRecommendation,
   });
 
   final ScheduleRepository? scheduleRepository;
   final AnalysisRepository? analysisRepository;
   final CompetitionApiClient? apiClient;
+  final EvaluationSession? decisionSession;
+  final int currentInputRevision;
+  final AcceptCandidateHandler? onAcceptCandidate;
+  final ValueChanged<EditConstraintsIntent>? onEditConstraints;
+  final ValueChanged<IgnoreRecommendationIntent>? onIgnoreRecommendation;
 
   @override
   Widget build(BuildContext context) {
-    final analysisRepo = analysisRepository ??
-        DriftAnalysisRepository(AppDatabase.open());
-    final client = apiClient ??
-        HttpCompetitionApiClient(baseUrl: ApiConfig.baseUrl);
-
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(
@@ -57,8 +65,8 @@ class TaktApp extends StatelessWidget {
         ),
         ChangeNotifierProvider(
           create: (_) => AnalisisViewModel(
-            apiClient: client,
-            repository: analysisRepo,
+            apiClient: apiClient ?? HttpCompetitionApiClient(baseUrl: ApiConfig.baseUrl),
+            repository: analysisRepository ?? DriftAnalysisRepository(AppDatabase.open()),
           ),
         ),
         ChangeNotifierProvider(create: (_) => RencanaViewModel()),
@@ -67,14 +75,28 @@ class TaktApp extends StatelessWidget {
         title: 'Takt',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.dark,
-        home: const RootShell(),
+        home: RootShell(
+          decisionSession: decisionSession,
+          currentInputRevision: currentInputRevision,
+          onAcceptCandidate: onAcceptCandidate,
+          onEditConstraints: onEditConstraints,
+          onIgnoreRecommendation: onIgnoreRecommendation,
+        ),
       ),
     );
   }
 }
 
 class RootShell extends StatefulWidget {
-  const RootShell({super.key});
+  const RootShell({super.key, this.decisionSession, this.currentInputRevision = 0,
+    this.onAcceptCandidate, this.onEditConstraints, this.onIgnoreRecommendation});
+
+  /// 4B publishes its active, paired session; navigation does not build inputs.
+  final EvaluationSession? decisionSession;
+  final int currentInputRevision;
+  final AcceptCandidateHandler? onAcceptCandidate;
+  final ValueChanged<EditConstraintsIntent>? onEditConstraints;
+  final ValueChanged<IgnoreRecommendationIntent>? onIgnoreRecommendation;
 
   @override
   State<RootShell> createState() => _RootShellState();
@@ -88,9 +110,47 @@ class _RootShellState extends State<RootShell> {
   int _analisisStep = 0;
   bool _addingSource = false;
 
+  @override
+  void initState() {
+    super.initState();
+    if (widget.decisionSession != null) {
+      _navIndex = 2;
+      _analisisStep = 3;
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant RootShell oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (!identical(oldWidget.decisionSession, widget.decisionSession)) {
+      if (widget.decisionSession != null) {
+        _navIndex = 2;
+        _analisisStep = 3;
+      } else if (_analisisStep == 3) {
+        _analisisStep = context.read<AnalisisViewModel>().response == null ? 0 : 2;
+      }
+    }
+  }
+
+  void _closeDecision() => setState(() {
+    _analisisStep = context.read<AnalisisViewModel>().response == null ? 0 : 2;
+  });
+
   Widget _analysisBody() {
     final vm = context.read<AnalisisViewModel>();
     switch (_analisisStep) {
+      case 3:
+        return RekomendasiJadwalScreen(
+          session: widget.decisionSession,
+          currentInputRevision: widget.currentInputRevision,
+          onAccept: widget.onAcceptCandidate,
+          onEditConstraints: widget.onEditConstraints,
+          onIgnore: (intent) {
+            widget.onIgnoreRecommendation?.call(intent);
+            _closeDecision();
+          },
+          onBack: _closeDecision,
+        );
       case 1:
         return ProgresAnalisisScreen(
           onReadResult: () => setState(() => _analisisStep = 2),
