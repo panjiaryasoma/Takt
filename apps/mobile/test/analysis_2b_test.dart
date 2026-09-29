@@ -1013,10 +1013,6 @@ class _BlockingApiClient implements CompetitionApiClient {
     );
   }
 
-  @override
-  void close() {
-    closed = true;
-  }
 }
 
 class _FakeApiClient implements CompetitionApiClient {
@@ -1068,6 +1064,11 @@ class _FakeApiClient implements CompetitionApiClient {
       source: source,
       continuation: continuation,
     );
+  }
+
+  @override
+  void close() {
+    closed = true;
   }
 }
 
