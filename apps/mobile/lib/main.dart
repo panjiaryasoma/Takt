@@ -41,7 +41,7 @@ void main() {
   runApp(const TaktApp());
 }
 
-class TaktApp extends StatelessWidget {
+class TaktApp extends StatefulWidget {
   const TaktApp({
     super.key,
     this.scheduleRepository,
@@ -73,62 +73,100 @@ class TaktApp extends StatelessWidget {
   final ValueChanged<IgnoreRecommendationIntent>? onIgnoreRecommendation;
 
   @override
+  State<TaktApp> createState() => _TaktAppState();
+}
+
+class _TaktAppState extends State<TaktApp> {
+  AppDatabase? _ownedDatabase;
+  late final ScheduleRepository _scheduleRepository;
+  late final AnalysisRepository _analysisRepository;
+  late final EvaluationRepository _evaluationRepository;
+  late final SavedPlanRepository _savedPlanRepository;
+
+  @override
+  void initState() {
+    super.initState();
+    final needsDatabase = widget.scheduleRepository == null ||
+        widget.analysisRepository == null ||
+        widget.evaluationRepository == null ||
+        widget.savedPlanRepository == null;
+    if (needsDatabase) {
+      _ownedDatabase = AppDatabase.open();
+    }
+    final database = _ownedDatabase;
+
+    _scheduleRepository = widget.scheduleRepository ??
+        DriftScheduleRepository(
+          database!,
+          closeDatabaseOnDispose: false,
+        );
+    _analysisRepository = widget.analysisRepository ??
+        DriftAnalysisRepository(
+          database!,
+          closeDatabaseOnDispose: false,
+        );
+    _evaluationRepository = widget.evaluationRepository ??
+        DriftEvaluationRepository(
+          database!,
+          closeDatabaseOnDispose: false,
+        );
+    _savedPlanRepository = widget.savedPlanRepository ??
+        DriftSavedPlanRepository(
+          database!,
+          closeDatabaseOnDispose: false,
+        );
+  }
+
+  @override
+  void dispose() {
+    final database = _ownedDatabase;
+    if (database != null) {
+      unawaited(database.close());
+    }
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final calendarScheduleRepository =
-        scheduleRepository ?? DriftScheduleRepository(AppDatabase.open());
-    final calendarSavedPlanRepository =
-        savedPlanRepository ?? DriftSavedPlanRepository(AppDatabase.open());
-
-    final analysisRepo =
-        analysisRepository ?? DriftAnalysisRepository(AppDatabase.open());
-
-    final savedPlansUiRepository =
-        savedPlanRepository ?? DriftSavedPlanRepository(AppDatabase.open());
-
-    final hostScheduleRepository =
-        scheduleRepository ?? DriftScheduleRepository(AppDatabase.open());
-    final hostEvaluationRepository =
-        evaluationRepository ?? DriftEvaluationRepository(AppDatabase.open());
-    final hostSavedPlanRepository =
-        savedPlanRepository ?? DriftSavedPlanRepository(AppDatabase.open());
-
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(
           create: (_) => JadwalViewModel(
-            calendarScheduleRepository,
-            savedPlanRepository: calendarSavedPlanRepository,
-            closeScheduleRepositoryOnDispose: scheduleRepository == null,
-            closeSavedPlanRepositoryOnDispose: savedPlanRepository == null,
+            _scheduleRepository,
+            savedPlanRepository: _savedPlanRepository,
+            closeScheduleRepositoryOnDispose:
+                widget.scheduleRepository == null,
+            closeSavedPlanRepositoryOnDispose: false,
           )..initialize(),
         ),
         ChangeNotifierProvider(
           create: (_) => AnalisisViewModel(
-            apiClient: apiClient ??
+            apiClient: widget.apiClient ??
                 HttpCompetitionApiClient(baseUrl: ApiConfig.baseUrl),
-            repository: analysisRepo,
+            repository: _analysisRepository,
+            closeRepositoryOnDispose: widget.analysisRepository == null,
           ),
         ),
         ChangeNotifierProvider(
           create: (_) => SavedPlansViewModel(
-            savedPlansUiRepository,
-            closeRepositoryOnDispose: savedPlanRepository == null,
+            _savedPlanRepository,
+            closeRepositoryOnDispose: widget.savedPlanRepository == null,
           )..initialize(),
         ),
         ChangeNotifierProvider(
-          create: (_) =>
-              SavedPlanDetailViewModel(savedPlansUiRepository),
+          create: (_) => SavedPlanDetailViewModel(_savedPlanRepository),
         ),
         ChangeNotifierProvider(
           create: (_) => PlanningHostViewModel(
-            apiClient: planApiClient ??
+            apiClient: widget.planApiClient ??
                 HttpPlanApiClient(baseUrl: ApiConfig.baseUrl),
-            scheduleRepository: hostScheduleRepository,
-            evaluationRepository: hostEvaluationRepository,
-            savedPlanRepository: hostSavedPlanRepository,
-            closeScheduleRepositoryOnDispose: scheduleRepository == null,
-            closeEvaluationRepositoryOnDispose: evaluationRepository == null,
-            closeSavedPlanRepositoryOnDispose: savedPlanRepository == null,
+            scheduleRepository: _scheduleRepository,
+            evaluationRepository: _evaluationRepository,
+            savedPlanRepository: _savedPlanRepository,
+            closeScheduleRepositoryOnDispose: false,
+            closeEvaluationRepositoryOnDispose:
+                widget.evaluationRepository == null,
+            closeSavedPlanRepositoryOnDispose: false,
           ),
         ),
       ],
@@ -138,11 +176,11 @@ class TaktApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: AppTheme.dark,
         home: RootShell(
-          decisionSession: decisionSession,
-          currentInputRevision: currentInputRevision,
-          onAcceptCandidate: onAcceptCandidate,
-          onEditConstraints: onEditConstraints,
-          onIgnoreRecommendation: onIgnoreRecommendation,
+          decisionSession: widget.decisionSession,
+          currentInputRevision: widget.currentInputRevision,
+          onAcceptCandidate: widget.onAcceptCandidate,
+          onEditConstraints: widget.onEditConstraints,
+          onIgnoreRecommendation: widget.onIgnoreRecommendation,
         ),
       ),
     );
