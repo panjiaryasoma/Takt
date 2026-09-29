@@ -112,7 +112,7 @@ class _RekomendasiJadwalScreenState extends State<RekomendasiJadwalScreen> {
           const SizedBox(height: 16),
 
           // Rekomendasi slot AI
-          Row(
+          const Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text('Rekomendasi Slot Pengerjaan',
