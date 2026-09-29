@@ -1,4 +1,25 @@
+import 'package:flutter/services.dart';
 import 'package:purchases_flutter/purchases_flutter.dart' as rc;
+
+enum RevenueCatPurchaseFailureKind {
+  cancelled,
+  pending,
+  notAllowed,
+  failed,
+}
+
+final class RevenueCatPurchaseFailure implements Exception {
+  const RevenueCatPurchaseFailure({
+    required this.kind,
+    required this.message,
+  });
+
+  final RevenueCatPurchaseFailureKind kind;
+  final String message;
+
+  @override
+  String toString() => message;
+}
 
 final class RevenueCatCustomerSnapshot {
   const RevenueCatCustomerSnapshot({
@@ -31,6 +52,13 @@ abstract interface class RevenueCatGateway {
     required String offeringIdentifier,
     required String packageIdentifier,
   });
+
+  Future<RevenueCatCustomerSnapshot> purchasePackage({
+    required String offeringIdentifier,
+    required String packageIdentifier,
+  });
+
+  Future<RevenueCatCustomerSnapshot> restorePurchases();
 }
 
 final class PurchasesRevenueCatGateway implements RevenueCatGateway {
@@ -51,14 +79,63 @@ final class PurchasesRevenueCatGateway implements RevenueCatGateway {
   @override
   Future<RevenueCatCustomerSnapshot> getCustomerInfo() async {
     final customerInfo = await rc.Purchases.getCustomerInfo();
-    return RevenueCatCustomerSnapshot(
-      activeEntitlementIds:
-          Set<String>.unmodifiable(customerInfo.entitlements.active.keys),
-    );
+    return _customerSnapshot(customerInfo);
   }
 
   @override
   Future<RevenueCatPackageSnapshot?> getPackage({
+    required String offeringIdentifier,
+    required String packageIdentifier,
+  }) async {
+    final package = await _resolvePackage(
+      offeringIdentifier: offeringIdentifier,
+      packageIdentifier: packageIdentifier,
+    );
+    if (package == null) {
+      return null;
+    }
+
+    return RevenueCatPackageSnapshot(
+      offeringIdentifier: package.presentedOfferingContext.offeringIdentifier,
+      packageIdentifier: package.identifier,
+      productIdentifier: package.storeProduct.identifier,
+      priceString: package.storeProduct.priceString,
+    );
+  }
+
+  @override
+  Future<RevenueCatCustomerSnapshot> purchasePackage({
+    required String offeringIdentifier,
+    required String packageIdentifier,
+  }) async {
+    final package = await _resolvePackage(
+      offeringIdentifier: offeringIdentifier,
+      packageIdentifier: packageIdentifier,
+    );
+    if (package == null) {
+      throw const RevenueCatPurchaseFailure(
+        kind: RevenueCatPurchaseFailureKind.failed,
+        message: 'The configured RevenueCat package is unavailable.',
+      );
+    }
+
+    try {
+      final result = await rc.Purchases.purchase(
+        rc.PurchaseParams.package(package),
+      );
+      return _customerSnapshot(result.customerInfo);
+    } on PlatformException catch (error) {
+      throw _purchaseFailure(error);
+    }
+  }
+
+  @override
+  Future<RevenueCatCustomerSnapshot> restorePurchases() async {
+    final customerInfo = await rc.Purchases.restorePurchases();
+    return _customerSnapshot(customerInfo);
+  }
+
+  Future<rc.Package?> _resolvePackage({
     required String offeringIdentifier,
     required String packageIdentifier,
   }) async {
@@ -68,22 +145,53 @@ final class PurchasesRevenueCatGateway implements RevenueCatGateway {
       return null;
     }
 
-    rc.Package? package;
     for (final candidate in offering.availablePackages) {
       if (candidate.identifier == packageIdentifier) {
-        package = candidate;
-        break;
+        return candidate;
       }
     }
-    if (package == null) {
-      return null;
+    return null;
+  }
+
+  static RevenueCatCustomerSnapshot _customerSnapshot(
+    rc.CustomerInfo customerInfo,
+  ) {
+    return RevenueCatCustomerSnapshot(
+      activeEntitlementIds:
+          Set<String>.unmodifiable(customerInfo.entitlements.active.keys),
+    );
+  }
+
+  static RevenueCatPurchaseFailure _purchaseFailure(
+    PlatformException error,
+  ) {
+    rc.PurchasesErrorCode code;
+    try {
+      code = rc.PurchasesErrorHelper.getErrorCode(error);
+    } on Object {
+      code = rc.PurchasesErrorCode.unknownError;
     }
 
-    return RevenueCatPackageSnapshot(
-      offeringIdentifier: offering.identifier,
-      packageIdentifier: package.identifier,
-      productIdentifier: package.storeProduct.identifier,
-      priceString: package.storeProduct.priceString,
-    );
+    return switch (code) {
+      rc.PurchasesErrorCode.purchaseCancelledError =>
+        const RevenueCatPurchaseFailure(
+          kind: RevenueCatPurchaseFailureKind.cancelled,
+          message: 'Purchase cancelled.',
+        ),
+      rc.PurchasesErrorCode.paymentPendingError =>
+        const RevenueCatPurchaseFailure(
+          kind: RevenueCatPurchaseFailureKind.pending,
+          message: 'Purchase is pending.',
+        ),
+      rc.PurchasesErrorCode.purchaseNotAllowedError =>
+        const RevenueCatPurchaseFailure(
+          kind: RevenueCatPurchaseFailureKind.notAllowed,
+          message: 'Purchases are not allowed on this device or account.',
+        ),
+      _ => RevenueCatPurchaseFailure(
+          kind: RevenueCatPurchaseFailureKind.failed,
+          message: error.message ?? 'RevenueCat purchase failed.',
+        ),
+    };
   }
 }

@@ -122,3 +122,31 @@ identity. The runtime then reads `CustomerInfo` and resolves the canonical
 Entitlement and offering refresh failures preserve the last trustworthy state.
 Missing offerings/packages stay explicitly empty; the app never invents a package.
 Purchase, restore, paywall UI, and final Decision Report gating remain later 4C work.
+
+
+### RevenueCat purchase and restore flow
+
+The Home screen exposes a **Takt Pro** entry point when RevenueCat configuration
+is available. The custom purchase screen resolves the canonical
+`default` / `$rc_lifetime` package from RevenueCat before purchase and uses
+the official `Purchases.purchase(PurchaseParams.package(...))` flow.
+
+Purchase outcomes are explicit:
+- success activates access only when the returned CustomerInfo contains `pro`;
+- cancellation is non-fatal and leaves existing access unchanged;
+- pending purchase is shown as pending and does not invent premium access;
+- failures preserve the last trustworthy entitlement state.
+
+Restore uses `Purchases.restorePurchases()` and applies the returned
+CustomerInfo. A successful restore with no `pro` entitlement remains a valid
+non-premium state.
+
+For the Test Store demo:
+
+```powershell
+flutter run --dart-define-from-file=config/revenuecat.test.local.json
+```
+
+Open **Home → Takt Pro**, complete the Test Store lifetime purchase, then verify
+that the screen reports the active `pro` entitlement. Do not commit the local
+config file or any store/server credentials.

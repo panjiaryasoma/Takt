@@ -18,6 +18,7 @@ import 'screens/home_screen.dart';
 import 'screens/jadwal_harian_screen.dart';
 import 'screens/jadwal_ringkasan_screen.dart';
 import 'screens/progres_analisis_screen.dart';
+import 'screens/premium_access_screen.dart';
 import 'screens/rencana_screen.dart';
 import 'screens/rekomendasi_jadwal_screen.dart';
 import 'screens/review_brief_screen.dart';
@@ -92,6 +93,7 @@ class TaktApp extends StatelessWidget {
         debugShowCheckedModeBanner: false,
         theme: AppTheme.dark,
         home: RootShell(
+          revenueCatEnabled: revenueCatService != null,
           decisionSession: decisionSession,
           currentInputRevision: currentInputRevision,
           onAcceptCandidate: onAcceptCandidate,
@@ -104,8 +106,17 @@ class TaktApp extends StatelessWidget {
 }
 
 class RootShell extends StatefulWidget {
-  const RootShell({super.key, this.decisionSession, this.currentInputRevision = 0,
-    this.onAcceptCandidate, this.onEditConstraints, this.onIgnoreRecommendation});
+  const RootShell({
+    super.key,
+    this.revenueCatEnabled = false,
+    this.decisionSession,
+    this.currentInputRevision = 0,
+    this.onAcceptCandidate,
+    this.onEditConstraints,
+    this.onIgnoreRecommendation,
+  });
+
+  final bool revenueCatEnabled;
 
   /// 4B publishes its active, paired session; navigation does not build inputs.
   final EvaluationSession? decisionSession;
@@ -151,6 +162,14 @@ class _RootShellState extends State<RootShell> {
   void _closeDecision() => setState(() {
     _analisisStep = context.read<AnalisisViewModel>().response == null ? 0 : 2;
   });
+
+  Future<void> _openPremiumAccess() {
+    return Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => const PremiumAccessScreen(),
+      ),
+    );
+  }
 
   Widget _analysisBody() {
     final vm = context.read<AnalisisViewModel>();
@@ -281,6 +300,7 @@ class _RootShellState extends State<RootShell> {
       case 0:
       default:
         return HomeScreen(
+          onOpenPro: widget.revenueCatEnabled ? _openPremiumAccess : null,
           onLihatJadwal: () => setState(() {
             _navIndex = 1;
             _jadwalTab = 0;

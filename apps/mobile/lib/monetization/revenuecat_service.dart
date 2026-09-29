@@ -12,6 +12,22 @@ enum OfferingSync {
   error,
 }
 
+enum PurchaseSync {
+  idle,
+  purchasing,
+  purchased,
+  cancelled,
+  pending,
+  error,
+}
+
+enum RestoreSync {
+  idle,
+  restoring,
+  restored,
+  error,
+}
+
 final class PremiumOfferingSnapshot {
   const PremiumOfferingSnapshot({
     required this.offeringIdentifier,
@@ -70,15 +86,26 @@ final class RevenueCatService extends ChangeNotifier {
   bool _configured = false;
   EntitlementState _entitlement = const EntitlementState.initial();
   PremiumOfferingState _offering = const PremiumOfferingState.initial();
+  PurchaseSync _purchaseSync = PurchaseSync.idle;
+  RestoreSync _restoreSync = RestoreSync.idle;
   Object? _entitlementError;
   Object? _offeringError;
+  Object? _purchaseError;
+  Object? _restoreError;
   Object? _configurationError;
 
   EntitlementState get entitlement => _entitlement;
   PremiumOfferingState get offering => _offering;
+  PurchaseSync get purchaseSync => _purchaseSync;
+  RestoreSync get restoreSync => _restoreSync;
   bool get isConfigured => _configured;
+  bool get operationInProgress =>
+      _purchaseSync == PurchaseSync.purchasing ||
+      _restoreSync == RestoreSync.restoring;
   Object? get entitlementError => _entitlementError;
   Object? get offeringError => _offeringError;
+  Object? get purchaseError => _purchaseError;
+  Object? get restoreError => _restoreError;
   Object? get configurationError => _configurationError;
 
   bool canAccess(PremiumFeature feature) =>
@@ -133,11 +160,7 @@ final class RevenueCatService extends ChangeNotifier {
 
     try {
       final customer = await _gateway.getCustomerInfo();
-      _entitlement = _entitlement.resolved(
-        isActive: customer.activeEntitlementIds.contains(
-          RevenueCatContract.entitlementIdentifier,
-        ),
-      );
+      _applyCustomer(customer);
     } catch (error) {
       _entitlementError = error;
       _entitlement = _entitlement.failed();
@@ -187,5 +210,97 @@ final class RevenueCatService extends ChangeNotifier {
       _offering = _offering.failed();
     }
     notifyListeners();
+  }
+
+  Future<void> purchaseLifetime() async {
+    if (!_configured || operationInProgress) {
+      return;
+    }
+
+    final currentOffering = _offering.offering;
+    if (_offering.sync != OfferingSync.ready || currentOffering == null) {
+      _purchaseError = StateError(
+        'A RevenueCat offering must be ready before purchase.',
+      );
+      _purchaseSync = PurchaseSync.error;
+      notifyListeners();
+      return;
+    }
+
+    _purchaseError = null;
+    _purchaseSync = PurchaseSync.purchasing;
+    notifyListeners();
+
+    try {
+      final customer = await _gateway.purchasePackage(
+        offeringIdentifier: currentOffering.offeringIdentifier,
+        packageIdentifier: currentOffering.packageIdentifier,
+      );
+      _applyCustomer(customer);
+
+      if (_entitlement.access != EntitlementAccess.active) {
+        _purchaseError = StateError(
+          'Purchase completed without activating the canonical entitlement.',
+        );
+        _purchaseSync = PurchaseSync.error;
+      } else {
+        _purchaseSync = PurchaseSync.purchased;
+      }
+    } on RevenueCatPurchaseFailure catch (error) {
+      switch (error.kind) {
+        case RevenueCatPurchaseFailureKind.cancelled:
+          _purchaseSync = PurchaseSync.cancelled;
+        case RevenueCatPurchaseFailureKind.pending:
+          _purchaseSync = PurchaseSync.pending;
+        case RevenueCatPurchaseFailureKind.notAllowed:
+        case RevenueCatPurchaseFailureKind.failed:
+          _purchaseError = error;
+          _purchaseSync = PurchaseSync.error;
+      }
+    } on Object catch (error) {
+      _purchaseError = error;
+      _purchaseSync = PurchaseSync.error;
+    }
+    notifyListeners();
+  }
+
+  Future<void> restorePurchases() async {
+    if (!_configured || operationInProgress) {
+      return;
+    }
+
+    _restoreError = null;
+    _restoreSync = RestoreSync.restoring;
+    notifyListeners();
+
+    try {
+      final customer = await _gateway.restorePurchases();
+      _applyCustomer(customer);
+      _restoreSync = RestoreSync.restored;
+    } on Object catch (error) {
+      _restoreError = error;
+      _restoreSync = RestoreSync.error;
+    }
+    notifyListeners();
+  }
+
+  void clearOperationFeedback() {
+    if (operationInProgress) {
+      return;
+    }
+    _purchaseSync = PurchaseSync.idle;
+    _restoreSync = RestoreSync.idle;
+    _purchaseError = null;
+    _restoreError = null;
+    notifyListeners();
+  }
+
+  void _applyCustomer(RevenueCatCustomerSnapshot customer) {
+    _entitlementError = null;
+    _entitlement = _entitlement.resolved(
+      isActive: customer.activeEntitlementIds.contains(
+        RevenueCatContract.entitlementIdentifier,
+      ),
+    );
   }
 }
