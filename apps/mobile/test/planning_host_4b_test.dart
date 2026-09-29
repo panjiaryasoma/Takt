@@ -141,7 +141,7 @@ void main() {
     );
 
     // Global defaults deliberately diverge from the accepted evaluation.
-    await schedule.updatePreferences(
+    await schedule.savePlanningPreferences(
       (await schedule.loadState()).preferences.copyWith(
         maxProjectMinutesPerDay: 30,
         preferredFocusMinutes: 15,
