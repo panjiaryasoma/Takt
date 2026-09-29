@@ -316,6 +316,90 @@ void main() {
       );
     });
 
+
+    test('rejects empty report source_ids', () {
+      final raw = jsonDecode(_responseBody('cmp-empty-sources'))
+          as Map<String, dynamic>;
+      final bundle = raw['report_bundle'] as Map<String, dynamic>;
+      final report = bundle['report'] as Map<String, dynamic>;
+      report['source_ids'] = <String>[];
+
+      expect(
+        () => CompetitionAnalyzeResponseWire.parse(jsonEncode(raw)),
+        throwsFormatException,
+      );
+    });
+
+    test('rejects duplicate provenance source_id multiplicity', () {
+      final raw = jsonDecode(_responseBody('cmp-provenance-duplicate'))
+          as Map<String, dynamic>;
+      final provenance = raw['provenance'] as Map<String, dynamic>;
+      final sources = provenance['sources'] as List<dynamic>;
+      sources.add(Map<String, dynamic>.from(
+        sources.first as Map<String, dynamic>,
+      ));
+
+      expect(
+        () => CompetitionAnalyzeResponseWire.parse(jsonEncode(raw)),
+        throwsFormatException,
+      );
+    });
+
+    test('rejects empty provenance extraction run source_id', () {
+      final raw = jsonDecode(_responseBody('cmp-run-source'))
+          as Map<String, dynamic>;
+      _firstProvenanceRun(raw)['source_id'] = '';
+
+      expect(
+        () => CompetitionAnalyzeResponseWire.parse(jsonEncode(raw)),
+        throwsFormatException,
+      );
+    });
+
+    test('rejects empty provenance extraction run snapshot_id', () {
+      final raw = jsonDecode(_responseBody('cmp-run-snapshot'))
+          as Map<String, dynamic>;
+      _firstProvenanceRun(raw)['snapshot_id'] = '';
+
+      expect(
+        () => CompetitionAnalyzeResponseWire.parse(jsonEncode(raw)),
+        throwsFormatException,
+      );
+    });
+
+    test('rejects empty provenance extraction run extractor_version', () {
+      final raw = jsonDecode(_responseBody('cmp-run-version'))
+          as Map<String, dynamic>;
+      _firstProvenanceRun(raw)['extractor_version'] = '';
+
+      expect(
+        () => CompetitionAnalyzeResponseWire.parse(jsonEncode(raw)),
+        throwsFormatException,
+      );
+    });
+
+    test('rejects unknown provenance extraction path', () {
+      final raw = jsonDecode(_responseBody('cmp-run-path'))
+          as Map<String, dynamic>;
+      _firstProvenanceRun(raw)['extraction_path'] = 'magic';
+
+      expect(
+        () => CompetitionAnalyzeResponseWire.parse(jsonEncode(raw)),
+        throwsFormatException,
+      );
+    });
+
+    test('accepts manual provenance extraction path', () {
+      final raw = jsonDecode(_responseBody('cmp-run-manual'))
+          as Map<String, dynamic>;
+      _firstProvenanceRun(raw)['extraction_path'] = 'manual';
+
+      final parsed =
+          CompetitionAnalyzeResponseWire.parse(jsonEncode(raw));
+
+      expect(parsed.report.competitionId, 'cmp-run-manual');
+    });
+
     test('missing field remains null and has no candidates', () {
       final raw = jsonDecode(_responseBody('cmp-missing'))
           as Map<String, dynamic>;
@@ -1016,6 +1100,15 @@ void main() {
   });
 }
 
+
+
+Map<String, dynamic> _firstProvenanceRun(
+  Map<String, dynamic> raw,
+) {
+  final provenance = raw['provenance'] as Map<String, dynamic>;
+  final runs = provenance['extraction_runs'] as List<dynamic>;
+  return runs.first as Map<String, dynamic>;
+}
 
 Map<String, dynamic> _firstSourceArtifact(
   Map<String, dynamic> raw,
