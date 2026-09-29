@@ -14,6 +14,7 @@ final class PlanApiFailure implements Exception {
     required this.message,
     required this.retryable,
     this.statusCode,
+    this.transportRequestJson,
     this.transportResponseJson,
     this.transition,
     this.errorJson,
@@ -24,6 +25,7 @@ final class PlanApiFailure implements Exception {
   final String message;
   final bool retryable;
   final int? statusCode;
+  final String? transportRequestJson;
   final String? transportResponseJson;
   final ReevaluationTransitionWire? transition;
   final String? errorJson;
@@ -137,11 +139,26 @@ final class HttpPlanApiClient implements PlanApiClient {
       'current': current,
     };
     final transportRequestJson = deterministicJsonEncode(wrapper);
-    final response = await _send(
-      '/api/v1/plans/re-evaluate',
-      transportRequestJson,
-      reevaluate: true,
-    );
+    late final String response;
+    try {
+      response = await _send(
+        '/api/v1/plans/re-evaluate',
+        transportRequestJson,
+        reevaluate: true,
+      );
+    } on PlanApiFailure catch (error) {
+      throw PlanApiFailure(
+        code: error.code,
+        stage: error.stage,
+        message: error.message,
+        retryable: error.retryable,
+        statusCode: error.statusCode,
+        transportRequestJson: transportRequestJson,
+        transportResponseJson: error.transportResponseJson,
+        transition: error.transition,
+        errorJson: error.errorJson,
+      );
+    }
     try {
       return PlanReevaluateTransportResult(
         transportRequestJson: transportRequestJson,
