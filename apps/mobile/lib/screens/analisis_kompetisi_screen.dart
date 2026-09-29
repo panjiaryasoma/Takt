@@ -89,7 +89,7 @@ class _AnalisisKompetisiScreenState
     if (_submitting) return;
     final sourceType = _sourceType;
     if (sourceType == null) {
-      setState(() => _error = 'Pilih jenis sumber.');
+      setState(() => _error = 'Select a source type.');
       return;
     }
 
@@ -100,7 +100,7 @@ class _AnalisisKompetisiScreenState
       final file = _picked;
       final bytes = file?.bytes;
       if (file == null || bytes == null || bytes.isEmpty) {
-        setState(() => _error = 'Pilih file PDF terlebih dahulu.');
+        setState(() => _error = 'Select a PDF file first.');
         return;
       }
       if (file.size > maxAnalysisSourceBytes) {
@@ -147,8 +147,8 @@ class _AnalisisKompetisiScreenState
   @override
   Widget build(BuildContext context) {
     final title = widget.continuation
-        ? 'Tambah sumber'
-        : 'Analisis kompetisi';
+        ? 'Add Source'
+        : 'Analyze Competition';
     final subtitle = widget.continuation
         ? 'Tambahkan evidence baru ke kompetisi yang sama.'
         : 'Masukkan satu sumber kompetisi untuk mulai analisis.';
@@ -267,8 +267,8 @@ class _AnalisisKompetisiScreenState
                   alignment: Alignment.center,
                   child: Text(
                     widget.continuation
-                        ? 'Tambah & Analisis Ulang'
-                        : 'Submit & Mulai Analisis',
+                        ? 'Add & Re-analyze'
+                        : 'Submit & Start Analysis',
                     style: const TextStyle(
                       color: C.bg,
                       fontSize: 15,
