@@ -1,6 +1,8 @@
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:drift/drift.dart';
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:http/http.dart' as http;
@@ -39,6 +41,39 @@ void main() {
       final bundle = raw['report_bundle'] as Map<String, dynamic>;
       final ref = bundle['ref'] as Map<String, dynamic>;
       ref['domain_schema_version'] = '99.0.0';
+
+      expect(
+        () => CompetitionAnalyzeResponseWire.parse(jsonEncode(raw)),
+        throwsFormatException,
+      );
+    });
+
+
+    test('rejects report missing any required core field', () {
+      final raw = jsonDecode(_responseBody('cmp-missing-core'))
+          as Map<String, dynamic>;
+      final bundle = raw['report_bundle'] as Map<String, dynamic>;
+      final report = bundle['report'] as Map<String, dynamic>;
+      final fields =
+          report['canonical_fields'] as Map<String, dynamic>;
+      fields.remove('organizer');
+
+      expect(
+        () => CompetitionAnalyzeResponseWire.parse(jsonEncode(raw)),
+        throwsFormatException,
+      );
+    });
+
+    test('rejects canonical evidence absent from provenance', () {
+      final raw = jsonDecode(_responseBody('cmp-dangling-evidence'))
+          as Map<String, dynamic>;
+      final provenance = raw['provenance'] as Map<String, dynamic>;
+      final evidence = provenance['evidence'] as List<dynamic>;
+      evidence.removeWhere(
+        (item) =>
+            (item as Map<String, dynamic>)['evidence_id'] ==
+            'ev-organizer',
+      );
 
       expect(
         () => CompetitionAnalyzeResponseWire.parse(jsonEncode(raw)),
