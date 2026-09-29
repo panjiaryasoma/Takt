@@ -115,10 +115,15 @@ class CandidateFieldWire {
     if (map['scope'] == null) {
       throw FormatException('$path.scope must be explicit');
     }
+    final evidenceIds =
+        _strings(map['evidence_ids'], '$path.evidence_ids');
+    if (evidenceIds.isEmpty) {
+      throw FormatException('$path.evidence_ids must not be empty');
+    }
     return CandidateFieldWire(
       rawValue: map['raw_value'],
       normalizedValue: map['normalized_value'],
-      evidenceIds: _strings(map['evidence_ids'], '$path.evidence_ids'),
+      evidenceIds: evidenceIds,
     );
   }
 }
@@ -435,6 +440,7 @@ class SourceRecordWire {
       },
       path,
     );
+    _string(map['content_hash'], '$path.content_hash');
     final retrievedAt =
         _string(map['retrieved_at'], '$path.retrieved_at');
     final aware = RegExp(r'(Z|[+-]\d{2}:\d{2})$');
@@ -685,38 +691,76 @@ class CompetitionAnalyzeResponseWire {
             '$reportPath has unsupported extraction path',
           );
         }
+        final candidateFields = <String, CandidateFieldWire>{};
         for (final fieldEntry
             in _list(report['fields'], '$reportPath.fields')
                 .asMap()
                 .entries) {
-          final fieldMap = _object(
-            fieldEntry.value,
-            '$reportPath.fields[${fieldEntry.key}]',
+          final fieldPath =
+              '$reportPath.fields[${fieldEntry.key}]';
+          final fieldMap = _object(fieldEntry.value, fieldPath);
+          final fieldName =
+              _string(fieldMap['field_name'], '$fieldPath.field_name');
+          if (candidateFields.containsKey(fieldName)) {
+            throw FormatException(
+              '$reportPath candidate field_name values must be unique',
+            );
+          }
+          final fieldExtractionPath = _string(
+            fieldMap['extraction_path'],
+            '$fieldPath.extraction_path',
           );
-          final fieldName = _string(
-            fieldMap['field_name'],
-            '$reportPath.fields[${fieldEntry.key}].field_name',
-          );
-          CandidateFieldWire.fromJson(
+          if (fieldExtractionPath != extractionPath) {
+            throw FormatException(
+              '$fieldPath extraction_path must match report extraction_path',
+            );
+          }
+          candidateFields[fieldName] = CandidateFieldWire.fromJson(
             fieldMap,
             fieldName: fieldName,
-            path: '$reportPath.fields[${fieldEntry.key}]',
+            path: fieldPath,
           );
         }
+
+        final evidenceById = <String, EvidenceSpanWire>{};
         for (final evidenceEntry
             in _list(report['evidence'], '$reportPath.evidence')
                 .asMap()
                 .entries) {
+          final evidencePath =
+              '$reportPath.evidence[${evidenceEntry.key}]';
           final evidence = EvidenceSpanWire.fromJson(
             evidenceEntry.value,
-            path:
-                '$reportPath.evidence[${evidenceEntry.key}]',
+            path: evidencePath,
           );
+          if (evidenceById.containsKey(evidence.evidenceId)) {
+            throw FormatException(
+              '$reportPath evidence_id values must be unique',
+            );
+          }
           if (evidence.sourceId != source.sourceId ||
               evidence.extractionPath != extractionPath) {
             throw FormatException(
               '$reportPath evidence continuity mismatch',
             );
+          }
+          evidenceById[evidence.evidenceId] = evidence;
+        }
+
+        for (final fieldEntry in candidateFields.entries) {
+          for (final evidenceId in fieldEntry.value.evidenceIds) {
+            final evidence = evidenceById[evidenceId];
+            if (evidence == null) {
+              throw FormatException(
+                '$reportPath candidate evidence_id $evidenceId '
+                'is not present in report evidence',
+              );
+            }
+            if (evidence.fieldName != fieldEntry.key) {
+              throw FormatException(
+                '$reportPath candidate evidence field_name mismatch',
+              );
+            }
           }
         }
       }
