@@ -177,7 +177,7 @@ final class DriftSavedPlanRepository implements SavedPlanRepository {
       var plan = await _planForCompetitionInternal(evaluation.competitionId);
       if (plan == null) {
         plan = SavedPlan(
-          id: _newId('plan'),
+          id: 'plan-${evaluation.competitionId}',
           competitionId: evaluation.competitionId,
           createdAtEpochMs: nowMs,
           updatedAtEpochMs: nowMs,
@@ -200,7 +200,7 @@ INSERT INTO saved_plans (
       final parent = await _currentRevisionInternal(plan.id);
       final revisionNumber = (parent?.revisionNumber ?? 0) + 1;
       final revision = SavedPlanRevision(
-        id: _newId('revision'),
+        id: 'revision-${evaluation.id}',
         savedPlanId: plan.id,
         revisionNumber: revisionNumber,
         evaluationId: evaluation.id,
