@@ -415,6 +415,42 @@ void main() {
         second.originalBody,
       );
     });
+
+    test('snapshot and competition survive database restart', () async {
+      final dir =
+          await Directory.systemTemp.createTemp('takt_analysis_restart_');
+      final file = File('${dir.path}/takt.sqlite3');
+      addTearDown(() async {
+        if (await dir.exists()) await dir.delete(recursive: true);
+      });
+
+      final firstDb = AppDatabase.forTesting(NativeDatabase(file));
+      final firstRepository = DriftAnalysisRepository(
+        firstDb,
+        now: () => DateTime.utc(2026, 9, 29, 12),
+      );
+      final transport = _transport('cmp-restart', pretty: true);
+      await firstRepository.persistResponse(
+        originalBody: transport.originalBody,
+        response: transport.response,
+      );
+      await firstRepository.close();
+
+      final secondDb = AppDatabase.forTesting(NativeDatabase(file));
+      final secondRepository = DriftAnalysisRepository(secondDb);
+      addTearDown(secondRepository.close);
+
+      final restored =
+          await secondRepository.latestSnapshot('cmp-restart');
+      expect(restored, isNotNull);
+      expect(restored!.responseJson, transport.originalBody);
+
+      final competitions = await secondDb.customSelect(
+        'SELECT id FROM competitions WHERE id = ?',
+        variables: [Variable<String>('cmp-restart')],
+      ).get();
+      expect(competitions, hasLength(1));
+    });
   });
 
   group('2B analysis state machine', () {
