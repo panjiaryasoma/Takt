@@ -76,9 +76,8 @@ class TaktApp extends StatelessWidget {
   Widget build(BuildContext context) {
     final calendarScheduleRepository =
         scheduleRepository ?? DriftScheduleRepository(AppDatabase.open());
-    final calendarSavedPlanRepository = scheduleRepository == null
-        ? DriftSavedPlanRepository(AppDatabase.open())
-        : null;
+    final calendarSavedPlanRepository =
+        savedPlanRepository ?? DriftSavedPlanRepository(AppDatabase.open());
 
     final analysisRepo =
         analysisRepository ?? DriftAnalysisRepository(AppDatabase.open());
@@ -93,16 +92,14 @@ class TaktApp extends StatelessWidget {
     final hostSavedPlanRepository =
         savedPlanRepository ?? DriftSavedPlanRepository(AppDatabase.open());
 
-    final hostOwnsRepositories = scheduleRepository == null &&
-        evaluationRepository == null &&
-        savedPlanRepository == null;
-
     return MultiProvider(
       providers: [
         ChangeNotifierProvider(
           create: (_) => JadwalViewModel(
             calendarScheduleRepository,
             savedPlanRepository: calendarSavedPlanRepository,
+            closeScheduleRepositoryOnDispose: scheduleRepository == null,
+            closeSavedPlanRepositoryOnDispose: savedPlanRepository == null,
           )..initialize(),
         ),
         ChangeNotifierProvider(
@@ -113,8 +110,10 @@ class TaktApp extends StatelessWidget {
           ),
         ),
         ChangeNotifierProvider(
-          create: (_) =>
-              SavedPlansViewModel(savedPlansUiRepository)..initialize(),
+          create: (_) => SavedPlansViewModel(
+            savedPlansUiRepository,
+            closeRepositoryOnDispose: savedPlanRepository == null,
+          )..initialize(),
         ),
         ChangeNotifierProvider(
           create: (_) =>
@@ -127,7 +126,9 @@ class TaktApp extends StatelessWidget {
             scheduleRepository: hostScheduleRepository,
             evaluationRepository: hostEvaluationRepository,
             savedPlanRepository: hostSavedPlanRepository,
-            closeRepositoriesOnDispose: hostOwnsRepositories,
+            closeScheduleRepositoryOnDispose: scheduleRepository == null,
+            closeEvaluationRepositoryOnDispose: evaluationRepository == null,
+            closeSavedPlanRepositoryOnDispose: savedPlanRepository == null,
           ),
         ),
       ],
