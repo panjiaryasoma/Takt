@@ -67,18 +67,18 @@ class AnalisisViewModel extends ChangeNotifier {
   String get statusText {
     switch (_phase) {
       case AnalysisPhase.idle:
-        return 'Menunggu sumber kompetisi.';
+        return 'Waiting for a competition source.';
       case AnalysisPhase.validating:
-        return 'Menyiapkan sumber dan konteks analisis.';
+        return 'Preparing the source and analysis context.';
       case AnalysisPhase.submitting:
-        return 'Backend sedang memproses sumber.';
+        return 'The backend is processing the source.';
       case AnalysisPhase.persisting:
-        return 'Menyimpan hasil analisis di perangkat.';
+        return 'Saving the analysis result on this device.';
       case AnalysisPhase.ready:
-        return 'Hasil tersimpan dan siap direview.';
+        return 'Result saved and ready for review.';
       case AnalysisPhase.requestError:
       case AnalysisPhase.persistenceError:
-        return _failure?.userMessage ?? 'Analisis gagal.';
+        return _failure?.userMessage ?? 'Analysis failed.';
     }
   }
 
@@ -110,23 +110,23 @@ class AnalisisViewModel extends ChangeNotifier {
 
     return [
       AnalysisStep(
-        title: 'Menyiapkan sumber',
-        detail: 'Validasi input dan metadata sumber',
+        title: 'Preparing source',
+        detail: 'Validating source input and metadata',
         state: stateFor(0),
       ),
       AnalysisStep(
-        title: 'Memproses di backend',
-        detail: 'Ekstraksi dan reconciliation berjalan di server',
+        title: 'Processing on the backend',
+        detail: 'Extraction and reconciliation are running on the server',
         state: stateFor(1),
       ),
       AnalysisStep(
-        title: 'Menyimpan hasil lokal',
-        detail: 'Raw response disimpan tanpa reconstruction',
+        title: 'Saving local result',
+        detail: 'Raw response is saved without reconstruction',
         state: stateFor(2),
       ),
       AnalysisStep(
-        title: 'Siap direview',
-        detail: 'Canonical report dan provenance tersedia',
+        title: 'Ready for review',
+        detail: 'Canonical report and provenance are available',
         state: stateFor(3),
       ),
     ];
@@ -331,7 +331,7 @@ class AnalisisViewModel extends ChangeNotifier {
         stage: 'continuation',
         message: 'No cached snapshot exists for continuation.',
         userMessage:
-            'Konteks sumber sebelumnya tidak tersedia. Mulai analisis baru.',
+            'The previous source context is unavailable. Start a new analysis.',
         retryable: false,
       );
     }
@@ -345,7 +345,7 @@ class AnalisisViewModel extends ChangeNotifier {
         stage: 'continuation',
         message: 'Cached continuation response is invalid: $error',
         userMessage:
-            'Konteks sumber sebelumnya rusak. Mulai analisis baru.',
+            'The previous source context is corrupted. Start a new analysis.',
         retryable: false,
       );
     }
@@ -359,7 +359,7 @@ class AnalisisViewModel extends ChangeNotifier {
         stage: 'continuation',
         message: 'No active competition identity exists.',
         userMessage:
-            'Konteks kompetisi sebelumnya tidak tersedia. Mulai analisis baru.',
+            'The previous competition context is unavailable. Start a new analysis.',
         retryable: false,
       );
     }
