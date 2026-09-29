@@ -47,15 +47,20 @@ final class ReevaluationTransitionWire {
       );
     }
     final reasons = List<String>.unmodifiable(reasonsRaw.cast<String>());
-    const allowedReasons = {
+    const canonicalReasons = [
       'REPORT_BASIS_CHANGED',
       'READINESS_BASIS_CHANGED',
       'PLANNING_BASIS_CHANGED',
-    };
-    if (reasons.any((reason) => !allowedReasons.contains(reason)) ||
-        reasons.toSet().length != reasons.length) {
+    ];
+    final canonicalProjection = [
+      for (final reason in canonicalReasons)
+        if (reasons.contains(reason)) reason,
+    ];
+    if (reasons.any((reason) => !canonicalReasons.contains(reason)) ||
+        reasons.toSet().length != reasons.length ||
+        !_sameStrings(reasons, canonicalProjection)) {
       throw const FormatException(
-        'REEVALUATION_CONTRACT_INVALID: invalid change reasons.',
+        'REEVALUATION_CONTRACT_INVALID: change reasons must be unique and canonically ordered.',
       );
     }
 
@@ -181,6 +186,16 @@ final class PlanReevaluateErrorWire {
         'REEVALUATION_CONTRACT_INVALID: error.details must be an array.',
       );
     }
+    for (final detail in details) {
+      final detailMap = _strictObject(
+        detail,
+        const {'path', 'message', 'code'},
+        'error.details[]',
+      );
+      _text(detailMap['path'], 'error.details[].path');
+      _text(detailMap['message'], 'error.details[].message');
+      _text(detailMap['code'], 'error.details[].code');
+    }
     final transitionValue = map['transition'];
     return PlanReevaluateErrorWire(
       code: _text(error['code'], 'error.code'),
@@ -239,6 +254,14 @@ String _uuid(Object? value, String field) {
     );
   }
   return text;
+}
+
+bool _sameStrings(List<String> left, List<String> right) {
+  if (left.length != right.length) return false;
+  for (var index = 0; index < left.length; index++) {
+    if (left[index] != right[index]) return false;
+  }
+  return true;
 }
 
 String _sha(Object? value, String field) {
