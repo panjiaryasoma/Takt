@@ -82,6 +82,7 @@ class _PlanningSetupScreenState extends State<PlanningSetupScreen> {
   }
 
   Future<void> _evaluate() async {
+    FocusScope.of(context).unfocus();
     setState(() => _localError = null);
     try {
       final ageText = _age.text.trim();
