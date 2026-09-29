@@ -494,6 +494,7 @@ final class PlanningHostViewModel extends ChangeNotifier {
             pending.generation,
             pending.revision,
           );
+          return;
         case _PendingReevaluationSuccess():
           final persisted = await _persistReevaluationSuccess(
             snapshot: pending.snapshot,
@@ -513,6 +514,7 @@ final class PlanningHostViewModel extends ChangeNotifier {
               pending.revision,
             );
           }
+          return;
         case _PendingReevaluationFailure():
           final error = pending.failure;
           await _evaluationRepository.persistReevaluation(
@@ -525,6 +527,7 @@ final class PlanningHostViewModel extends ChangeNotifier {
           await _savedPlanRepository.refresh();
           _pendingPersistence = null;
           _setApiFailure(error);
+          return;
       }
     } on Object catch (error) {
       _setPersistenceFailure(error);
