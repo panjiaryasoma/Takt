@@ -312,10 +312,10 @@ class _BottomNav extends StatelessWidget {
   final ValueChanged<int> onTap;
 
   static const _items = <(IconData, String)>[
-    (Icons.home_rounded, 'Beranda'),
-    (Icons.calendar_today_rounded, 'Jadwal'),
-    (Icons.auto_awesome_rounded, 'Analisis'),
-    (Icons.bookmark_rounded, 'Rencana'),
+    (Icons.home_rounded, 'Home'),
+    (Icons.calendar_today_rounded, 'Schedule'),
+    (Icons.auto_awesome_rounded, 'Analysis'),
+    (Icons.bookmark_rounded, 'Plans'),
   ];
 
   @override
