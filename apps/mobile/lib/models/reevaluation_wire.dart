@@ -207,14 +207,14 @@ Map<String, dynamic> _strictObject(
 ) {
   if (value is! Map) {
     throw FormatException(
-      'REEVALUATION_CONTRACT_INVALID: ' + field + ' must be an object.',
+      'REEVALUATION_CONTRACT_INVALID: $field must be an object.',
     );
   }
   final map = Map<String, dynamic>.from(value);
   if (map.keys.toSet().difference(keys).isNotEmpty ||
       keys.difference(map.keys.toSet()).isNotEmpty) {
     throw FormatException(
-      'REEVALUATION_CONTRACT_INVALID: ' + field + ' has unexpected fields.',
+      'REEVALUATION_CONTRACT_INVALID: $field has unexpected fields.',
     );
   }
   return map;
@@ -223,7 +223,7 @@ Map<String, dynamic> _strictObject(
 String _text(Object? value, String field) {
   if (value is! String || value.trim().isEmpty) {
     throw FormatException(
-      'REEVALUATION_CONTRACT_INVALID: ' + field + ' must be nonblank.',
+      'REEVALUATION_CONTRACT_INVALID: $field must be nonblank.',
     );
   }
   return value;
@@ -235,7 +235,7 @@ String _uuid(Object? value, String field) {
     r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-4[0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}$',
   ).hasMatch(text)) {
     throw FormatException(
-      'REEVALUATION_CONTRACT_INVALID: ' + field + ' must be UUIDv4.',
+      'REEVALUATION_CONTRACT_INVALID: $field must be UUIDv4.',
     );
   }
   return text;
@@ -245,7 +245,7 @@ String _sha(Object? value, String field) {
   final text = _text(value, field);
   if (!RegExp(r'^[0-9a-f]{64}$').hasMatch(text)) {
     throw FormatException(
-      'REEVALUATION_CONTRACT_INVALID: ' + field + ' must be SHA-256 hex.',
+      'REEVALUATION_CONTRACT_INVALID: $field must be SHA-256 hex.',
     );
   }
   return text;
