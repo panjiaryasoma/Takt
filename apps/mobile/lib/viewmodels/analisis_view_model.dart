@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/foundation.dart';
@@ -368,5 +369,12 @@ class AnalisisViewModel extends ChangeNotifier {
 
   String _newCompetitionId() {
     return 'cmp-' + DateTime.now().microsecondsSinceEpoch.toString();
+  }
+
+  @override
+  void dispose() {
+    _apiClient.close();
+    unawaited(_repository.close());
+    super.dispose();
   }
 }
