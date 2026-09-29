@@ -14,7 +14,12 @@ void main() {
     final repository = DriftScheduleRepository(database);
     addTearDown(repository.close);
 
-    await tester.pumpWidget(TaktApp(scheduleRepository: repository));
+    await tester.pumpWidget(
+      TaktApp(
+        database: database,
+        scheduleRepository: repository,
+      ),
+    );
     await tester.pumpAndSettle();
 
     expect(tester.widget<MaterialApp>(find.byType(MaterialApp)).locale,
