@@ -26,7 +26,7 @@ class HomeScreen extends StatelessWidget {
   static String _jam(int menit) {
     final jam = menit / 60.0;
     final text = jam.toStringAsFixed(1).replaceAll('.', ',');
-    return '$text jam';
+    return '$text hr';
   }
 
   @override
@@ -72,7 +72,7 @@ class HomeScreen extends StatelessWidget {
                 ),
                 const SizedBox(width: 24),
                 const Text(
-                  'Selamat datang',
+                  'Welcome',
                   style: TextStyle(color: C.white, fontSize: 20),
                 ),
               ],
@@ -82,8 +82,8 @@ class HomeScreen extends StatelessWidget {
           if (vm.isLoading) const LinearProgressIndicator(minHeight: 2),
           const SizedBox(height: 16),
           SectionHeading(
-            title: 'Ringkasan pekan ini',
-            action: 'Lihat jadwal',
+            title: 'This week at a glance',
+            action: 'View schedule',
             onAction: onLihatJadwal,
           ),
           const SizedBox(height: 16),
@@ -99,13 +99,13 @@ class HomeScreen extends StatelessWidget {
                 Row(
                   children: [
                     _Metric(
-                      label: 'Komitmen minggu ini',
+                      label: 'Commitments this week',
                       value: _jam(terjadwalMenit),
                       color: C.accent,
                     ),
                     const SizedBox(width: 16),
                     _Metric(
-                      label: 'Batas proyek / hari',
+                      label: 'Project limit / day',
                       value: _jam(batasProyekHarianMenit),
                       color: C.white,
                     ),
@@ -145,7 +145,7 @@ class HomeScreen extends StatelessWidget {
             ),
           ],
           const SizedBox(height: 16),
-          const SectionHeading(title: 'Lomba Minggu ini'),
+          const SectionHeading(title: 'Competitions this week'),
           const SizedBox(height: 16),
           const _EmptyCard(
             icon: Icons.emoji_events_outlined,
