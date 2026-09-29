@@ -400,6 +400,21 @@ void main() {
       expect(parsed.report.competitionId, 'cmp-run-manual');
     });
 
+
+    test('accepts manual source-artifact extraction run path', () {
+      final raw = jsonDecode(_responseBody('cmp-artifact-run-manual'))
+          as Map<String, dynamic>;
+      final artifact = _firstSourceArtifact(raw);
+      final runs = artifact['extraction_runs'] as List<dynamic>;
+      final run = runs.first as Map<String, dynamic>;
+      run['extraction_path'] = 'manual';
+
+      final parsed =
+          CompetitionAnalyzeResponseWire.parse(jsonEncode(raw));
+
+      expect(parsed.report.competitionId, 'cmp-artifact-run-manual');
+    });
+
     test('missing field remains null and has no candidates', () {
       final raw = jsonDecode(_responseBody('cmp-missing'))
           as Map<String, dynamic>;
