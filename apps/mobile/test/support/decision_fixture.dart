@@ -8,10 +8,10 @@ const alternativeId = 'later-option';
 
 EvaluationSession testSession({int generation = 12, int revision = 3,
     String readiness = 'READY_TO_EVALUATE', String feasibility = 'TIGHT_CAPACITY',
-    bool alternatives = true}) => EvaluationSession.fromRaw(
+    bool alternatives = true}) => EvaluationSession.fromEvaluationSnapshot(
   sessionId: 'session-$generation', generation: generation, inputRevision: revision,
-  analysisSnapshotId: 'snapshot-2', originalRequestJson: '{"host": true}',
-  originalResponseJson: jsonEncode(decisionFixture(readiness: readiness,
+  analysisSnapshotId: 'snapshot-2', evaluationRequestJson: '{"host": true}',
+  evaluationResponseJson: jsonEncode(decisionFixture(readiness: readiness,
       feasibility: feasibility, alternatives: alternatives)),
 );
 
