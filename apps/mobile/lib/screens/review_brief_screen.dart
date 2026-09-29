@@ -27,7 +27,7 @@ class ReviewBriefScreen extends StatelessWidget {
             (nameField.state == CanonicalFieldState.verified ||
                 nameField.state == CanonicalFieldState.singleSource)
         ? _displayValue(nameField.value)
-        : 'Kompetisi belum teridentifikasi penuh';
+        : 'Competition not fully identified yet';
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
@@ -151,7 +151,7 @@ class ReviewBriefScreen extends StatelessWidget {
             children: [
               Expanded(
                 child: _ActionButton(
-                  label: 'Tambah sumber',
+                  label: 'Add Source',
                   filled: true,
                   onTap: onAddSource,
                 ),
@@ -159,7 +159,7 @@ class ReviewBriefScreen extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: _ActionButton(
-                  label: 'Analisis baru',
+                  label: 'New Analysis',
                   filled: false,
                   onTap: onNewAnalysis,
                 ),
@@ -168,7 +168,7 @@ class ReviewBriefScreen extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           const Text(
-            'Tambah sumber akan mempertahankan competition_id, report bundle, dan source artifacts lama untuk reconciliation berikutnya.',
+            'Adding a source keeps the existing competition_id, report bundle, and source artifacts for the next reconciliation.',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: C.navInactive,
@@ -298,14 +298,14 @@ class _FieldBody extends StatelessWidget {
         );
       case CanonicalFieldState.missing:
         return const _ValueBlock(
-          text: 'Belum ditemukan',
-          helper: 'Backend tidak memiliki candidate value untuk field ini.',
+          text: 'Not found yet',
+          helper: 'The backend did not return a candidate value for this field.',
         );
       case CanonicalFieldState.conflict:
         return _CandidateList(
           candidates: field.candidates,
           provenance: provenance,
-          helper: 'Sumber memberikan nilai yang berbeda. Tidak ada canonical value yang dipilih.',
+          helper: 'Sources provide conflicting values. No canonical value was selected.',
         );
       case CanonicalFieldState.unverified:
         return _CandidateList(
@@ -712,7 +712,7 @@ String _stateLabel(CanonicalFieldState state) {
     CanonicalFieldState.verified => 'Terverifikasi',
     CanonicalFieldState.singleSource => 'Satu sumber',
     CanonicalFieldState.conflict => 'Konflik',
-    CanonicalFieldState.missing => 'Belum ditemukan',
+    CanonicalFieldState.missing => 'Not found yet',
     CanonicalFieldState.unverified => 'Belum terverifikasi',
   };
 }
