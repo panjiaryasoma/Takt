@@ -9,12 +9,10 @@ import '../data/repositories/saved_plan_repository.dart';
 import '../data/repositories/schedule_repository.dart';
 import '../models/analysis_snapshot.dart';
 import '../models/decision_intent.dart';
-import '../models/enums.dart';
 import '../models/evaluation.dart';
 import '../models/evaluation_session.dart';
 import '../models/planning_input_draft.dart';
 import '../models/planning_preferences.dart';
-import '../models/reevaluation_wire.dart';
 import '../models/saved_plan.dart';
 import '../services/planning_request_assembler.dart';
 
@@ -693,7 +691,7 @@ final class PlanningHostViewModel extends ChangeNotifier {
 
   void _setPersistenceFailure(Object error) {
     _phase = PlanningHostPhase.persistenceError;
-    _failure = PlanningHostFailure(
+    _failure = const PlanningHostFailure(
       code: 'PERSISTENCE_ERROR',
       message:
           'The evaluated result is safe in memory but could not be saved locally. Retry saving without calling the backend again.',
