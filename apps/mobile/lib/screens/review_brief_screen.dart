@@ -486,19 +486,63 @@ class _EvidenceRow extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 6),
-            Text(
-              _displayValue(item.rawReference),
-              maxLines: 8,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: C.white,
-                fontSize: 11,
-                height: 1.45,
-              ),
+            _ExpandableEvidenceText(
+              text: _displayValue(item.rawReference),
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+
+class _ExpandableEvidenceText extends StatefulWidget {
+  const _ExpandableEvidenceText({required this.text});
+
+  final String text;
+
+  @override
+  State<_ExpandableEvidenceText> createState() =>
+      _ExpandableEvidenceTextState();
+}
+
+class _ExpandableEvidenceTextState
+    extends State<_ExpandableEvidenceText> {
+  bool _expanded = false;
+
+  @override
+  Widget build(BuildContext context) {
+    final canExpand = widget.text.length > 220;
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          widget.text,
+          maxLines: _expanded ? null : 8,
+          overflow:
+              _expanded ? TextOverflow.visible : TextOverflow.ellipsis,
+          style: const TextStyle(
+            color: C.white,
+            fontSize: 11,
+            height: 1.45,
+          ),
+        ),
+        if (canExpand) ...[
+          const SizedBox(height: 6),
+          GestureDetector(
+            onTap: () => setState(() => _expanded = !_expanded),
+            child: Text(
+              _expanded ? 'Tutup' : 'Lihat selengkapnya',
+              style: const TextStyle(
+                color: C.accent,
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ],
     );
   }
 }
