@@ -40,9 +40,10 @@ Host contract:
 
 - Own authoritative inputs, request generation, late-response rejection and active
   session replacement. Pair the exact request/response and check report/snapshot
-  identity before publishing `EvaluationSession.fromRaw(...)`.
-- `fromRaw` is the only session constructor. The original request is opaque to 3B;
-  the original response is parsed internally into deeply immutable DTOs.
+  identity before publishing `EvaluationSession.fromEvaluationSnapshot(...)`.
+- `fromEvaluationSnapshot` is the only session construction path. 4B persists and
+  reloads the paired evaluation request/response before publication; 3B parses the
+  response internally into deeply immutable DTOs.
 - Push the current input revision into the component when authoritative inputs
   change. Invalidated sessions cannot regain action authority without replacement.
 - Replacing a session cancels pending confirmation even at the same input revision.
@@ -60,11 +61,28 @@ the user selects an alternative. Only backend-allowed actions are rendered; miss
 host handlers disable Accept/Edit rather than silently pretending success.
 Timestamps are shown in device local time with explicit UTC offsets.
 
-HTTP, planning-input assembly, workload/availability generation, authoritative
-constraint mutation, persistence, Saved Plans and re-evaluation remain 4B work.
-Issue #7 component behavior can be tested here; real edit-to-evaluate and the
-Technical MVP end-to-end remain dependent on that host.
+## 4B Planning Integration
 
-Verification: `flutter analyze`, `flutter test`, `flutter build apk --debug`, and
-the existing backend regression suite. Results must be associated with the tested
-commit, not inherited from an earlier baseline.
+4B is the production host around the 3B Decision Report. It now owns:
+
+- explicit readiness, workload, timezone, planning-hours, daily-capacity, focus,
+  and buffer inputs;
+- deterministic `/api/v1/plans/evaluate` and `/api/v1/plans/re-evaluate`
+  transport, including exact re-evaluation wrapper persistence;
+- IANA-timezone work-window expansion with fail-closed DST gap/fold handling;
+- persist-before-publish evaluation sessions and late-response rejection;
+- schema v3 cumulative migration from v1/v2;
+- atomic Accept persistence into Saved Plans, revisions, task snapshots,
+  accepted work blocks, and task progress;
+- stale-transition handling where the old accepted plan stays visible until the
+  user accepts a fresh revision;
+- read-only accepted work blocks in Daily and Weekly My Schedule views;
+- explicit compatibility fallback for unsupported historical re-evaluation
+  contracts.
+
+The user still owns the decision. Suggestions are not commitments until Accept is
+confirmed, and Ignore does not mutate persistence.
+
+Verification is `flutter analyze`, `flutter test`, `flutter build apk --debug`,
+plus the backend Ruff/pytest regression suite. Results must be associated with the
+tested commit, not inherited from an earlier baseline.
