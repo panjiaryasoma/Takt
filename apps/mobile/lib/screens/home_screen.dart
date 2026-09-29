@@ -115,7 +115,7 @@ class HomeScreen extends StatelessWidget {
                 const Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    'Waktu luang dihitung saat evaluasi rencana.',
+                    'Free time is calculated when a plan is evaluated.',
                     style: TextStyle(color: C.detailMuted, fontSize: 11),
                   ),
                 ),
@@ -139,7 +139,7 @@ class HomeScreen extends StatelessWidget {
                       style: const TextStyle(color: C.detailMuted, fontSize: 12),
                     ),
                   ),
-                  TextButton(onPressed: vm.retry, child: const Text('Coba lagi')),
+                  TextButton(onPressed: vm.retry, child: const Text('Try again')),
                 ],
               ),
             ),
@@ -149,16 +149,16 @@ class HomeScreen extends StatelessWidget {
           const SizedBox(height: 16),
           const _EmptyCard(
             icon: Icons.emoji_events_outlined,
-            text: 'Belum ada lomba. Tambahkan dari tab Analisis.',
+            text: 'No competitions yet. Add one from the Analysis tab.',
           ),
           const SizedBox(height: 16),
-          const SectionHeading(title: 'Rencana Tersimpan'),
+          const SectionHeading(title: 'Saved Plans'),
           const SizedBox(height: 16),
           _EmptyCard(
             icon: Icons.bookmark_border_rounded,
             text: adaJadwal
-                ? 'Belum ada rencana tersimpan.'
-                : 'Belum ada rencana. Susun jadwal dulu.',
+                ? 'No saved plans yet.'
+                : 'No plans yet. Set up your schedule first.',
           ),
         ],
       ),
