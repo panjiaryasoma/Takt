@@ -28,7 +28,7 @@ class ProgresAnalisisScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const AppHeader(title: 'Progres Analisis'),
+          const AppHeader(title: 'Analysis Progress'),
           const HeaderDivider(),
           const SizedBox(height: 16),
           Container(
@@ -78,7 +78,7 @@ class ProgresAnalisisScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          const SectionHeading(title: 'Langkah analisis'),
+          const SectionHeading(title: 'Analysis steps'),
           const SizedBox(height: 12),
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 20),
@@ -115,7 +115,7 @@ class ProgresAnalisisScreen extends StatelessWidget {
                       ),
                       SizedBox(width: 8),
                       Text(
-                        'Analisis belum selesai',
+                        'Analysis is not complete',
                         style: TextStyle(
                           color: C.white,
                           fontSize: 14,
@@ -144,26 +144,26 @@ class ProgresAnalisisScreen extends StatelessWidget {
                   const SizedBox(height: 12),
                   if (vm.canRetryRequest)
                     _ActionButton(
-                      label: 'Coba request lagi',
+                      label: 'Retry request',
                       onTap: () {
                         vm.retryRequest();
                       },
                     )
                   else if (vm.canRetryPersistence)
                     _ActionButton(
-                      label: 'Coba simpan lagi',
+                      label: 'Retry save',
                       onTap: () {
                         vm.retryPersistence();
                       },
                     )
                   else if (vm.requiresFreshAnalysis)
                     _ActionButton(
-                      label: 'Mulai analisis baru',
+                      label: 'Start a new analysis',
                       onTap: onStartNewAnalysis,
                     )
                   else
                     _ActionButton(
-                      label: 'Kembali ke input',
+                      label: 'Back to input',
                       onTap: onBackToInput,
                     ),
                 ],
@@ -185,7 +185,7 @@ class ProgresAnalisisScreen extends StatelessWidget {
                   ),
                   alignment: Alignment.center,
                   child: Text(
-                    vm.selesai ? 'Baca Hasil' : 'Belum siap direview',
+                    vm.selesai ? 'View Results' : 'Not ready for review',
                     style: const TextStyle(
                       color: C.bg,
                       fontSize: 15,
@@ -200,7 +200,7 @@ class ProgresAnalisisScreen extends StatelessWidget {
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 24),
             child: Text(
-              'Tidak ada persentase atau ETA palsu. Client hanya menampilkan state yang benar-benar diketahui.',
+              'No fake percentage or ETA. The client only shows states it actually knows.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: C.navInactive,
@@ -226,17 +226,17 @@ class _StepRow extends StatelessWidget {
       AnalysisStepState.done => (
           Icons.check_circle,
           C.kosong,
-          'Selesai',
+          'Done',
         ),
       AnalysisStepState.process => (
           Icons.sync,
           C.accent,
-          'Proses',
+          'In progress',
         ),
       AnalysisStepState.waiting => (
           Icons.radio_button_unchecked,
           C.navInactive,
-          'Menunggu',
+          'Waiting',
         ),
     };
 

@@ -28,9 +28,9 @@ void main() {
     );
 
     expect(find.text('Upload PDF'), findsOneWidget);
-    expect(find.text('Masukkan Link'), findsOneWidget);
-    expect(find.text('Pilih jenis sumber'), findsOneWidget);
-    expect(find.textContaining('Tujuan Analisis'), findsNothing);
+    expect(find.text('Enter Link'), findsOneWidget);
+    expect(find.text('Select source type'), findsOneWidget);
+    expect(find.textContaining('Analysis Goal'), findsNothing);
     expect(find.textContaining('Foto'), findsNothing);
     expect(tester.takeException(), isNull);
   });
@@ -53,7 +53,7 @@ void main() {
       return tester.widget<GestureDetector>(
         find
             .ancestor(
-              of: find.text('Submit & Mulai Analisis'),
+              of: find.text('Submit & Start Analysis'),
               matching: find.byType(GestureDetector),
             )
             .first,
@@ -62,13 +62,13 @@ void main() {
 
     expect(submitGesture().onTap, isNull);
 
-    await tester.tap(find.text('Masukkan Link'));
+    await tester.tap(find.text('Enter Link'));
     await tester.pump();
     expect(submitGesture().onTap, isNull);
 
     await tester.tap(find.byType(DropdownButton<SourceTypeWire>));
     await tester.pumpAndSettle();
-    await tester.tap(find.text('Peraturan resmi').last);
+    await tester.tap(find.text('Official rules').last);
     await tester.pumpAndSettle();
 
     await tester.enterText(
@@ -107,8 +107,8 @@ void main() {
     );
 
     expect(find.textContaining('%'), findsNothing);
-    expect(find.textContaining('detik'), findsNothing);
-    expect(find.text('Belum siap direview'), findsOneWidget);
+    expect(find.textContaining('seconds'), findsNothing);
+    expect(find.text('Not ready for review'), findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 
@@ -131,17 +131,17 @@ void main() {
     await tester.pumpAndSettle();
 
     expect(find.text('Report v2'), findsOneWidget);
-    expect(find.text('Terverifikasi'), findsWidgets);
-    expect(find.text('Satu sumber'), findsOneWidget);
-    expect(find.text('Konflik'), findsOneWidget);
-    expect(find.text('Belum ditemukan'), findsWidgets);
-    expect(find.text('Belum terverifikasi'), findsOneWidget);
+    expect(find.text('Verified'), findsWidgets);
+    expect(find.text('Single source'), findsOneWidget);
+    expect(find.text('Conflict'), findsOneWidget);
+    expect(find.text('Not found yet'), findsWidgets);
+    expect(find.text('Unverified'), findsOneWidget);
     expect(find.text('Candidate 1'), findsWidgets);
     expect(find.text('Candidate 2'), findsOneWidget);
-    expect(find.text('Lihat sumber'), findsWidgets);
+    expect(find.text('View sources'), findsWidgets);
 
     final scrollable = find.byType(Scrollable).first;
-    final firstSource = find.text('Lihat sumber').first;
+    final firstSource = find.text('View sources').first;
     await tester.scrollUntilVisible(
       firstSource,
       200,
@@ -149,9 +149,9 @@ void main() {
     );
     await tester.tap(firstSource);
     await tester.pumpAndSettle();
-    expect(find.text('Lihat selengkapnya'), findsOneWidget);
+    expect(find.text('Show more'), findsOneWidget);
 
-    final addSource = find.text('Tambah sumber');
+    final addSource = find.text('Add Source');
     await tester.scrollUntilVisible(
       addSource,
       500,
@@ -161,8 +161,8 @@ void main() {
     await tester.pump();
     expect(addSourceCalled, isTrue);
 
-    expect(find.textContaining('Tambah Jadwal'), findsNothing);
-    expect(find.textContaining('Simpan Jadwal'), findsNothing);
+    expect(find.textContaining('Add Schedule'), findsNothing);
+    expect(find.textContaining('Save Schedule'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 }

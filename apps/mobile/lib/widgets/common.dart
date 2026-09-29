@@ -112,7 +112,7 @@ class AppHeader extends StatelessWidget {
 
 /// Tombol "Tambah" pill kecil (accent) untuk header.
 class AddButton extends StatelessWidget {
-  const AddButton({super.key, this.onTap, this.label = 'Tambah'});
+  const AddButton({super.key, this.onTap, this.label = 'Add'});
 
   final VoidCallback? onTap;
   final String label;

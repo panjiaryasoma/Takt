@@ -25,8 +25,8 @@ class HomeScreen extends StatelessWidget {
 
   static String _jam(int menit) {
     final jam = menit / 60.0;
-    final text = jam.toStringAsFixed(1).replaceAll('.', ',');
-    return '$text jam';
+    final text = jam.toStringAsFixed(1);
+    return '$text hr';
   }
 
   @override
@@ -72,7 +72,7 @@ class HomeScreen extends StatelessWidget {
                 ),
                 const SizedBox(width: 24),
                 const Text(
-                  'Selamat datang',
+                  'Welcome',
                   style: TextStyle(color: C.white, fontSize: 20),
                 ),
               ],
@@ -82,8 +82,8 @@ class HomeScreen extends StatelessWidget {
           if (vm.isLoading) const LinearProgressIndicator(minHeight: 2),
           const SizedBox(height: 16),
           SectionHeading(
-            title: 'Ringkasan pekan ini',
-            action: 'Lihat jadwal',
+            title: 'This week at a glance',
+            action: 'View schedule',
             onAction: onLihatJadwal,
           ),
           const SizedBox(height: 16),
@@ -99,13 +99,13 @@ class HomeScreen extends StatelessWidget {
                 Row(
                   children: [
                     _Metric(
-                      label: 'Komitmen minggu ini',
+                      label: 'Commitments this week',
                       value: _jam(terjadwalMenit),
                       color: C.accent,
                     ),
                     const SizedBox(width: 16),
                     _Metric(
-                      label: 'Batas proyek / hari',
+                      label: 'Project limit / day',
                       value: _jam(batasProyekHarianMenit),
                       color: C.white,
                     ),
@@ -115,7 +115,7 @@ class HomeScreen extends StatelessWidget {
                 const Align(
                   alignment: Alignment.centerLeft,
                   child: Text(
-                    'Waktu luang dihitung saat evaluasi rencana.',
+                    'Free time is calculated when a plan is evaluated.',
                     style: TextStyle(color: C.detailMuted, fontSize: 11),
                   ),
                 ),
@@ -139,26 +139,26 @@ class HomeScreen extends StatelessWidget {
                       style: const TextStyle(color: C.detailMuted, fontSize: 12),
                     ),
                   ),
-                  TextButton(onPressed: vm.retry, child: const Text('Coba lagi')),
+                  TextButton(onPressed: vm.retry, child: const Text('Try again')),
                 ],
               ),
             ),
           ],
           const SizedBox(height: 16),
-          const SectionHeading(title: 'Lomba Minggu ini'),
+          const SectionHeading(title: 'Competitions this week'),
           const SizedBox(height: 16),
           const _EmptyCard(
             icon: Icons.emoji_events_outlined,
-            text: 'Belum ada lomba. Tambahkan dari tab Analisis.',
+            text: 'No competitions yet. Add one from the Analysis tab.',
           ),
           const SizedBox(height: 16),
-          const SectionHeading(title: 'Rencana Tersimpan'),
+          const SectionHeading(title: 'Saved Plans'),
           const SizedBox(height: 16),
           _EmptyCard(
             icon: Icons.bookmark_border_rounded,
             text: adaJadwal
-                ? 'Belum ada rencana tersimpan.'
-                : 'Belum ada rencana. Susun jadwal dulu.',
+                ? 'No saved plans yet.'
+                : 'No plans yet. Set up your schedule first.',
           ),
         ],
       ),

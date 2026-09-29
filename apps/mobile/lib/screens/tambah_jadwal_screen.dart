@@ -29,8 +29,8 @@ class _TambahJadwalScreenState extends State<TambahJadwalScreen> {
   DateTime _tanggal = DateTime.now();
   TimeOfDay _mulai = const TimeOfDay(hour: 13, minute: 0);
   TimeOfDay _selesai = const TimeOfDay(hour: 15, minute: 0);
-  static const _monthShort = ['Jan','Feb','Mar','Apr','Mei','Jun','Jul','Agu','Sep','Okt','Nov','Des'];
-  static const _namaHari = ['Sen','Sel','Rab','Kam','Jum','Sab','Min'];
+  static const _monthShort = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  static const _namaHari = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
 
   @override
   void initState() {
@@ -67,7 +67,7 @@ class _TambahJadwalScreenState extends State<TambahJadwalScreen> {
   @override
   void dispose() { _titleCtrl.dispose(); _categoryCtrl.dispose(); super.dispose(); }
   String get _tanggalLabel => '${_tanggal.day} ${_monthShort[_tanggal.month - 1]} ${_tanggal.year}';
-  String _hhmm(TimeOfDay time) => '${time.hour.toString().padLeft(2,'0')}.${time.minute.toString().padLeft(2,'0')}';
+  String _hhmm(TimeOfDay time) => '${time.hour.toString().padLeft(2,'0')}:${time.minute.toString().padLeft(2,'0')}';
 
   Future<void> _pilihTanggal() async {
     final picked = await showDatePicker(context: context, initialDate: _tanggal, firstDate: DateTime(2024), lastDate: DateTime(2035));
@@ -91,9 +91,9 @@ class _TambahJadwalScreenState extends State<TambahJadwalScreen> {
     final category = _categoryCtrl.text.trim();
     final vm = context.read<JadwalViewModel>();
     final messenger = ScaffoldMessenger.of(context);
-    if (title.isEmpty) { messenger.showSnackBar(const SnackBar(content: Text('Judul jadwal wajib diisi'))); return; }
-    if (!_waktuValid()) { messenger.showSnackBar(const SnackBar(content: Text('Waktu selesai harus setelah waktu mulai'))); return; }
-    if (_pola == _PolaJadwal.rutin && _hari.isEmpty) { messenger.showSnackBar(const SnackBar(content: Text('Pilih minimal satu hari'))); return; }
+    if (title.isEmpty) { messenger.showSnackBar(const SnackBar(content: Text('Schedule title is required'))); return; }
+    if (!_waktuValid()) { messenger.showSnackBar(const SnackBar(content: Text('End time must be after start time'))); return; }
+    if (_pola == _PolaJadwal.rutin && _hari.isEmpty) { messenger.showSnackBar(const SnackBar(content: Text('Select at least one day'))); return; }
     final start = DateTime(_tanggal.year,_tanggal.month,_tanggal.day,_mulai.hour,_mulai.minute);
     final end = DateTime(_tanggal.year,_tanggal.month,_tanggal.day,_selesai.hour,_selesai.minute);
     bool ok;
@@ -106,7 +106,7 @@ class _TambahJadwalScreenState extends State<TambahJadwalScreen> {
     }
     if (!mounted) return;
     if (ok) { widget.onSave?.call(); return; }
-    messenger.showSnackBar(SnackBar(content: Text(vm.errorMessage ?? 'Jadwal gagal disimpan'), action: SnackBarAction(label: 'Coba lagi', onPressed: _simpan)));
+    messenger.showSnackBar(SnackBar(content: Text(vm.errorMessage ?? 'Failed to save schedule'), action: SnackBarAction(label: 'Try again', onPressed: _simpan)));
   }
 
   @override
@@ -117,25 +117,25 @@ class _TambahJadwalScreenState extends State<TambahJadwalScreen> {
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         Align(alignment: Alignment.centerLeft, child: GestureDetector(onTap: vm.isSaving ? null : widget.onBack, child: Container(width:40,height:40,decoration:BoxDecoration(color:C.card,shape:BoxShape.circle,border:Border.all(color:C.accent.withValues(alpha:0.6))),alignment:Alignment.center,child:const Icon(Icons.chevron_left,color:C.accent,size:22)))),
         const SizedBox(height:14),
-        Text(widget.isEditing ? 'Edit Jadwal' : 'Tambah Jadwal', style: const TextStyle(color:C.white,fontSize:24)),
+        Text(widget.isEditing ? 'Edit Schedule' : 'Add Schedule', style: const TextStyle(color:C.white,fontSize:24)),
         const SizedBox(height:24),
-        _FieldCard(label:'Judul Jadwal', child:_input(_titleCtrl,'Kelas Metode Riset')),
+        _FieldCard(label:'Schedule Title', child:_input(_titleCtrl,'Research Methods Class')),
         const SizedBox(height:16),
-        _FieldCard(label:'Kategori', child:_input(_categoryCtrl,'Kuliah, kerja, tim, lomba')),
+        _FieldCard(label:'Category', child:_input(_categoryCtrl,'Class, work, team, competition')),
         const SizedBox(height:16),
-        _FieldCard(label:'Pola Jadwal', child:Row(children:[_Chip(label:'Rutin',active:_pola==_PolaJadwal.rutin,onTap:()=>setState(()=>_pola=_PolaJadwal.rutin)),const SizedBox(width:10),_Chip(label:'Sekali',active:_pola==_PolaJadwal.sekali,onTap:()=>setState(()=>_pola=_PolaJadwal.sekali))])),
+        _FieldCard(label:'Schedule Pattern', child:Row(children:[_Chip(label:'Recurring',active:_pola==_PolaJadwal.rutin,onTap:()=>setState(()=>_pola=_PolaJadwal.rutin)),const SizedBox(width:10),_Chip(label:'One-time',active:_pola==_PolaJadwal.sekali,onTap:()=>setState(()=>_pola=_PolaJadwal.sekali))])),
         const SizedBox(height:16),
-        _FieldCard(label:'Sifat Waktu', child:Row(children:[_Chip(label:'FIXED',active:_type==CommitmentType.fixed,onTap:()=>setState(()=>_type=CommitmentType.fixed)),const SizedBox(width:10),_Chip(label:'FLEXIBLE',active:_type==CommitmentType.flexible,onTap:()=>setState(()=>_type=CommitmentType.flexible))])),
+        _FieldCard(label:'Time Type', child:Row(children:[_Chip(label:'FIXED',active:_type==CommitmentType.fixed,onTap:()=>setState(()=>_type=CommitmentType.fixed)),const SizedBox(width:10),_Chip(label:'FLEXIBLE',active:_type==CommitmentType.flexible,onTap:()=>setState(()=>_type=CommitmentType.flexible))])),
         const SizedBox(height:16),
         if (_pola == _PolaJadwal.rutin)
-          _FieldCard(label:'Setiap hari',child:Wrap(spacing:8,runSpacing:8,children:List.generate(7,(index){final weekday=index+1;final active=_hari.contains(weekday);return _Chip(label:_namaHari[index],active:active,onTap:()=>setState((){if(active){_hari.remove(weekday);}else{_hari.add(weekday);}}));})))
-        else _FieldCard(label:'Tanggal', child:_TapValue(value:_tanggalLabel,onTap:_pilihTanggal)),
+          _FieldCard(label:'Every day',child:Wrap(spacing:8,runSpacing:8,children:List.generate(7,(index){final weekday=index+1;final active=_hari.contains(weekday);return _Chip(label:_namaHari[index],active:active,onTap:()=>setState((){if(active){_hari.remove(weekday);}else{_hari.add(weekday);}}));})))
+        else _FieldCard(label:'Date', child:_TapValue(value:_tanggalLabel,onTap:_pilihTanggal)),
         const SizedBox(height:16),
-        Row(children:[Expanded(child:_FieldCard(label:'Dari jam',child:_TapValue(value:_hhmm(_mulai),onTap:()=>_pilihWaktu(mulai:true)))),const SizedBox(width:16),Expanded(child:_FieldCard(label:'Sampai jam',child:_TapValue(value:_hhmm(_selesai),onTap:()=>_pilihWaktu(mulai:false))))]),
+        Row(children:[Expanded(child:_FieldCard(label:'From',child:_TapValue(value:_hhmm(_mulai),onTap:()=>_pilihWaktu(mulai:true)))),const SizedBox(width:16),Expanded(child:_FieldCard(label:'To',child:_TapValue(value:_hhmm(_selesai),onTap:()=>_pilihWaktu(mulai:false))))]),
         const SizedBox(height:24),
-        GestureDetector(onTap:vm.isSaving?null:_simpan,child:Container(padding:const EdgeInsets.symmetric(vertical:18),decoration:BoxDecoration(color:C.accent,borderRadius:BorderRadius.circular(14)),alignment:Alignment.center,child:vm.isSaving?const SizedBox(width:20,height:20,child:CircularProgressIndicator(strokeWidth:2,color:C.bg)):Text(widget.isEditing?'Simpan Perubahan':'Tambah Jadwal',style:const TextStyle(color:C.bg,fontSize:16,fontWeight:FontWeight.w700)))),
+        GestureDetector(onTap:vm.isSaving?null:_simpan,child:Container(padding:const EdgeInsets.symmetric(vertical:18),decoration:BoxDecoration(color:C.accent,borderRadius:BorderRadius.circular(14)),alignment:Alignment.center,child:vm.isSaving?const SizedBox(width:20,height:20,child:CircularProgressIndicator(strokeWidth:2,color:C.bg)):Text(widget.isEditing?'Save Changes':'Add Schedule',style:const TextStyle(color:C.bg,fontSize:16,fontWeight:FontWeight.w700)))),
         const SizedBox(height:12),
-        GestureDetector(onTap:vm.isSaving?null:widget.onBack,child:Container(padding:const EdgeInsets.symmetric(vertical:16),decoration:BoxDecoration(color:C.card,borderRadius:BorderRadius.circular(14)),alignment:Alignment.center,child:const Text('Batal',style:TextStyle(color:C.white,fontSize:15)))),
+        GestureDetector(onTap:vm.isSaving?null:widget.onBack,child:Container(padding:const EdgeInsets.symmetric(vertical:16),decoration:BoxDecoration(color:C.card,borderRadius:BorderRadius.circular(14)),alignment:Alignment.center,child:const Text('Cancel',style:TextStyle(color:C.white,fontSize:15)))),
       ]),
     );
   }

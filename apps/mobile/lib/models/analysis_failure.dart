@@ -23,7 +23,7 @@ class AnalysisFailure implements Exception {
       stage: stage,
       message: message,
       userMessage: _knownMessages[code] ??
-          'Analisis gagal dengan respons yang belum dikenali aplikasi.',
+          'Analysis failed with a response this app does not recognize.',
       retryable: _retryableCodes.contains(code),
     );
   }
@@ -32,7 +32,7 @@ class AnalysisFailure implements Exception {
         code: 'NETWORK_ERROR',
         stage: 'transport',
         message: error.toString(),
-        userMessage: 'Tidak dapat terhubung ke server Takt.',
+        userMessage: 'Could not connect to the Takt server.',
         retryable: true,
       );
 
@@ -40,7 +40,7 @@ class AnalysisFailure implements Exception {
         code: 'RESPONSE_CONTRACT_INVALID',
         stage: 'response',
         message: error.toString(),
-        userMessage: 'Respons server tidak cocok dengan kontrak aplikasi.',
+        userMessage: 'The server response does not match the app contract.',
         retryable: false,
       );
 
@@ -49,7 +49,7 @@ class AnalysisFailure implements Exception {
         stage: 'persistence',
         message: error.toString(),
         userMessage:
-            'Hasil analisis sudah diterima, tetapi gagal disimpan di perangkat.',
+            'The analysis result was received, but could not be saved on this device.',
         retryable: true,
       );
 
@@ -61,40 +61,40 @@ class AnalysisFailure implements Exception {
   };
 
   static const _knownMessages = <String, String>{
-    'VALIDATION_ERROR': 'Data permintaan belum valid.',
-    'SOURCE_METADATA_INVALID': 'Metadata sumber belum valid.',
+    'VALIDATION_ERROR': 'The request data is invalid.',
+    'SOURCE_METADATA_INVALID': 'The source metadata is invalid.',
     'ANALYSIS_CONTEXT_INVALID':
-        'Konteks analisis sebelumnya tidak lagi cocok.',
+        'The previous analysis context is no longer compatible.',
     'UNSUPPORTED_REPORT_CONTRACT':
-        'Versi laporan tidak didukung aplikasi ini.',
+        'This report version is not supported by the app.',
     'REPORT_BUNDLE_INVALID':
-        'Laporan lokal gagal pemeriksaan integritas.',
-    'INVALID_SOURCE': 'Sumber tidak valid atau tidak diizinkan.',
-    'SOURCE_FETCH_FAILED': 'Sumber gagal diambil dari jaringan.',
+        'The local report failed its integrity check.',
+    'INVALID_SOURCE': 'The source is invalid or not allowed.',
+    'SOURCE_FETCH_FAILED': 'The source could not be fetched from the network.',
     'SOURCE_LIMIT_EXCEEDED':
-        'Ukuran sumber melewati batas yang didukung.',
-    'UNSUPPORTED_MEDIA_TYPE': 'Format sumber tidak didukung.',
+        'The source exceeds the supported size limit.',
+    'UNSUPPORTED_MEDIA_TYPE': 'The source format is not supported.',
     'OCR_PROVIDER_UNAVAILABLE':
-        'Layanan OCR sedang tidak tersedia.',
-    'OCR_TIMEOUT': 'Proses OCR melewati batas waktu.',
+        'The OCR service is currently unavailable.',
+    'OCR_TIMEOUT': 'The OCR process timed out.',
     'OCR_PROVIDER_ERROR':
-        'Layanan OCR gagal memproses dokumen.',
+        'The OCR service failed to process the document.',
     'NATIVE_EXTRACTION_FAILED':
-        'Konten sumber gagal diproses secara langsung.',
+        'The source content could not be processed directly.',
     'OCR_EXTRACTION_FAILED':
-        'OCR tidak menghasilkan ekstraksi yang valid.',
+        'OCR did not produce a valid extraction.',
     'CANDIDATE_NORMALIZATION_FAILED':
-        'Hasil ekstraksi gagal dinormalisasi dengan aman.',
+        'The extracted result could not be normalized safely.',
     'SNAPSHOT_INTEGRITY_FAILED':
-        'Integritas snapshot sumber gagal diverifikasi.',
+        'The source snapshot failed integrity verification.',
     'SNAPSHOT_BATCH_INVALID':
-        'Hasil ekstraksi sumber tidak konsisten.',
+        'The source extraction results are inconsistent.',
     'RECONCILIATION_FAILED':
-        'Server gagal membangun laporan canonical.',
+        'The server failed to build the canonical report.',
     'ANALYSIS_INVARIANT_FAILED':
-        'Hasil analisis kehilangan traceability yang diwajibkan.',
+        'The analysis result is missing required traceability.',
     'INTERNAL_ERROR':
-        'Server tidak dapat menyelesaikan analisis.',
+        'The server could not complete the analysis.',
   };
 
   @override

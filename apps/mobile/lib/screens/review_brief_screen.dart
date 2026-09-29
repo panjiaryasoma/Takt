@@ -27,7 +27,7 @@ class ReviewBriefScreen extends StatelessWidget {
             (nameField.state == CanonicalFieldState.verified ||
                 nameField.state == CanonicalFieldState.singleSource)
         ? _displayValue(nameField.value)
-        : 'Kompetisi belum teridentifikasi penuh';
+        : 'Competition not fully identified yet';
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
@@ -53,7 +53,7 @@ class ReviewBriefScreen extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           const Text(
-            'REVIEW SUMBER',
+            'SOURCE REVIEW',
             style: TextStyle(
               color: C.accent,
               fontSize: 11,
@@ -63,7 +63,7 @@ class ReviewBriefScreen extends StatelessWidget {
           ),
           const SizedBox(height: 4),
           const Text(
-            'Review sumber kompetisi',
+            'Review competition sources',
             style: TextStyle(
               color: C.white,
               fontSize: 22,
@@ -85,13 +85,13 @@ class ReviewBriefScreen extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               _MetaChip(
-                label: '${report.sourceIds.length} sumber',
+                label: '${report.sourceIds.length} sources',
               ),
               const SizedBox(width: 8),
               _MetaChip(
                 label: response.reportChanged
-                    ? 'Berubah'
-                    : 'Tidak berubah',
+                    ? 'Changed'
+                    : 'Unchanged',
               ),
             ],
           ),
@@ -116,7 +116,7 @@ class ReviewBriefScreen extends StatelessWidget {
                   const SizedBox(width: 10),
                   Expanded(
                     child: Text(
-                      '${report.unresolvedCriticalFields.length} field kritis masih perlu ditinjau. Ini bukan verdict readiness.',
+                      '${report.unresolvedCriticalFields.length} critical fields still need review. This is not a readiness verdict.',
                       style: const TextStyle(
                         color: C.white,
                         fontSize: 12,
@@ -130,7 +130,7 @@ class ReviewBriefScreen extends StatelessWidget {
           ],
           const SizedBox(height: 20),
           const Text(
-            'Field canonical',
+            'Canonical fields',
             style: TextStyle(
               color: C.white,
               fontSize: 16,
@@ -151,7 +151,7 @@ class ReviewBriefScreen extends StatelessWidget {
             children: [
               Expanded(
                 child: _ActionButton(
-                  label: 'Tambah sumber',
+                  label: 'Add Source',
                   filled: true,
                   onTap: onAddSource,
                 ),
@@ -159,7 +159,7 @@ class ReviewBriefScreen extends StatelessWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: _ActionButton(
-                  label: 'Analisis baru',
+                  label: 'New Analysis',
                   filled: false,
                   onTap: onNewAnalysis,
                 ),
@@ -168,7 +168,7 @@ class ReviewBriefScreen extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           const Text(
-            'Tambah sumber akan mempertahankan competition_id, report bundle, dan source artifacts lama untuk reconciliation berikutnya.',
+            'Adding a source keeps the existing competition_id, report bundle, and source artifacts for the next reconciliation.',
             textAlign: TextAlign.center,
             style: TextStyle(
               color: C.navInactive,
@@ -251,7 +251,7 @@ class _CanonicalFieldCard extends StatelessWidget {
                   iconColor: C.accent,
                   collapsedIconColor: C.navInactive,
                   title: const Text(
-                    'Lihat sumber',
+                    'View sources',
                     style: TextStyle(
                       color: C.accent,
                       fontSize: 12,
@@ -289,29 +289,29 @@ class _FieldBody extends StatelessWidget {
       case CanonicalFieldState.verified:
         return _ValueBlock(
           text: _displayValue(field.value),
-          helper: 'Didukung evidence yang sudah direkonsiliasi.',
+          helper: 'Supported by reconciled evidence.',
         );
       case CanonicalFieldState.singleSource:
         return _ValueBlock(
           text: _displayValue(field.value),
-          helper: 'Nilai ini baru didukung satu sumber.',
+          helper: 'This value is supported by only one source.',
         );
       case CanonicalFieldState.missing:
         return const _ValueBlock(
-          text: 'Belum ditemukan',
-          helper: 'Backend tidak memiliki candidate value untuk field ini.',
+          text: 'Not found yet',
+          helper: 'The backend did not return a candidate value for this field.',
         );
       case CanonicalFieldState.conflict:
         return _CandidateList(
           candidates: field.candidates,
           provenance: provenance,
-          helper: 'Sumber memberikan nilai yang berbeda. Tidak ada canonical value yang dipilih.',
+          helper: 'Sources provide conflicting values. No canonical value was selected.',
         );
       case CanonicalFieldState.unverified:
         return _CandidateList(
           candidates: field.candidates,
           provenance: provenance,
-          helper: 'Candidate tersedia, tetapi belum boleh dianggap canonical value.',
+          helper: 'A candidate is available, but it cannot yet be treated as a canonical value.',
         );
     }
   }
@@ -439,7 +439,7 @@ class _EvidenceRow extends StatelessWidget {
       return const Padding(
         padding: EdgeInsets.fromLTRB(14, 0, 14, 12),
         child: Text(
-          'Evidence reference tidak tersedia.',
+          'Evidence reference is unavailable.',
           style: TextStyle(
             color: C.padat,
             fontSize: 11,
@@ -536,7 +536,7 @@ class _ExpandableEvidenceTextState
           GestureDetector(
             onTap: () => setState(() => _expanded = !_expanded),
             child: Text(
-              _expanded ? 'Tutup' : 'Lihat selengkapnya',
+              _expanded ? 'Close' : 'Show more',
               style: const TextStyle(
                 color: C.accent,
                 fontSize: 10,
@@ -690,30 +690,30 @@ class _ActionButton extends StatelessWidget {
 
 String _fieldLabel(String name) {
   return switch (name) {
-    'competition_name' => 'Nama kompetisi',
-    'organizer' => 'Penyelenggara',
-    'submission_deadline' => 'Deadline submission',
-    'registration_deadline' => 'Deadline registrasi',
+    'competition_name' => 'Competition name',
+    'organizer' => 'Organizer',
+    'submission_deadline' => 'Submission deadline',
+    'registration_deadline' => 'Registration deadline',
     'eligibility' => 'Eligibility',
-    'team_size' => 'Ukuran tim',
+    'team_size' => 'Team size',
     'format' => 'Format',
-    'location' => 'Lokasi',
-    'tracks_or_categories' => 'Track / kategori',
+    'location' => 'Location',
+    'tracks_or_categories' => 'Tracks / categories',
     'deliverables' => 'Deliverables',
-    'required_technologies' => 'Teknologi wajib',
-    'judging_criteria' => 'Kriteria penilaian',
-    'prizes_or_benefits' => 'Hadiah / benefit',
+    'required_technologies' => 'Required technologies',
+    'judging_criteria' => 'Judging criteria',
+    'prizes_or_benefits' => 'Prizes / benefits',
     _ => name,
   };
 }
 
 String _stateLabel(CanonicalFieldState state) {
   return switch (state) {
-    CanonicalFieldState.verified => 'Terverifikasi',
-    CanonicalFieldState.singleSource => 'Satu sumber',
-    CanonicalFieldState.conflict => 'Konflik',
-    CanonicalFieldState.missing => 'Belum ditemukan',
-    CanonicalFieldState.unverified => 'Belum terverifikasi',
+    CanonicalFieldState.verified => 'Verified',
+    CanonicalFieldState.singleSource => 'Single source',
+    CanonicalFieldState.conflict => 'Conflict',
+    CanonicalFieldState.missing => 'Not found yet',
+    CanonicalFieldState.unverified => 'Unverified',
   };
 }
 
@@ -729,17 +729,17 @@ Color _stateColor(CanonicalFieldState state) {
 
 String _sourceTypeLabel(SourceTypeWire type) {
   return switch (type) {
-    SourceTypeWire.officialRules => 'Peraturan resmi',
-    SourceTypeWire.officialOrganizer => 'Situs penyelenggara',
-    SourceTypeWire.officialFaq => 'FAQ resmi',
+    SourceTypeWire.officialRules => 'Official rules',
+    SourceTypeWire.officialOrganizer => 'Organizer website',
+    SourceTypeWire.officialFaq => 'Official FAQ',
     SourceTypeWire.platform => 'Platform',
-    SourceTypeWire.secondary => 'Sumber sekunder',
-    SourceTypeWire.derivedFixture => 'Fixture internal',
+    SourceTypeWire.secondary => 'Secondary source',
+    SourceTypeWire.derivedFixture => 'Internal fixture',
   };
 }
 
 String _displayValue(Object? value) {
-  if (value == null) return 'Belum tersedia';
+  if (value == null) return 'Not available yet';
   if (value is String) return value;
   if (value is num || value is bool) return value.toString();
   try {

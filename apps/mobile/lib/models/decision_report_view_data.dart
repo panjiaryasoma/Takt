@@ -7,33 +7,33 @@ final class DecisionReportViewData {
   final PlanEvaluateResponseV1 response;
 
   String get readinessLabel => switch (response.readiness.status) {
-    ReadinessStatus.readyToEvaluate => 'Siap dievaluasi',
-    ReadinessStatus.needsReview => 'Perlu review',
-    ReadinessStatus.eligibilityBlocked => 'Syarat peserta belum terpenuhi',
-    ReadinessStatus.deadlinePassed => 'Batas pengumpulan sudah lewat',
-    ReadinessStatus.insufficientInformation => 'Informasi belum cukup',
+    ReadinessStatus.readyToEvaluate => 'Ready to evaluate',
+    ReadinessStatus.needsReview => 'Needs review',
+    ReadinessStatus.eligibilityBlocked => 'Participant requirements not met',
+    ReadinessStatus.deadlinePassed => 'Submission deadline has passed',
+    ReadinessStatus.insufficientInformation => 'Insufficient information',
   };
 
   String get feasibilityLabel => switch (response.planning?.feasibility) {
-    null => 'Belum dievaluasi',
+    null => 'Not evaluated',
     FeasibilityStatus.feasible => 'Feasible',
-    FeasibilityStatus.feasibleWithTradeoffs => 'Feasible dengan tradeoff',
-    FeasibilityStatus.tightCapacity => 'Kapasitas ketat',
-    FeasibilityStatus.notFeasible => 'Tidak feasible dengan batasan saat ini',
+    FeasibilityStatus.feasibleWithTradeoffs => 'Feasible with tradeoffs',
+    FeasibilityStatus.tightCapacity => 'Tight capacity',
+    FeasibilityStatus.notFeasible => 'Not feasible under current constraints',
   };
 
   String get feasibilityExplanation => switch (response.planning?.feasibility) {
     null => switch (response.readiness.status) {
-      ReadinessStatus.needsReview => 'Evaluasi jadwal belum dijalankan karena ada informasi yang perlu ditinjau.',
-      ReadinessStatus.insufficientInformation => 'Evaluasi jadwal belum dijalankan karena informasi yang dibutuhkan belum cukup.',
-      ReadinessStatus.eligibilityBlocked => 'Evaluasi jadwal tidak dijalankan karena persyaratan peserta tidak terpenuhi.',
-      ReadinessStatus.deadlinePassed => 'Evaluasi jadwal tidak dijalankan karena batas pengumpulan sudah lewat.',
+      ReadinessStatus.needsReview => 'Schedule feasibility was not evaluated because some information still needs review.',
+      ReadinessStatus.insufficientInformation => 'Schedule feasibility was not evaluated because required information is still insufficient.',
+      ReadinessStatus.eligibilityBlocked => 'Schedule feasibility was not evaluated because participant requirements are not met.',
+      ReadinessStatus.deadlinePassed => 'Schedule feasibility was not evaluated because the submission deadline has passed.',
       ReadinessStatus.readyToEvaluate => throw StateError('Ready response requires planning'),
     },
-    FeasibilityStatus.feasible => 'Pekerjaan wajib beserta prasyaratnya muat pada estimasi maksimum. Seluruh scope muat pada estimasi likely.',
-    FeasibilityStatus.feasibleWithTradeoffs => 'Pekerjaan wajib beserta prasyaratnya muat pada estimasi maksimum, tetapi seluruh scope tidak muat pada estimasi likely.',
-    FeasibilityStatus.tightCapacity => 'Pekerjaan wajib beserta prasyaratnya muat pada estimasi likely, tetapi tidak muat pada estimasi maksimum.',
-    FeasibilityStatus.notFeasible => 'Pekerjaan wajib beserta prasyaratnya tidak muat pada estimasi likely dengan batasan saat ini.',
+    FeasibilityStatus.feasible => 'Required work and its prerequisites fit at the maximum estimate. The full scope fits at the likely estimate.',
+    FeasibilityStatus.feasibleWithTradeoffs => 'Required work and its prerequisites fit at the maximum estimate, but the full scope does not fit at the likely estimate.',
+    FeasibilityStatus.tightCapacity => 'Required work and its prerequisites fit at the likely estimate, but not at the maximum estimate.',
+    FeasibilityStatus.notFeasible => 'Required work and its prerequisites do not fit at the likely estimate under the current constraints.',
   };
 
   DecisionCandidateViewData candidate(PublicCandidateV1 candidate) {
@@ -52,9 +52,9 @@ final class DecisionReportViewData {
   /// remain available in details; an unknown code gets a neutral explanation.
   static String explain(String code) {
     if (code.startsWith('unresolved_critical_field:')) {
-      return 'Ada informasi penting kompetisi yang perlu ditinjau.';
+      return 'Important competition information still needs review.';
     }
-    return _explanations[code] ?? 'Ada catatan tambahan dari evaluasi. Lihat detail evaluasi.';
+    return _explanations[code] ?? 'There is an additional evaluation note. See the evaluation details.';
   }
 }
 
@@ -69,31 +69,31 @@ final class DecisionCandidateViewData {
 }
 
 const _explanations = {
-  'submission_deadline_missing': 'Batas pengumpulan belum diketahui.',
-  'authoritative_submission_deadline_passed': 'Batas pengumpulan resmi sudah lewat.',
-  'deadline_valid': 'Batas pengumpulan masih berlaku saat evaluasi.',
-  'mandatory_competition_information_missing': 'Informasi wajib kompetisi belum lengkap.',
-  'user_age_unknown': 'Usia peserta perlu dilengkapi untuk memeriksa persyaratan.',
-  'minimum_age_not_met': 'Persyaratan usia minimum belum terpenuhi.',
-  'minimum_age_met': 'Persyaratan usia minimum terpenuhi.',
-  'student_status_unknown': 'Status pelajar/mahasiswa perlu dikonfirmasi.',
-  'student_status_requirement_not_met': 'Persyaratan pelajar/mahasiswa belum terpenuhi.',
-  'student_status_met': 'Persyaratan pelajar/mahasiswa terpenuhi.',
-  'user_country_unknown': 'Negara peserta perlu dilengkapi.',
-  'region_requirement_not_met': 'Persyaratan wilayah peserta belum terpenuhi.',
-  'region_eligible': 'Persyaratan wilayah peserta terpenuhi.',
-  'mandatory_information_complete': 'Informasi wajib kompetisi sudah lengkap.',
-  'REQUIRED_LIKELY_INFEASIBLE': 'Pekerjaan wajib tidak muat pada estimasi likely.',
-  'REQUIRED_MAX_INFEASIBLE': 'Pekerjaan wajib tidak muat pada estimasi maksimum.',
-  'FULL_SCOPE_LIKELY_INFEASIBLE': 'Seluruh scope tidak muat pada estimasi likely.',
-  'FULL_SCOPE_LIKELY_SCENARIO_UNKNOWN': 'Kelayakan seluruh scope belum dapat ditentukan.',
-  'ALL_REQUIRED_SCENARIOS_FEASIBLE': 'Pekerjaan wajib muat pada skenario minimum, likely, dan maksimum.',
-  'FULL_SCOPE_LIKELY_FEASIBLE': 'Seluruh scope muat pada estimasi likely.',
-  'MINIMUM_EFFORT_SCENARIO_FEASIBLE': 'Pekerjaan wajib muat pada estimasi minimum.',
-  'MIN_SCENARIO_UNKNOWN': 'Kelayakan pada estimasi minimum belum dapat ditentukan.',
-  'LIKELY_EFFORT_SCENARIO_INFEASIBLE': 'Pekerjaan wajib tidak muat pada estimasi likely.',
-  'EFFORT_OVERRUN_BREAKS_PLAN': 'Rencana sensitif terhadap pekerjaan yang memakan waktu lebih lama.',
-  'MAX_EFFORT_SCENARIO_FEASIBLE': 'Pekerjaan wajib masih muat pada estimasi maksimum.',
-  'MAX_SCENARIO_UNKNOWN': 'Kelayakan pada estimasi maksimum belum dapat ditentukan.',
-  'OPTIONAL_SCOPE_DOES_NOT_FIT': 'Sebagian pekerjaan opsional perlu dikeluarkan dengan batasan saat ini.',
+  'submission_deadline_missing': 'The submission deadline is not known yet.',
+  'authoritative_submission_deadline_passed': 'The authoritative submission deadline has passed.',
+  'deadline_valid': 'The submission deadline was still valid at evaluation time.',
+  'mandatory_competition_information_missing': 'Required competition information is incomplete.',
+  'user_age_unknown': 'Participant age is required to check eligibility.',
+  'minimum_age_not_met': 'The minimum age requirement is not met.',
+  'minimum_age_met': 'The minimum age requirement is met.',
+  'student_status_unknown': 'Student status needs to be confirmed.',
+  'student_status_requirement_not_met': 'The student-status requirement is not met.',
+  'student_status_met': 'The student-status requirement is met.',
+  'user_country_unknown': 'Participant country is required.',
+  'region_requirement_not_met': 'The participant region requirement is not met.',
+  'region_eligible': 'The participant region requirement is met.',
+  'mandatory_information_complete': 'Required competition information is complete.',
+  'REQUIRED_LIKELY_INFEASIBLE': 'Required work does not fit at the likely estimate.',
+  'REQUIRED_MAX_INFEASIBLE': 'Required work does not fit at the maximum estimate.',
+  'FULL_SCOPE_LIKELY_INFEASIBLE': 'The full scope does not fit at the likely estimate.',
+  'FULL_SCOPE_LIKELY_SCENARIO_UNKNOWN': 'Full-scope feasibility cannot be determined yet.',
+  'ALL_REQUIRED_SCENARIOS_FEASIBLE': 'Required work fits in the minimum, likely, and maximum scenarios.',
+  'FULL_SCOPE_LIKELY_FEASIBLE': 'The full scope fits at the likely estimate.',
+  'MINIMUM_EFFORT_SCENARIO_FEASIBLE': 'Required work fits at the minimum estimate.',
+  'MIN_SCENARIO_UNKNOWN': 'Feasibility at the minimum estimate cannot be determined yet.',
+  'LIKELY_EFFORT_SCENARIO_INFEASIBLE': 'Required work does not fit at the likely estimate.',
+  'EFFORT_OVERRUN_BREAKS_PLAN': 'The plan is sensitive to work taking longer than expected.',
+  'MAX_EFFORT_SCENARIO_FEASIBLE': 'Required work still fits at the maximum estimate.',
+  'MAX_SCENARIO_UNKNOWN': 'Feasibility at the maximum estimate cannot be determined yet.',
+  'OPTIONAL_SCOPE_DOES_NOT_FIT': 'Some optional work must be removed under the current constraints.',
 };

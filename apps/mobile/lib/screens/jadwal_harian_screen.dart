@@ -53,9 +53,9 @@ class JadwalTabs extends StatelessWidget {
       ),
       child: Row(
         children: [
-          tab('Jadwal Harian', 0),
+          tab('Daily Schedule', 0),
           const SizedBox(width: 4),
-          tab('Ringkasan Pekan', 1),
+          tab('Weekly Summary', 1),
         ],
       ),
     );
@@ -76,13 +76,13 @@ class JadwalHarianScreen extends StatelessWidget {
   final VoidCallback? onBack;
   final ValueChanged<Commitment>? onEdit;
 
-  static const _dayHeaders = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min'];
+  static const _dayHeaders = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
   static const _monthNames = [
-    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
   ];
   static const _dayNames = [
-    'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu',
+    'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday',
   ];
 
   static Color _dotFor(Commitment commitment) {
@@ -98,9 +98,9 @@ class JadwalHarianScreen extends StatelessWidget {
       "${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}";
 
   static String _duration(int minutes) {
-    if (minutes % 60 == 0) return '${minutes ~/ 60} jam';
-    if (minutes < 60) return '$minutes menit';
-    return '${minutes ~/ 60} jam ${minutes % 60} menit';
+    if (minutes % 60 == 0) return '${minutes ~/ 60} hr';
+    if (minutes < 60) return '$minutes min';
+    return '${minutes ~/ 60} hr ${minutes % 60} min';
   }
 
   static List<List<int?>> _weeks(DateTime month) {
@@ -128,20 +128,20 @@ class JadwalHarianScreen extends StatelessWidget {
           context: context,
           builder: (context) => AlertDialog(
             backgroundColor: C.card,
-            title: const Text('Hapus jadwal?'),
+            title: const Text('Delete schedule?'),
             content: Text(
               item.isRecurring
-                  ? 'Ini akan menghapus seluruh rangkaian jadwal rutin.'
-                  : 'Jadwal ini akan dihapus dari perangkat.',
+                  ? 'This will delete the entire recurring schedule.'
+                  : 'This schedule will be deleted from this device.',
             ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text('Batal'),
+                child: const Text('Cancel'),
               ),
               TextButton(
                 onPressed: () => Navigator.pop(context, true),
-                child: const Text('Hapus'),
+                child: const Text('Delete'),
               ),
             ],
           ),
@@ -151,7 +151,7 @@ class JadwalHarianScreen extends StatelessWidget {
     final ok = await vm.hapus(item.commitment.id);
     if (!ok && context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(vm.errorMessage ?? 'Jadwal gagal dihapus')),
+        SnackBar(content: Text(vm.errorMessage ?? 'Failed to delete schedule')),
       );
     }
   }
@@ -167,8 +167,8 @@ class JadwalHarianScreen extends StatelessWidget {
       SnackBar(
         content: Text(
           ok
-              ? 'Kejadian ini dibatalkan. Rangkaian rutin tetap ada.'
-              : (vm.errorMessage ?? 'Perubahan gagal disimpan'),
+              ? 'This occurrence was canceled. The recurring series remains.'
+              : (vm.errorMessage ?? 'Failed to save changes'),
         ),
       ),
     );
@@ -200,8 +200,8 @@ class JadwalHarianScreen extends StatelessWidget {
       SnackBar(
         content: Text(
           ok
-              ? 'Kejadian dipindahkan tanpa mengubah pola rutin.'
-              : (vm.errorMessage ?? 'Perubahan gagal disimpan'),
+              ? 'This occurrence was moved without changing the recurring pattern.'
+              : (vm.errorMessage ?? 'Failed to save changes'),
         ),
       ),
     );
@@ -222,7 +222,7 @@ class JadwalHarianScreen extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
           AppHeader(
-            title: 'Jadwal Saya',
+            title: 'My Schedule',
             trailing: AddButton(onTap: vm.isSaving ? null : onAdd),
             onBack: onBack,
           ),
@@ -366,7 +366,7 @@ class JadwalHarianScreen extends StatelessWidget {
               ),
               alignment: Alignment.center,
               child: const Text(
-                'Belum ada jadwal di tanggal ini',
+                'No schedule for this date',
                 style: TextStyle(color: C.detailMuted, fontSize: 13),
               ),
             )
@@ -401,7 +401,7 @@ class JadwalHarianScreen extends StatelessWidget {
                 SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Kalender tidak akan diubah otomatis. Takt hanya membaca kapasitas yang Anda konfirmasi.',
+                    'Your calendar will not be changed automatically. Takt only reads the capacity you confirm.',
                     style: TextStyle(color: C.detailMuted, fontSize: 12),
                   ),
                 ),
@@ -436,7 +436,7 @@ class _RetryCard extends StatelessWidget {
               style: const TextStyle(color: C.detailMuted, fontSize: 13),
             ),
           ),
-          TextButton(onPressed: onRetry, child: const Text('Coba lagi')),
+          TextButton(onPressed: onRetry, child: const Text('Try again')),
         ],
       ),
     );
@@ -503,7 +503,7 @@ class _ActivityCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  item.isRecurring ? '$duration · rutin' : duration,
+                  item.isRecurring ? '$duration · recurring' : duration,
                   style: const TextStyle(color: C.detailMuted, fontSize: 11),
                 ),
               ],
@@ -524,11 +524,11 @@ class _ActivityCard extends StatelessWidget {
               itemBuilder: (_) => const [
                 PopupMenuItem(
                   value: 'move',
-                  child: Text('Geser tanggal ini'),
+                  child: Text('Move this occurrence'),
                 ),
                 PopupMenuItem(
                   value: 'cancel',
-                  child: Text('Batalkan tanggal ini'),
+                  child: Text('Cancel this occurrence'),
                 ),
               ],
             ),

@@ -75,7 +75,7 @@ class _AnalisisKompetisiScreenState
     if (file.size <= 0 || file.size > maxAnalysisSourceBytes) {
       setState(() {
         _picked = null;
-        _error = 'PDF harus berisi data dan maksimal 20 MiB.';
+        _error = 'The PDF must contain data and be no larger than 20 MiB.';
       });
       return;
     }
@@ -89,7 +89,7 @@ class _AnalisisKompetisiScreenState
     if (_submitting) return;
     final sourceType = _sourceType;
     if (sourceType == null) {
-      setState(() => _error = 'Pilih jenis sumber.');
+      setState(() => _error = 'Select a source type.');
       return;
     }
 
@@ -100,12 +100,12 @@ class _AnalisisKompetisiScreenState
       final file = _picked;
       final bytes = file?.bytes;
       if (file == null || bytes == null || bytes.isEmpty) {
-        setState(() => _error = 'Pilih file PDF terlebih dahulu.');
+        setState(() => _error = 'Select a PDF file first.');
         return;
       }
       if (file.size > maxAnalysisSourceBytes) {
         setState(
-          () => _error = 'PDF melebihi batas 20 MiB.',
+          () => _error = 'The PDF exceeds the 20 MiB limit.',
         );
         return;
       }
@@ -122,7 +122,7 @@ class _AnalisisKompetisiScreenState
           (uri.scheme != 'http' && uri.scheme != 'https') ||
           uri.host.isEmpty) {
         setState(
-          () => _error = 'Masukkan URL http/https yang valid.',
+          () => _error = 'Enter a valid http/https URL.',
         );
         return;
       }
@@ -147,11 +147,11 @@ class _AnalisisKompetisiScreenState
   @override
   Widget build(BuildContext context) {
     final title = widget.continuation
-        ? 'Tambah sumber'
-        : 'Analisis kompetisi';
+        ? 'Add Source'
+        : 'Analyze Competition';
     final subtitle = widget.continuation
-        ? 'Tambahkan evidence baru ke kompetisi yang sama.'
-        : 'Masukkan satu sumber kompetisi untuk mulai analisis.';
+        ? 'Add new evidence to the same competition.'
+        : 'Add one competition source to start the analysis.';
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(10, 0, 10, 24),
@@ -183,8 +183,8 @@ class _AnalisisKompetisiScreenState
                 const SizedBox(height: 12),
                 Text(
                   widget.continuation
-                      ? 'SUMBER TAMBAHAN'
-                      : 'KEPUTUSAN BARU',
+                      ? 'ADDITIONAL SOURCE'
+                      : 'NEW ANALYSIS',
                   style: const TextStyle(
                     color: C.accent,
                     fontSize: 11,
@@ -224,7 +224,7 @@ class _AnalisisKompetisiScreenState
               children: [
                 Expanded(child: _segment('Upload PDF', 0)),
                 const SizedBox(width: 12),
-                Expanded(child: _segment('Masukkan Link', 1)),
+                Expanded(child: _segment('Enter Link', 1)),
               ],
             ),
           ),
@@ -267,8 +267,8 @@ class _AnalisisKompetisiScreenState
                   alignment: Alignment.center,
                   child: Text(
                     widget.continuation
-                        ? 'Tambah & Analisis Ulang'
-                        : 'Submit & Mulai Analisis',
+                        ? 'Add & Re-analyze'
+                        : 'Submit & Start Analysis',
                     style: const TextStyle(
                       color: C.bg,
                       fontSize: 15,
@@ -283,7 +283,7 @@ class _AnalisisKompetisiScreenState
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 24),
             child: Text(
-              'Flutter hanya mengirim sumber. Ekstraksi dan reconciliation tetap menjadi otoritas backend.',
+              'Flutter only sends the source. Extraction and reconciliation remain backend authority.',
               textAlign: TextAlign.center,
               style: TextStyle(
                 color: C.navInactive,
@@ -348,7 +348,7 @@ class _AnalisisKompetisiScreenState
                   ),
                   const SizedBox(height: 10),
                   const Text(
-                    'Pilih dokumen PDF',
+                    'Select PDF document',
                     style: TextStyle(
                       color: C.white,
                       fontSize: 14,
@@ -356,14 +356,14 @@ class _AnalisisKompetisiScreenState
                   ),
                   const SizedBox(height: 6),
                   const Text(
-                    'Maks. 20 MiB · application/pdf',
+                    'Max. 20 MiB · application/pdf',
                     style: TextStyle(
                       color: C.navInactive,
                       fontSize: 11,
                     ),
                   ),
                   const SizedBox(height: 12),
-                  _outlineButton('Pilih File', _pickFile),
+                  _outlineButton('Choose File', _pickFile),
                 ],
               )
             : Column(
@@ -396,10 +396,10 @@ class _AnalisisKompetisiScreenState
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      _outlineButton('Ganti', _pickFile),
+                      _outlineButton('Replace', _pickFile),
                       const SizedBox(width: 10),
                       _outlineButton(
-                        'Hapus',
+                        'Remove',
                         () => setState(() => _picked = null),
                       ),
                     ],
@@ -434,7 +434,7 @@ class _AnalisisKompetisiScreenState
         decoration: const InputDecoration(
           isDense: true,
           border: InputBorder.none,
-          hintText: 'https://... link halaman kompetisi',
+          hintText: 'https://... competition page link',
           hintStyle: TextStyle(
             color: C.navInactive,
             fontSize: 13,
@@ -461,7 +461,7 @@ class _AnalisisKompetisiScreenState
           isExpanded: true,
           dropdownColor: C.card,
           hint: const Text(
-            'Pilih jenis sumber',
+            'Select source type',
             style: TextStyle(
               color: C.navInactive,
               fontSize: 13,
@@ -514,12 +514,12 @@ class _AnalisisKompetisiScreenState
 
   String _sourceLabel(SourceTypeWire type) {
     return switch (type) {
-      SourceTypeWire.officialRules => 'Peraturan resmi',
-      SourceTypeWire.officialOrganizer => 'Situs penyelenggara',
-      SourceTypeWire.officialFaq => 'FAQ resmi',
-      SourceTypeWire.platform => 'Platform kompetisi',
-      SourceTypeWire.secondary => 'Sumber sekunder',
-      SourceTypeWire.derivedFixture => 'Fixture internal',
+      SourceTypeWire.officialRules => 'Official rules',
+      SourceTypeWire.officialOrganizer => 'Organizer website',
+      SourceTypeWire.officialFaq => 'Official FAQ',
+      SourceTypeWire.platform => 'Competition platform',
+      SourceTypeWire.secondary => 'Secondary source',
+      SourceTypeWire.derivedFixture => 'Internal fixture',
     };
   }
 

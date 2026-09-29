@@ -80,25 +80,25 @@ class _RekomendasiJadwalScreenState extends State<RekomendasiJadwalScreen> {
         return SafeArea(child: FractionallySizedBox(heightFactor: 0.85,
           child: SingleChildScrollView(padding: const EdgeInsets.all(20),
             child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-              const Text('Terima opsi ini?', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
+              const Text('Accept this option?', style: TextStyle(fontSize: 22, fontWeight: FontWeight.w700)),
               const SizedBox(height: 12),
-              const Text('Periksa seluruh saran jadwal berikut sebelum mengonfirmasi pilihan Anda.'),
+              const Text('Review all suggested work windows before confirming your choice.'),
               const SizedBox(height: 12),
               Text(token.selectionSource == SelectionSource.primary
-                  ? 'Rekomendasi utama sistem' : 'Opsi alternatif yang Anda pilih'),
-              Text('Buffer tersisa: ${candidate.bufferMinutes} menit'),
+                  ? 'System primary recommendation' : 'Your selected alternative'),
+              Text('Remaining buffer: ${candidate.bufferMinutes} min'),
               const SizedBox(height: 12),
-              const Text('Saran jadwal · Belum masuk kalender', style: TextStyle(color: C.accent)),
-              const Text('Jam ditampilkan dalam zona waktu perangkat.'),
+              const Text('Suggested schedule · Not added to calendar', style: TextStyle(color: C.accent)),
+              const Text('Times are shown in your device time zone.'),
               ...candidate.workBlocks.map((b) => _WindowText(taskId: b.taskId,
                   start: b.start, end: b.end, minutes: b.allocatedMinutes)),
-              if (candidate.workBlocks.isEmpty) const Text('Tidak ada blok kerja pada kandidat ini.'),
-              _TextList(title: 'Asumsi kandidat', lines: candidate.assumptions),
+              if (candidate.workBlocks.isEmpty) const Text('No work blocks in this candidate.'),
+              _TextList(title: 'Candidate assumptions', lines: candidate.assumptions),
               const SizedBox(height: 16),
               FilledButton(key: const Key('confirm-accept'),
                 onPressed: () => Navigator.of(sheetContext).pop(true),
-                child: const Text('Konfirmasi pilihan')),
-              TextButton(onPressed: () => Navigator.of(sheetContext).pop(false), child: const Text('Batal')),
+                child: const Text('Confirm choice')),
+              TextButton(onPressed: () => Navigator.of(sheetContext).pop(false), child: const Text('Cancel')),
             ]),
           ),
         ));
@@ -134,29 +134,29 @@ class _RekomendasiJadwalScreenState extends State<RekomendasiJadwalScreen> {
           Align(alignment: Alignment.centerLeft, child: Container(
             decoration: BoxDecoration(color: C.card, shape: BoxShape.circle,
                 border: Border.all(color: C.accent.withValues(alpha: 0.6))),
-            child: IconButton(tooltip: 'Kembali', onPressed: widget.onBack,
+            child: IconButton(tooltip: 'Back', onPressed: widget.onBack,
                 icon: const Icon(Icons.chevron_left, color: C.accent)),
           )),
           const SizedBox(height: 14),
           const Text('Decision Report', style: TextStyle(color: C.white, fontSize: 24, fontWeight: FontWeight.w700)),
           const SizedBox(height: 8),
           if (view == null)
-            const _ReportCard(child: Text('Rekomendasi belum tersedia. Selesaikan evaluasi untuk melihat saran jadwal.'))
+            const _ReportCard(child: Text('Recommendation is not available yet. Complete the evaluation to view schedule suggestions.'))
           else if (_vm.isDismissed)
-            const _ReportCard(child: Text('Rekomendasi diabaikan. Jadwal Anda tidak berubah.'))
+            const _ReportCard(child: Text('Recommendation ignored. Your schedule has not changed.'))
           else ...[
-            const Text('Saran jadwal · Belum masuk kalender', style: TextStyle(color: C.accent)),
+            const Text('Suggested schedule · Not added to calendar', style: TextStyle(color: C.accent)),
             const SizedBox(height: 8),
-            Text('Dievaluasi ${_instant(view.response.evaluatedAt)}', style: const TextStyle(color: C.detailMuted)),
+            Text('Evaluated ${_instant(view.response.evaluatedAt)}', style: const TextStyle(color: C.detailMuted)),
             if (_vm.isStale) const _ReportCard(highlight: true, child: Text(
-              'Input telah berubah. Kembali untuk evaluasi baru sebelum menerima saran jadwal.',
+              'Inputs have changed. Go back for a new evaluation before accepting a suggested schedule.',
               key: Key('stale-notice'))),
             _ReportCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               const _Heading('Readiness'),
               Text(view.readinessLabel, style: const TextStyle(fontSize: 17, color: C.accent)),
-              _TextList(title: 'Penghambat', lines: view.response.readiness.blockingReasons.map(DecisionReportViewData.explain).toList()),
-              _TextList(title: 'Perlu ditinjau', lines: view.response.readiness.reviewItems.map(DecisionReportViewData.explain).toList()),
-              _TextList(title: 'Pemeriksaan terpenuhi', lines: view.response.readiness.passedChecks.map(DecisionReportViewData.explain).toList()),
+              _TextList(title: 'Blockers', lines: view.response.readiness.blockingReasons.map(DecisionReportViewData.explain).toList()),
+              _TextList(title: 'Needs review', lines: view.response.readiness.reviewItems.map(DecisionReportViewData.explain).toList()),
+              _TextList(title: 'Passed checks', lines: view.response.readiness.passedChecks.map(DecisionReportViewData.explain).toList()),
             ])),
             _ReportCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               const _Heading('Feasibility'),
@@ -165,44 +165,44 @@ class _RekomendasiJadwalScreenState extends State<RekomendasiJadwalScreen> {
               Text(view.feasibilityExplanation),
               if (planning != null) ...[
                 const SizedBox(height: 8),
-                const Text('Likely adalah estimasi waktu kerja yang paling mungkin. Hasil ini menggambarkan batasan dan estimasi pada model, bukan kemampuan Anda.', style: TextStyle(color: C.detailMuted)),
-                _TextList(title: 'Dasar evaluasi', lines: planning.reasonCodes.map(DecisionReportViewData.explain).toList()),
-                _TextList(title: 'Sensitivitas', lines: planning.sensitivityCodes.map(DecisionReportViewData.explain).toList()),
-                _TextList(title: 'Tradeoff scope', lines: planning.tradeoffCodes.map(DecisionReportViewData.explain).toList()),
+                const Text('Likely is the most probable work-time estimate. This result describes modeled constraints and estimates, not your ability.', style: TextStyle(color: C.detailMuted)),
+                _TextList(title: 'Evaluation basis', lines: planning.reasonCodes.map(DecisionReportViewData.explain).toList()),
+                _TextList(title: 'Sensitivities', lines: planning.sensitivityCodes.map(DecisionReportViewData.explain).toList()),
+                _TextList(title: 'Scope tradeoffs', lines: planning.tradeoffCodes.map(DecisionReportViewData.explain).toList()),
               ],
             ])),
             if (planning != null && payload != null) ...[
-              const Text('Jam ditampilkan dalam zona waktu perangkat.', style: TextStyle(color: C.detailMuted)),
+              const Text('Times are shown in your device time zone.', style: TextStyle(color: C.detailMuted)),
               for (var i = 0; i < planning.candidates.length; i++)
                 _CandidateCard(key: Key('candidate-${planning.candidates[i].ref.candidateId}'),
                   data: view.candidate(planning.candidates[i]),
-                  label: i == 0 ? 'Rekomendasi utama sistem' : 'Alternatif $i',
+                  label: i == 0 ? 'System primary recommendation' : 'Alternative $i',
                   selected: _vm.selectedCandidateId == planning.candidates[i].ref.candidateId,
                   showChoose: planning.allowedActions.contains(RecommendationAction.chooseAlternative),
                   onChoose: _vm.can(RecommendationAction.chooseAlternative)
                       ? () => _vm.chooseCandidate(planning.candidates[i].ref.candidateId) : null),
               _ReportCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                _TextList(title: 'Alasan rekomendasi utama', lines: payload.rationale),
-                _TextList(title: 'Asumsi evaluasi', lines: payload.assumptions.map((item) =>
+                _TextList(title: 'Primary recommendation rationale', lines: payload.rationale),
+                _TextList(title: 'Evaluation assumptions', lines: payload.assumptions.map((item) =>
                     item.taskId == null ? item.description : '${item.description} (Task ${item.taskId})').toList()),
               ])),
             ],
-            if (_vm.handoffPending) const _ReportCard(child: Text('Mengirim pilihan Anda…', key: Key('handoff-pending'))),
-            if (_vm.handoffComplete) const _ReportCard(child: Text('Pilihan telah diteruskan. Tunggu konfirmasi penyimpanan.', key: Key('handoff-complete'))),
-            if (_vm.handoffFailed) const _ReportCard(highlight: true, child: Text('Pilihan belum berhasil diteruskan. Periksa kembali sebelum mencoba lagi.', key: Key('handoff-failed'))),
+            if (_vm.handoffPending) const _ReportCard(child: Text('Sending your choice…', key: Key('handoff-pending'))),
+            if (_vm.handoffComplete) const _ReportCard(child: Text('Your choice was handed off. Wait for persistence confirmation.', key: Key('handoff-complete'))),
+            if (_vm.handoffFailed) const _ReportCard(highlight: true, child: Text('Your choice could not be handed off. Review it before trying again.', key: Key('handoff-failed'))),
             if (planning != null) ...[
               if (planning.allowedActions.contains(RecommendationAction.accept)) ...[
                 FilledButton(key: const Key('accept-candidate'),
                     onPressed: widget.onAccept != null && _vm.can(RecommendationAction.accept) ? _accept : null,
-                    child: const Text('Terima opsi ini')),
-                if (widget.onAccept == null) const Text('Penerimaan rencana belum tersedia.', style: TextStyle(color: C.detailMuted)),
+                    child: const Text('Accept this option')),
+                if (widget.onAccept == null) const Text('Plan acceptance is not available yet.', style: TextStyle(color: C.detailMuted)),
               ],
               if (planning.allowedActions.contains(RecommendationAction.editConstraints)) ...[
                 OutlinedButton(key: const Key('edit-constraints'),
                   onPressed: widget.onEditConstraints != null && _vm.can(RecommendationAction.editConstraints)
                       ? () { final intent = _vm.editConstraints(); if (intent != null) widget.onEditConstraints!(intent); }
-                      : null, child: const Text('Ubah batasan')),
-                if (widget.onEditConstraints == null) const Text('Pengubahan batasan belum tersedia.', style: TextStyle(color: C.detailMuted)),
+                      : null, child: const Text('Edit constraints')),
+                if (widget.onEditConstraints == null) const Text('Constraint editing is not available yet.', style: TextStyle(color: C.detailMuted)),
               ],
               if (planning.allowedActions.contains(RecommendationAction.ignore))
                 TextButton(key: const Key('ignore-recommendation'),
@@ -210,10 +210,10 @@ class _RekomendasiJadwalScreenState extends State<RekomendasiJadwalScreen> {
                     final intent = _vm.ignore();
                     if (intent == null) return;
                     if (widget.onIgnore != null) { widget.onIgnore!(intent); } else { widget.onBack?.call(); }
-                  } : null, child: const Text('Abaikan rekomendasi')),
+                  } : null, child: const Text('Ignore recommendation')),
             ],
             _ReportCard(child: ExpansionTile(tilePadding: EdgeInsets.zero,
-              title: const Text('Detail evaluasi'), children: [
+              title: const Text('Evaluation details'), children: [
                 Align(alignment: Alignment.centerLeft, child: SelectableText([
                   'Evaluation: ${view.response.evaluationId}',
                   'Competition: ${view.response.basis.report.competitionId}',
@@ -246,27 +246,27 @@ class _CandidateCard extends StatelessWidget {
     return _ReportCard(highlight: selected,
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
         _Heading(label),
-        if (selected) const Text('Opsi yang Anda pilih', style: TextStyle(color: C.accent, fontWeight: FontWeight.w700)),
+        if (selected) const Text('Your selected option', style: TextStyle(color: C.accent, fontWeight: FontWeight.w700)),
         const SizedBox(height: 8),
-        Text('Buffer tersisa: ${data.bufferMinutes} menit'),
+        Text('Remaining buffer: ${data.bufferMinutes} min'),
         const SizedBox(height: 12),
-        const Text('Saran jadwal · Belum masuk kalender', style: TextStyle(color: C.accent)),
+        const Text('Suggested schedule · Not added to calendar', style: TextStyle(color: C.accent)),
         if (next != null) ...[
           const SizedBox(height: 8),
-          Text('Pekerjaan berikutnya: ${next.taskName}', style: const TextStyle(fontWeight: FontWeight.w600)),
-          Text('${_instant(next.start)} · ${next.allocatedMinutes} menit'),
+          Text('Next work: ${next.taskName}', style: const TextStyle(fontWeight: FontWeight.w600)),
+          Text('${_instant(next.start)} · ${next.allocatedMinutes} min'),
         ],
         ...data.windows.map((w) => _WindowText(taskId: w.taskId, start: w.start, end: w.end, minutes: w.allocatedMinutes)),
-        if (data.windows.isEmpty) const Text('Tidak ada saran blok kerja pada kandidat ini.'),
-        _TextList(title: 'Tradeoff opsi', lines: data.tradeoffs),
-        _TextList(title: 'Asumsi kandidat', lines: data.candidate.assumptions),
+        if (data.windows.isEmpty) const Text('No suggested work blocks in this candidate.'),
+        _TextList(title: 'Option tradeoffs', lines: data.tradeoffs),
+        _TextList(title: 'Candidate assumptions', lines: data.candidate.assumptions),
         if (showChoose) OutlinedButton(key: Key('choose-${data.candidate.ref.candidateId}'),
-          onPressed: selected ? null : onChoose, child: Text(selected ? 'Sedang dipilih' : 'Pilih opsi ini')),
-        ExpansionTile(tilePadding: EdgeInsets.zero, title: const Text('Detail kandidat dan blok kerja'), children: [
+          onPressed: selected ? null : onChoose, child: Text(selected ? 'Selected' : 'Choose this option')),
+        ExpansionTile(tilePadding: EdgeInsets.zero, title: const Text('Candidate and work-block details'), children: [
           Align(alignment: Alignment.centerLeft, child: SelectableText('Candidate: ${data.candidate.ref.candidateId}')),
           for (final b in data.candidate.workBlocks) ...[
             _WindowText(taskId: b.taskId, start: b.start, end: b.end, minutes: b.allocatedMinutes),
-            Text('Sumber waktu: ${b.availabilitySource}', style: const TextStyle(color: C.detailMuted)),
+            Text('Time source: ${b.availabilitySource}', style: const TextStyle(color: C.detailMuted)),
           ],
         ]),
       ]),
@@ -322,7 +322,7 @@ class _WindowText extends StatelessWidget {
   @override
   Widget build(BuildContext context) => Padding(padding: const EdgeInsets.symmetric(vertical: 8),
       child: Align(alignment: Alignment.centerLeft,
-          child: Text('Task $taskId · $minutes menit\n${_instant(start)}\nsampai ${_instant(end)}')));
+          child: Text('Task $taskId · $minutes min\n${_instant(start)}\nto ${_instant(end)}')));
 }
 
 String _instant(DateTime instant) {

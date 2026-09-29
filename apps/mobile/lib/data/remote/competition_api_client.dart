@@ -113,7 +113,7 @@ class HttpCompetitionApiClient implements CompetitionApiClient {
         code: 'CLIENT_VALIDATION_ERROR',
         stage: 'validation',
         message: 'URL must be absolute http/https.',
-        userMessage: 'Masukkan URL http/https yang valid.',
+        userMessage: 'Enter a valid http/https URL.',
         retryable: false,
       );
     }
@@ -157,7 +157,7 @@ class HttpCompetitionApiClient implements CompetitionApiClient {
         code: 'CLIENT_SOURCE_LIMIT',
         stage: 'validation',
         message: 'PDF bytes are empty or exceed 20 MiB.',
-        userMessage: 'PDF harus berisi data dan maksimal 20 MiB.',
+        userMessage: 'The PDF must contain data and be no larger than 20 MiB.',
         retryable: false,
       );
     }
@@ -166,7 +166,7 @@ class HttpCompetitionApiClient implements CompetitionApiClient {
         code: 'CLIENT_MEDIA_TYPE',
         stage: 'validation',
         message: 'Only PDF upload is supported.',
-        userMessage: 'Upload hanya menerima file PDF.',
+        userMessage: 'Only PDF files can be uploaded.',
         retryable: false,
       );
     }
@@ -283,7 +283,7 @@ class HttpCompetitionApiClient implements CompetitionApiClient {
         stage: 'unknown',
         message: 'Backend returned an unrecognized error envelope.',
         userMessage:
-            'Server mengembalikan error yang belum dikenali aplikasi.',
+            'The server returned an error this app does not recognize.',
         retryable: false,
       );
     }

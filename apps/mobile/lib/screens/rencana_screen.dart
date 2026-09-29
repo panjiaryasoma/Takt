@@ -18,21 +18,21 @@ class RencanaScreen extends StatelessWidget {
   final void Function(SavedPlanEntry entry)? onCekJadwal;
 
   static const _bulan = [
-    'Januari', 'Februari', 'Maret', 'April', 'Mei', 'Juni',
-    'Juli', 'Agustus', 'September', 'Oktober', 'November', 'Desember',
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December',
   ];
   static const _bulanSingkat = [
-    'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
-    'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des',
+    'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+    'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
   ];
 
   String _deadlineLabel(DateTime d) =>
-      'Sebelum ${d.day} ${_bulan[d.month - 1]} ${d.year}';
+      'Before ${d.day} ${_bulan[d.month - 1]} ${d.year}';
 
   String _decidedLabel(SavedPlanEntry e) {
     final d = e.decidedAt;
-    if (d == null) return 'oleh ${e.decidedBy ?? 'Anda'}';
-    return '${d.day} ${_bulanSingkat[d.month - 1]} · oleh ${e.decidedBy ?? 'Anda'}';
+    if (d == null) return e.decidedBy ?? 'You';
+    return '${d.day} ${_bulanSingkat[d.month - 1]} · by ${e.decidedBy ?? 'You'}';
   }
 
   @override
@@ -44,7 +44,7 @@ class RencanaScreen extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const AppHeader(title: 'Rencana tersimpan'),
+        const AppHeader(title: 'Saved Plans'),
         const HeaderDivider(),
         const SizedBox(height: 20),
         Expanded(
@@ -53,13 +53,13 @@ class RencanaScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const _Title('Rencana tersimpan'),
+                const _Title('Saved Plans'),
                 const SizedBox(height: 12),
                 if (tersimpan.isEmpty)
                   const _Empty(
                     icon: Icons.eco_outlined,
                     text:
-                        'Belum ada rencana tersimpan. Simpan dari hasil analisis.',
+                        'No saved plans yet. Save one from an analysis result.',
                   )
                 else
                   ...tersimpan.map((e) => Padding(
@@ -71,12 +71,12 @@ class RencanaScreen extends StatelessWidget {
                         ),
                       )),
                 const SizedBox(height: 24),
-                const _Title('History Rencana Disetujui'),
+                const _Title('Accepted Plan History'),
                 const SizedBox(height: 12),
                 if (disetujui.isEmpty)
                   const _Empty(
                     icon: Icons.check_circle_outline,
-                    text: 'Belum ada rencana yang disetujui.',
+                    text: 'No accepted plans yet.',
                   )
                 else
                   ...disetujui.map((e) => Padding(
@@ -197,7 +197,7 @@ class _SavedCard extends StatelessWidget {
           ),
           const SizedBox(width: 10),
           _PillButton(
-            label: 'Tinjau',
+            label: 'Review',
             icon: Icons.info_outline,
             onTap: onTap,
           ),
@@ -254,7 +254,7 @@ class _HistoryCard extends StatelessWidget {
             ),
           ),
           const SizedBox(width: 10),
-          _PillButton(label: 'Cek Jadwal', onTap: onTap),
+          _PillButton(label: 'View Schedule', onTap: onTap),
         ],
       ),
     );
