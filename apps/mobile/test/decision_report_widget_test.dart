@@ -44,21 +44,21 @@ void main() {
     await tester.pumpWidget(report(testSession(), scale: 1.5, onAccept: (_, _) async {}));
     expect(find.text('Readiness'), findsOneWidget);
     expect(find.text('Feasibility'), findsOneWidget);
-    expect(find.text('Kapasitas ketat'), findsOneWidget);
-    expect(find.text('Rekomendasi utama sistem'), findsOneWidget);
-    expect(find.text('Saran jadwal · Belum masuk kalender'), findsWidgets);
-    expect(find.text('Buffer tersisa: 180 menit'), findsOneWidget);
-    expect(find.text('Buffer tersisa: 120 menit'), findsOneWidget);
+    expect(find.text('Tight capacity'), findsOneWidget);
+    expect(find.text('System primary recommendation'), findsOneWidget);
+    expect(find.text('Suggested schedule · Not added to calendar'), findsWidgets);
+    expect(find.text('Remaining buffer: 180 min'), findsOneWidget);
+    expect(find.text('Remaining buffer: 120 min'), findsOneWidget);
     expect(find.text('EFFORT_OVERRUN_BREAKS_PLAN'), findsNothing);
-    expect(find.textContaining('bukan kemampuan Anda'), findsOneWidget);
-    expect(find.textContaining('Pekerjaan berikutnya: Buat prototype'), findsNWidgets(2));
+    expect(find.textContaining('not your ability'), findsOneWidget);
+    expect(find.textContaining('Next work: Build prototype'), findsNWidgets(2));
     await tapKey(tester, 'choose-$alternativeId');
     expect(find.descendant(of: find.byKey(const Key('candidate-primary-option')),
-        matching: find.text('Opsi yang Anda pilih')), findsNothing);
+        matching: find.text('Your selected option')), findsNothing);
     expect(find.descendant(of: find.byKey(const Key('candidate-later-option')),
-        matching: find.text('Opsi yang Anda pilih')), findsOneWidget);
-    expect(find.text('Rekomendasi utama sistem'), findsOneWidget);
-    expect(find.text('Tersimpan'), findsNothing);
+        matching: find.text('Your selected option')), findsOneWidget);
+    expect(find.text('System primary recommendation'), findsOneWidget);
+    expect(find.text('Saved'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -73,8 +73,8 @@ void main() {
     await tapKey(tester, 'choose-$alternativeId');
     await tapKey(tester, 'accept-candidate');
     expect(calls, isEmpty);
-    expect(find.text('Terima opsi ini?'), findsOneWidget);
-    expect(find.text('Opsi alternatif yang Anda pilih'), findsOneWidget);
+    expect(find.text('Accept this option?'), findsOneWidget);
+    expect(find.text('Your selected alternative'), findsOneWidget);
     await tapKey(tester, 'confirm-accept');
     expect(calls, hasLength(1));
     expect(calls.single.$1, same(session));
@@ -85,8 +85,8 @@ void main() {
     gate.complete();
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('handoff-complete')), findsOneWidget);
-    expect(find.text('Tersimpan'), findsNothing);
-    expect(find.text('Masuk jadwal'), findsNothing);
+    expect(find.text('Saved'), findsNothing);
+    expect(find.text('Added to calendar'), findsNothing);
     expect(tester.takeException(), isNull);
   });
 
@@ -94,8 +94,8 @@ void main() {
     var calls = 0;
     await tester.pumpWidget(report(testSession(), onAccept: (_, _) async { calls++; }));
     await tapKey(tester, 'accept-candidate');
-    await tester.ensureVisible(find.text('Batal'));
-    await tester.tap(find.text('Batal'));
+    await tester.ensureVisible(find.text('Cancel'));
+    await tester.tap(find.text('Cancel'));
     await tester.pumpAndSettle();
     expect(calls, 0);
     expect(find.byKey(const Key('confirm-accept')), findsNothing);
@@ -125,7 +125,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('confirm-accept')), findsNothing);
     expect(find.byKey(const Key('stale-notice')), findsOneWidget);
-    expect(find.text('Opsi yang Anda pilih'), findsNothing);
+    expect(find.text('Your selected option'), findsNothing);
     expect(tester.widget<FilledButton>(find.byKey(const Key('accept-candidate'))).onPressed, isNull);
     expect(calls, 0);
     expect(tester.takeException(), isNull);
@@ -136,28 +136,28 @@ void main() {
     IgnoreRecommendationIntent? ignore;
     await tester.pumpWidget(report(testSession(feasibility: 'NOT_FEASIBLE_UNDER_CURRENT_CONSTRAINTS'),
         onEdit: (intent) => edit = intent, onIgnore: (intent) => ignore = intent));
-    expect(find.text('Siap dievaluasi'), findsOneWidget);
-    expect(find.text('Tidak feasible dengan batasan saat ini'), findsOneWidget);
+    expect(find.text('Ready to evaluate'), findsOneWidget);
+    expect(find.text('Not feasible under current constraints'), findsOneWidget);
     expect(find.byKey(const Key('accept-candidate')), findsNothing);
-    expect(find.text('Rekomendasi utama sistem'), findsNothing);
+    expect(find.text('System primary recommendation'), findsNothing);
     await tapKey(tester, 'edit-constraints');
     expect(edit!.sessionId, 'session-12');
     expect(edit!.inputRevision, 3);
     expect(ignore, isNull);
     await tapKey(tester, 'ignore-recommendation');
     expect(ignore!.evaluationId, evaluationId);
-    expect(find.text('Rekomendasi diabaikan. Jadwal Anda tidak berubah.'), findsOneWidget);
+    expect(find.text('Recommendation ignored. Your schedule has not changed.'), findsOneWidget);
   });
 
   const blockedCases = [
-    (ReadinessStatus.needsReview, 'Perlu review',
-      'Evaluasi jadwal belum dijalankan karena ada informasi yang perlu ditinjau.'),
-    (ReadinessStatus.insufficientInformation, 'Informasi belum cukup',
-      'Evaluasi jadwal belum dijalankan karena informasi yang dibutuhkan belum cukup.'),
-    (ReadinessStatus.eligibilityBlocked, 'Syarat peserta belum terpenuhi',
-      'Evaluasi jadwal tidak dijalankan karena persyaratan peserta tidak terpenuhi.'),
-    (ReadinessStatus.deadlinePassed, 'Batas pengumpulan sudah lewat',
-      'Evaluasi jadwal tidak dijalankan karena batas pengumpulan sudah lewat.'),
+    (ReadinessStatus.needsReview, 'Needs review',
+      'Schedule feasibility was not evaluated because some information still needs review.'),
+    (ReadinessStatus.insufficientInformation, 'Insufficient information',
+      'Schedule feasibility was not evaluated because required information is still insufficient.'),
+    (ReadinessStatus.eligibilityBlocked, 'Participant requirements not met',
+      'Schedule feasibility was not evaluated because participant requirements are not met.'),
+    (ReadinessStatus.deadlinePassed, 'Submission deadline has passed',
+      'Schedule feasibility was not evaluated because the submission deadline has passed.'),
   ];
   for (final (status, readinessLabel, explanation) in blockedCases) {
     testWidgets('${status.wire} explains the readiness gate without implying infeasibility', (tester) async {
@@ -166,14 +166,14 @@ void main() {
           onAccept: (_, _) async { decisions++; },
           onEdit: (_) { decisions++; }, onIgnore: (_) { decisions++; }));
       expect(find.text(readinessLabel), findsOneWidget);
-      expect(find.text('Belum dievaluasi'), findsOneWidget);
+      expect(find.text('Not evaluated'), findsOneWidget);
       expect(find.text(explanation), findsOneWidget);
-      expect(find.text('Tidak feasible dengan batasan saat ini'), findsNothing);
-      expect(find.text('Rekomendasi utama sistem'), findsNothing);
+      expect(find.text('Not feasible under current constraints'), findsNothing);
+      expect(find.text('System primary recommendation'), findsNothing);
       expect(find.byKey(const Key('accept-candidate')), findsNothing);
       expect(find.byKey(const Key('edit-constraints')), findsNothing);
       expect(find.byKey(const Key('ignore-recommendation')), findsNothing);
-      expect(find.text('Evaluasi jadwal menunggu kesiapan informasi dan persyaratan.'), findsNothing);
+      expect(find.text('Schedule feasibility is waiting for information and requirements.'), findsNothing);
       expect(decisions, 0);
       expect(tester.takeException(), isNull);
     });
@@ -183,8 +183,8 @@ void main() {
     await tester.pumpWidget(report(testSession(alternatives: false)));
     expect(tester.widget<FilledButton>(find.byKey(const Key('accept-candidate'))).onPressed, isNull);
     expect(tester.widget<OutlinedButton>(find.byKey(const Key('edit-constraints'))).onPressed, isNull);
-    expect(find.text('Pilih opsi ini'), findsNothing);
-    expect(find.text('Penerimaan rencana belum tersedia.'), findsOneWidget);
+    expect(find.text('Choose this option'), findsNothing);
+    expect(find.text('Plan acceptance is not available yet.'), findsOneWidget);
   });
 
   testWidgets('failed host callback shows safe retry requiring new confirmation', (tester) async {
@@ -216,13 +216,13 @@ void main() {
     await tester.pumpWidget(app(3));
     await tester.pumpAndSettle();
     expect(find.text('Decision Report'), findsOneWidget);
-    expect(find.text('Beranda'), findsOneWidget);
+    expect(find.text('Home'), findsOneWidget);
     final before = await schedule.loadState();
     await tester.pumpWidget(app(4));
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('stale-notice')), findsOneWidget);
     expect((await schedule.loadState()).commitments.length, before.commitments.length);
-    final back = find.byTooltip('Kembali');
+    final back = find.byTooltip('Back');
     await tester.ensureVisible(back);
     await tester.tap(back);
     await tester.pumpAndSettle();
