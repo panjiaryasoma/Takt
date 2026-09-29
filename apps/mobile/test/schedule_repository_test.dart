@@ -288,7 +288,7 @@ ORDER BY name
     final vm = JadwalViewModel(repository);
 
     await vm.initialize();
-    expect(vm.errorMessage, 'Gagal membuka database jadwal.');
+    expect(vm.errorMessage, 'Failed to open the schedule database.');
     expect(vm.all, isEmpty);
 
     await vm.retry();
