@@ -8,6 +8,7 @@ import 'package:takt_mobile/data/remote/plan_api_client.dart';
 import 'package:takt_mobile/data/repositories/drift_evaluation_repository.dart';
 import 'package:takt_mobile/data/repositories/drift_saved_plan_repository.dart';
 import 'package:takt_mobile/data/repositories/drift_schedule_repository.dart';
+import 'package:takt_mobile/data/repositories/saved_plan_repository.dart';
 import 'package:takt_mobile/data/repositories/evaluation_repository.dart';
 import 'package:takt_mobile/models/analysis_snapshot.dart';
 import 'package:takt_mobile/models/decision_intent.dart';
@@ -16,6 +17,7 @@ import 'package:takt_mobile/models/evaluation.dart';
 import 'package:takt_mobile/models/plan_evaluation_wire.dart';
 import 'package:takt_mobile/models/planning_input_draft.dart';
 import 'package:takt_mobile/models/reevaluation_wire.dart';
+import 'package:takt_mobile/screens/planning_setup_screen.dart';
 import 'package:takt_mobile/viewmodels/planning_host_view_model.dart';
 
 import 'support/decision_fixture.dart';
@@ -89,6 +91,102 @@ void main() {
       await evaluations.evaluationById(evaluationId),
       isNull,
     );
+    host.dispose();
+  });
+
+  test('startPlanning replacement invalidates an in-flight prior lifecycle',
+      () async {
+    final api = _ControlledPlanApi(delayed: true);
+    final host = PlanningHostViewModel(
+      apiClient: api,
+      scheduleRepository: schedule,
+      evaluationRepository: evaluations,
+      savedPlanRepository: savedPlans,
+    );
+    final secondSnapshot = _snapshotFor(
+      id: 'snapshot-b',
+      competitionId: 'competition-b',
+    );
+    await _seedSnapshot(db, secondSnapshot);
+
+    await host.startPlanning(snapshot);
+    host.addTask(_task());
+    final firstEvaluation = host.evaluate();
+    await _waitFor(() => api.lastEvaluationRequest != null);
+
+    await host.startPlanning(secondSnapshot);
+    expect(host.phase, PlanningHostPhase.setup);
+    expect(host.analysisSnapshot?.id, secondSnapshot.id);
+    expect(host.draft, isNotNull);
+
+    api.completeEvaluate();
+    await firstEvaluation;
+
+    expect(host.phase, PlanningHostPhase.setup);
+    expect(host.analysisSnapshot?.id, secondSnapshot.id);
+    expect(host.activeSession, isNull);
+    expect(await evaluations.evaluationById(evaluationId), isNull);
+    host.dispose();
+  });
+
+  testWidgets('Planning Setup freezes authoritative fields while request is active',
+      (tester) async {
+    final api = _ControlledPlanApi(delayed: true);
+    final host = PlanningHostViewModel(
+      apiClient: api,
+      scheduleRepository: schedule,
+      evaluationRepository: evaluations,
+      savedPlanRepository: savedPlans,
+    );
+    await host.startPlanning(snapshot);
+    host.addTask(_task());
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: PlanningSetupScreen(host: host)),
+      ),
+    );
+
+    await tester.tap(find.text('Evaluate'));
+    await tester.pump();
+    await _waitFor(() => api.lastEvaluationRequest != null);
+    await tester.pump();
+
+    final fields = tester.widgetList<TextField>(find.byType(TextField)).toList();
+    expect(fields, isNotEmpty);
+    expect(fields.every((field) => field.enabled == false), isTrue);
+
+    api.completeEvaluate();
+    await tester.pumpAndSettle();
+    host.dispose();
+  });
+
+  testWidgets('Planning Setup stays frozen while a result awaits Retry Save',
+      (tester) async {
+    final api = _ControlledPlanApi();
+    final failOnce = _FailOnceEvaluationRepository(evaluations);
+    final host = PlanningHostViewModel(
+      apiClient: api,
+      scheduleRepository: schedule,
+      evaluationRepository: failOnce,
+      savedPlanRepository: savedPlans,
+    );
+    await host.startPlanning(snapshot);
+    host.addTask(_task());
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(body: PlanningSetupScreen(host: host)),
+      ),
+    );
+    await tester.tap(find.text('Evaluate'));
+    await tester.pumpAndSettle();
+
+    expect(host.phase, PlanningHostPhase.persistenceError);
+    expect(find.text('Retry local save'), findsOneWidget);
+    final fields = tester.widgetList<TextField>(find.byType(TextField)).toList();
+    expect(fields, isNotEmpty);
+    expect(fields.every((field) => field.enabled == false), isTrue);
     host.dispose();
   });
 
@@ -385,7 +483,7 @@ final class _ReevaluationPlanApi implements PlanApiClient {
         'kind': 'SUPERSEDED',
         'prior_evaluation_id': this.priorEvaluationId,
         'prior_basis_fingerprint': priorBasisFingerprint,
-        'current_basis_fingerprint': null,
+        'current_basis_fingerprint': List.filled(64, 'c').join(),
         'prior_evaluation_freshness': 'STALE',
         'change_reasons': ['PLANNING_BASIS_CHANGED'],
       });
@@ -636,11 +734,19 @@ PlanningTaskDraft _task() => PlanningTaskDraft(
       assumptions: const ['Confirmed effort.'],
     );
 
-AnalysisSnapshot _snapshot() {
+AnalysisSnapshot _snapshot() => _snapshotFor(
+      id: 'snapshot-2',
+      competitionId: 'competition-1',
+    );
+
+AnalysisSnapshot _snapshotFor({
+  required String id,
+  required String competitionId,
+}) {
   final hash = List.filled(64, 'a').join();
   return AnalysisSnapshot(
-    id: 'snapshot-2',
-    competitionId: 'competition-1',
+    id: id,
+    competitionId: competitionId,
     reportVersion: 2,
     assemblyMaterialFingerprint: hash,
     sourceSetFingerprint: null,
@@ -649,7 +755,7 @@ AnalysisSnapshot _snapshot() {
     responseJson: jsonEncode({
       'report_bundle': {
         'report': {
-          'competition_id': 'competition-1',
+          'competition_id': competitionId,
           'report_version': 2,
           'canonical_fields': {
             'submission_deadline': {
