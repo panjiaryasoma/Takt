@@ -305,8 +305,13 @@ class _RootShellState extends State<RootShell> {
     final vm = context.watch<AnalisisViewModel>();
     final host = context.watch<PlanningHostViewModel>();
     final injected = widget.decisionSession != null;
+    final effectiveStep = !injected &&
+            host.phase == PlanningHostPhase.decision &&
+            host.activeSession != null
+        ? 3
+        : _analisisStep;
 
-    switch (_analisisStep) {
+    switch (effectiveStep) {
       case 4:
         final draft = host.draft;
         if (draft == null) {
