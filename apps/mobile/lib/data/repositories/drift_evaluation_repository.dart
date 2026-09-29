@@ -26,10 +26,12 @@ final class DriftEvaluationRepository implements EvaluationRepository {
   DriftEvaluationRepository(
     this._db, {
     DateTime Function()? now,
+    this.closeDatabaseOnDispose = true,
   }) : _now = now ?? DateTime.now;
 
   final AppDatabase _db;
   final DateTime Function() _now;
+  final bool closeDatabaseOnDispose;
   bool _initialized = false;
   bool _closed = false;
 
@@ -397,6 +399,8 @@ SELECT EXISTS(
   Future<void> close() async {
     if (_closed) return;
     _closed = true;
-    await _db.close();
+    if (closeDatabaseOnDispose) {
+      await _db.close();
+    }
   }
 }
