@@ -46,7 +46,7 @@ enum ReadinessStatus {
 
   static ReadinessStatus fromWire(String value) =>
       ReadinessStatus.values.firstWhere((e) => e.wire == value,
-          orElse: () => ReadinessStatus.needsReview);
+          orElse: () => throw StateError('Unknown readiness status: $value'));
 }
 
 /// Status kelayakan (feasibility). Boleh null.
@@ -62,7 +62,7 @@ enum FeasibilityStatus {
   static FeasibilityStatus? fromWire(String? value) {
     if (value == null) return null;
     return FeasibilityStatus.values.firstWhere((e) => e.wire == value,
-        orElse: () => FeasibilityStatus.feasible);
+        orElse: () => throw StateError('Unknown feasibility status: $value'));
   }
 }
 
@@ -76,7 +76,7 @@ enum ReevaluationKind {
 
   static ReevaluationKind fromWire(String value) =>
       ReevaluationKind.values.firstWhere((e) => e.wire == value,
-          orElse: () => ReevaluationKind.unchanged);
+          orElse: () => throw StateError('Unknown reevaluation kind: $value'));
 }
 
 /// Sumber pemilihan kandidat pada revisi rencana.
@@ -89,5 +89,5 @@ enum SelectionSource {
 
   static SelectionSource fromWire(String value) =>
       SelectionSource.values.firstWhere((e) => e.wire == value,
-          orElse: () => SelectionSource.primary);
+          orElse: () => throw StateError('Unknown selection source: $value'));
 }
