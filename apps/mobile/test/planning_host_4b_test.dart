@@ -312,6 +312,41 @@ void main() {
     host.dispose();
   });
 
+  test('Accept remains successful when post-commit Evaluation reload fails',
+      () async {
+    final api = _ControlledPlanApi();
+    final reloadFailure = _ToggleReadEvaluationRepository(evaluations);
+    final host = PlanningHostViewModel(
+      apiClient: api,
+      scheduleRepository: schedule,
+      evaluationRepository: reloadFailure,
+      savedPlanRepository: savedPlans,
+    );
+
+    await host.startPlanning(snapshot);
+    host.addTask(_task());
+    await host.evaluate();
+    final session = host.activeSession!;
+    reloadFailure.failReads = true;
+
+    await host.accept(
+      session,
+      AcceptCandidateIntent(
+        sessionId: session.sessionId,
+        evaluationId: session.parsedResponse.evaluationId,
+        candidateId: primaryId,
+        selectionSource: SelectionSource.primary,
+      ),
+    );
+
+    expect(host.phase, PlanningHostPhase.accepted);
+    final plan = await savedPlans.planForCompetition(snapshot.competitionId);
+    expect(plan, isNotNull);
+    final detail = await savedPlans.loadDetail(plan!.id);
+    expect(detail!.summary.currentRevision.evaluationId, evaluationId);
+    host.dispose();
+  });
+
   test('SUPERSEDED re-evaluation publishes fresh session and Accept creates revision 2',
       () async {
     final prior = await _persistAndAcceptPrior(
@@ -626,6 +661,69 @@ final class _ControlledPlanApi implements PlanApiClient {
 
   @override
   void close() {}
+}
+
+final class _ToggleReadEvaluationRepository
+    implements EvaluationRepository {
+  _ToggleReadEvaluationRepository(this.delegate);
+
+  final EvaluationRepository delegate;
+  bool failReads = false;
+
+  @override
+  Future<void> initialize() => delegate.initialize();
+
+  @override
+  Future<Evaluation?> evaluationById(String evaluationId) {
+    if (failReads) {
+      throw StateError('simulated post-commit Evaluation reload failure');
+    }
+    return delegate.evaluationById(evaluationId);
+  }
+
+  @override
+  Future<Evaluation> persistEvaluation({
+    required AnalysisSnapshot analysisSnapshot,
+    required String evaluationRequestJson,
+    required String evaluationResponseJson,
+    required String planningWindowPolicyJson,
+  }) =>
+      delegate.persistEvaluation(
+        analysisSnapshot: analysisSnapshot,
+        evaluationRequestJson: evaluationRequestJson,
+        evaluationResponseJson: evaluationResponseJson,
+        planningWindowPolicyJson: planningWindowPolicyJson,
+      );
+
+  @override
+  Future<ReevaluationPersistenceResult> persistReevaluation({
+    required String priorEvaluationId,
+    required ReevaluationTransitionWire transition,
+    required String transportRequestJson,
+    required String transportResponseJson,
+    required String? errorJson,
+    AnalysisSnapshot? currentAnalysisSnapshot,
+    String? currentEvaluationRequestJson,
+    String? currentEvaluationResponseJson,
+    String? planningWindowPolicyJson,
+  }) =>
+      delegate.persistReevaluation(
+        priorEvaluationId: priorEvaluationId,
+        transition: transition,
+        transportRequestJson: transportRequestJson,
+        transportResponseJson: transportResponseJson,
+        errorJson: errorJson,
+        currentAnalysisSnapshot: currentAnalysisSnapshot,
+        currentEvaluationRequestJson: currentEvaluationRequestJson,
+        currentEvaluationResponseJson: currentEvaluationResponseJson,
+        planningWindowPolicyJson: planningWindowPolicyJson,
+      );
+
+  @override
+  Future<bool> isStale(String evaluationId) => delegate.isStale(evaluationId);
+
+  @override
+  Future<void> close() => delegate.close();
 }
 
 final class _FailOnceEvaluationRepository implements EvaluationRepository {
