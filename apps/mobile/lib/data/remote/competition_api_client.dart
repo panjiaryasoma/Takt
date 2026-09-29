@@ -87,7 +87,7 @@ class HttpCompetitionApiClient implements CompetitionApiClient {
   HttpCompetitionApiClient({
     required String baseUrl,
     http.Client? client,
-    this.timeout = const Duration(seconds: 120),
+    this.timeout = const Duration(seconds: 180),
   })  : _baseUrl = baseUrl.replaceFirst(RegExp(r'/+$'), ''),
         _client = client ?? http.Client();
 
