@@ -279,10 +279,17 @@ class _ReportCard extends StatelessWidget {
   final Widget child;
   final bool highlight;
   @override
-  Widget build(BuildContext context) => Container(
-    margin: const EdgeInsets.symmetric(vertical: 8), padding: const EdgeInsets.all(16),
-    decoration: BoxDecoration(color: C.card, borderRadius: BorderRadius.circular(14),
-        border: highlight ? Border.all(color: C.accent) : null), child: child);
+  Widget build(BuildContext context) => Padding(
+    padding: const EdgeInsets.symmetric(vertical: 8),
+    child: Material(
+      color: C.card,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(14),
+        side: highlight ? const BorderSide(color: C.accent) : BorderSide.none,
+      ),
+      child: Padding(padding: const EdgeInsets.all(16), child: child),
+    ),
+  );
 }
 
 class _Heading extends StatelessWidget {
