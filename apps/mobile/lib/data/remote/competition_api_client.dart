@@ -133,7 +133,12 @@ class HttpCompetitionApiClient implements CompetitionApiClient {
         ),
       );
 
-    return _send(request);
+    final result = await _send(request);
+    return _validateResponseIdentity(
+      result,
+      competitionId: competitionId,
+      sourceId: source.sourceId,
+    );
   }
 
   @override
@@ -186,7 +191,34 @@ class HttpCompetitionApiClient implements CompetitionApiClient {
         ),
       );
 
-    return _send(request);
+    final result = await _send(request);
+    return _validateResponseIdentity(
+      result,
+      competitionId: competitionId,
+      sourceId: source.sourceId,
+    );
+  }
+
+  CompetitionAnalysisTransportResult _validateResponseIdentity(
+    CompetitionAnalysisTransportResult result, {
+    required String competitionId,
+    required String sourceId,
+  }) {
+    if (result.response.report.competitionId != competitionId) {
+      throw AnalysisFailure.contract(
+        const FormatException(
+          'Response competition_id does not match request.',
+        ),
+      );
+    }
+    if (!result.response.report.sourceIds.contains(sourceId)) {
+      throw AnalysisFailure.contract(
+        const FormatException(
+          'Response source set does not contain submitted source.',
+        ),
+      );
+    }
+    return result;
   }
 
   Future<CompetitionAnalysisTransportResult> _send(
