@@ -20,10 +20,14 @@ class JadwalViewModel extends ChangeNotifier {
   JadwalViewModel(
     this._repository, {
     SavedPlanRepository? savedPlanRepository,
+    this.closeScheduleRepositoryOnDispose = true,
+    this.closeSavedPlanRepositoryOnDispose = true,
   }) : _savedPlanRepository = savedPlanRepository;
 
   final ScheduleRepository _repository;
   final SavedPlanRepository? _savedPlanRepository;
+  final bool closeScheduleRepositoryOnDispose;
+  final bool closeSavedPlanRepositoryOnDispose;
 
   ScheduleState _state = ScheduleState.empty();
   StreamSubscription<ScheduleState>? _subscription;
@@ -622,9 +626,13 @@ class JadwalViewModel extends ChangeNotifier {
   void dispose() {
     _subscription?.cancel();
     _savedPlanSubscription?.cancel();
-    unawaited(_repository.close());
+    if (closeScheduleRepositoryOnDispose) {
+      unawaited(_repository.close());
+    }
     final saved = _savedPlanRepository;
-    if (saved != null) unawaited(saved.close());
+    if (saved != null && closeSavedPlanRepositoryOnDispose) {
+      unawaited(saved.close());
+    }
     super.dispose();
   }
 }
