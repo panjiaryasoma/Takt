@@ -91,6 +91,7 @@ final class PlanningHostViewModel extends ChangeNotifier {
   bool get canRetryPersistence =>
       _phase == PlanningHostPhase.persistenceError &&
       _pendingPersistence != null;
+  bool get inputsLocked => busy || canRetryPersistence;
   bool get canRetryRequest =>
       _phase == PlanningHostPhase.error && (_failure?.retryable ?? false);
   bool get canCreateFreshBaseline =>
@@ -99,11 +100,18 @@ final class PlanningHostViewModel extends ChangeNotifier {
       _savedPlan != null;
 
   Future<void> startPlanning(AnalysisSnapshot snapshot) async {
+    final contextGeneration = ++_generation;
     _phase = PlanningHostPhase.loading;
+    _analysisSnapshot = null;
+    _draft = null;
+    _savedPlan = null;
+    _priorEvaluation = null;
+    _activeSession = null;
+    _pendingPersistence = null;
     _failure = null;
     _message = null;
-    _pendingPersistence = null;
-    _activeSession = null;
+    _inputRevision = 0;
+    _forceFreshBaseline = false;
     notifyListeners();
 
     try {
@@ -144,6 +152,8 @@ final class PlanningHostViewModel extends ChangeNotifier {
         nextDraft = _draftFromEvaluation(prior);
       }
 
+      if (contextGeneration != _generation) return;
+
       _analysisSnapshot = snapshot;
       _savedPlan = plan;
       _priorEvaluation = prior;
@@ -153,6 +163,7 @@ final class PlanningHostViewModel extends ChangeNotifier {
       _phase = PlanningHostPhase.setup;
       notifyListeners();
     } on Object catch (error) {
+      if (contextGeneration != _generation) return;
       _phase = PlanningHostPhase.error;
       _failure = PlanningHostFailure(
         code: 'LOCAL_CONTEXT_INVALID',
