@@ -191,6 +191,7 @@ class CanonicalFieldWire {
         if (candidates.isEmpty || evidenceIds.isEmpty) {
           throw FormatException('$path ${state.wire} requires provenance');
         }
+        return;
       case CanonicalFieldState.conflict:
         if (value != null || normalizedValue != null) {
           throw FormatException('$path CONFLICT must not expose a value');
@@ -198,12 +199,14 @@ class CanonicalFieldWire {
         if (candidates.length < 2 || evidenceIds.length < 2) {
           throw FormatException('$path CONFLICT requires multiple evidence');
         }
+        return;
       case CanonicalFieldState.missing:
         if (value != null ||
             normalizedValue != null ||
             candidates.isNotEmpty) {
           throw FormatException('$path MISSING must not invent a value');
         }
+        return;
       case CanonicalFieldState.unverified:
         if (value != null || normalizedValue != null) {
           throw FormatException('$path UNVERIFIED must not expose a value');
@@ -211,6 +214,7 @@ class CanonicalFieldWire {
         if (candidates.isEmpty || evidenceIds.isEmpty) {
           throw FormatException('$path UNVERIFIED requires provenance');
         }
+        return;
     }
   }
 }
