@@ -5,9 +5,13 @@ import 'package:flutter/foundation.dart';
 import '../data/repositories/saved_plan_repository.dart';
 
 final class SavedPlansViewModel extends ChangeNotifier {
-  SavedPlansViewModel(this._repository);
+  SavedPlansViewModel(
+    this._repository, {
+    this.closeRepositoryOnDispose = true,
+  });
 
   final SavedPlanRepository _repository;
+  final bool closeRepositoryOnDispose;
   StreamSubscription<List<SavedPlanSummary>>? _subscription;
 
   List<SavedPlanSummary> _items = const [];
@@ -59,7 +63,9 @@ final class SavedPlansViewModel extends ChangeNotifier {
   @override
   void dispose() {
     _subscription?.cancel();
-    unawaited(_repository.close());
+    if (closeRepositoryOnDispose) {
+      unawaited(_repository.close());
+    }
     super.dispose();
   }
 }
