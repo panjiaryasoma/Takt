@@ -4,7 +4,6 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:takt_mobile/data/database/app_database.dart';
 import 'package:takt_mobile/data/repositories/drift_schedule_repository.dart';
 import 'package:takt_mobile/main.dart';
-import 'package:takt_mobile/models/competition_brief.dart';
 import 'package:takt_mobile/models/enums.dart';
 import 'package:takt_mobile/screens/rekomendasi_jadwal_screen.dart';
 import 'package:takt_mobile/theme/app_theme.dart';
@@ -60,8 +59,9 @@ void main() {
       theme: AppTheme.dark,
       home: Scaffold(
         body: RekomendasiJadwalScreen(
-          brief: CompetitionBrief.demo(),
-          onSubmitDone: () => submitted = true,
+          session: null,
+          currentInputRevision: 0,
+          onAccept: (_, _) async { submitted = true; },
           onBack: () => wentBack = true,
         ),
       ),
@@ -70,11 +70,7 @@ void main() {
     expect(find.textContaining('Tidak ada slot kosong'), findsNothing);
     expect(find.textContaining('Rekomendasi belum tersedia'), findsOneWidget);
 
-    final pendingButton = find.text('Belum tersedia').last;
-    await tester.ensureVisible(pendingButton);
-    await tester.pumpAndSettle();
-    await tester.tap(pendingButton);
-    await tester.pump();
+    expect(find.byKey(const Key('accept-candidate')), findsNothing);
     expect(submitted, isFalse);
 
     final backButton = find.byIcon(Icons.chevron_left);
