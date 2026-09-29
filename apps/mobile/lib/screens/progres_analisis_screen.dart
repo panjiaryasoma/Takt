@@ -1,5 +1,3 @@
-import 'dart:math' as math;
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
@@ -8,34 +6,20 @@ import '../theme/app_theme.dart';
 import '../viewmodels/analisis_view_model.dart';
 import '../widgets/common.dart';
 
-/// ProgresAnalisisScreen — Figma node 11:1473 ("Progres Analisis").
-/// Progress ring beranimasi + daftar langkah + konflik + Baca Hasil.
-/// Data dari [AnalisisViewModel] (simulasi sekarang, AI model nanti).
-class ProgresAnalisisScreen extends StatefulWidget {
-  const ProgresAnalisisScreen({super.key, this.onReadResult});
+class ProgresAnalisisScreen extends StatelessWidget {
+  const ProgresAnalisisScreen({
+    super.key,
+    this.onReadResult,
+    this.onBackToInput,
+  });
 
   final VoidCallback? onReadResult;
-
-  @override
-  State<ProgresAnalisisScreen> createState() => _ProgresAnalisisScreenState();
-}
-
-class _ProgresAnalisisScreenState extends State<ProgresAnalisisScreen> {
-  @override
-  void initState() {
-    super.initState();
-    // Mulai simulasi saat layar dibuka (idempotent).
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      context.read<AnalisisViewModel>().mulaiSimulasi();
-    });
-  }
+  final VoidCallback? onBackToInput;
 
   @override
   Widget build(BuildContext context) {
     final vm = context.watch<AnalisisViewModel>();
-    final etaText = vm.etaDetik == null
-        ? '…'
-        : (vm.etaDetik! <= 0 ? 'selesai' : '± ${vm.etaDetik} detik');
+    final failure = vm.failure;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(10, 0, 10, 24),
@@ -45,11 +29,12 @@ class _ProgresAnalisisScreenState extends State<ProgresAnalisisScreen> {
           const AppHeader(title: 'Progres Analisis'),
           const HeaderDivider(),
           const SizedBox(height: 16),
-
-          // Progress ring card (beranimasi)
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 20),
-            padding: const EdgeInsets.symmetric(vertical: 24),
+            padding: const EdgeInsets.symmetric(
+              vertical: 24,
+              horizontal: 20,
+            ),
             decoration: BoxDecoration(
               color: C.accent,
               borderRadius: BorderRadius.circular(16),
@@ -57,63 +42,36 @@ class _ProgresAnalisisScreenState extends State<ProgresAnalisisScreen> {
             child: Column(
               children: [
                 SizedBox(
-                  width: 130,
-                  height: 130,
-                  child: TweenAnimationBuilder<double>(
-                    duration: const Duration(milliseconds: 400),
-                    curve: Curves.easeOut,
-                    tween: Tween(begin: 0, end: vm.progress),
-                    builder: (context, value, _) => CustomPaint(
-                      painter: _RingPainter(value),
-                      child: Center(
-                        child: Text(
-                          '${(value * 100).round()}%',
-                          style: const TextStyle(
-                            color: C.bg,
-                            fontSize: 32,
-                            fontWeight: FontWeight.w800,
-                          ),
+                  width: 70,
+                  height: 70,
+                  child: vm.selesai
+                      ? const Icon(
+                          Icons.check_circle,
+                          color: C.bg,
+                          size: 64,
+                        )
+                      : const CircularProgressIndicator(
+                          color: C.bg,
+                          strokeWidth: 6,
                         ),
-                      ),
-                    ),
-                  ),
                 ),
-                const SizedBox(height: 14),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: C.bg,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.access_time, color: C.white, size: 13),
-                      const SizedBox(width: 6),
-                      Text(etaText,
-                          style: const TextStyle(
-                              color: C.white, fontSize: 12)),
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 14),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 24),
-                  child: Text(
-                    vm.statusText,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(color: C.accentText, fontSize: 13),
+                const SizedBox(height: 16),
+                Text(
+                  vm.statusText,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: C.accentText,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    height: 1.4,
                   ),
                 ),
               ],
             ),
           ),
           const SizedBox(height: 16),
-
           const SectionHeading(title: 'Langkah analisis'),
-          const SizedBox(height: 16),
-
+          const SizedBox(height: 12),
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 20),
             padding: const EdgeInsets.all(8),
@@ -122,66 +80,90 @@ class _ProgresAnalisisScreenState extends State<ProgresAnalisisScreen> {
               borderRadius: BorderRadius.circular(16),
             ),
             child: Column(
-              children:
-                  vm.steps.map((s) => _StepRow(step: s)).toList(),
+              children: [
+                for (final step in vm.steps) _StepRow(step: step),
+              ],
             ),
           ),
-          const SizedBox(height: 16),
-
-          // Konflik tanggal (muncul bila ada)
-          if (vm.konflikText != null) ...[
+          if (failure != null) ...[
+            const SizedBox(height: 16),
             Container(
               margin: const EdgeInsets.symmetric(horizontal: 20),
               padding: const EdgeInsets.all(16),
               decoration: BoxDecoration(
                 color: C.card,
                 borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: C.padat),
               ),
-              child: Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Container(
-                    width: 36,
-                    height: 36,
-                    decoration: BoxDecoration(
-                      color: C.bg,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    alignment: Alignment.center,
-                    child: const Icon(Icons.warning_amber_rounded,
-                        color: C.sedang, size: 18),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text('Konflik tanggal terdeteksi',
-                            style: TextStyle(
-                                color: C.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w700)),
-                        const SizedBox(height: 3),
-                        Text(
-                          vm.konflikText!,
-                          style: const TextStyle(
-                              color: C.detailMuted, fontSize: 12),
+                  const Row(
+                    children: [
+                      Icon(
+                        Icons.error_outline,
+                        color: C.padat,
+                        size: 20,
+                      ),
+                      SizedBox(width: 8),
+                      Text(
+                        'Analisis belum selesai',
+                        style: TextStyle(
+                          color: C.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
                         ),
-                      ],
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    failure.userMessage,
+                    style: const TextStyle(
+                      color: C.detailMuted,
+                      fontSize: 12,
+                      height: 1.4,
                     ),
                   ),
+                  const SizedBox(height: 6),
+                  Text(
+                    '${failure.code} · ${failure.stage}',
+                    style: const TextStyle(
+                      color: C.navInactive,
+                      fontSize: 10,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  if (vm.canRetryRequest)
+                    _ActionButton(
+                      label: 'Coba request lagi',
+                      onTap: () {
+                        vm.retryRequest();
+                      },
+                    )
+                  else if (vm.canRetryPersistence)
+                    _ActionButton(
+                      label: 'Coba simpan lagi',
+                      onTap: () {
+                        vm.retryPersistence();
+                      },
+                    )
+                  else
+                    _ActionButton(
+                      label: 'Kembali ke input',
+                      onTap: onBackToInput,
+                    ),
                 ],
               ),
             ),
-            const SizedBox(height: 16),
           ],
-
-          // Baca Hasil — aktif saat selesai
+          const SizedBox(height: 16),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
             child: GestureDetector(
-              onTap: vm.selesai ? widget.onReadResult : null,
+              onTap: vm.selesai ? onReadResult : null,
               child: Opacity(
-                opacity: vm.selesai ? 1 : 0.5,
+                opacity: vm.selesai ? 1 : 0.45,
                 child: Container(
                   padding: const EdgeInsets.symmetric(vertical: 16),
                   decoration: BoxDecoration(
@@ -190,7 +172,7 @@ class _ProgresAnalisisScreenState extends State<ProgresAnalisisScreen> {
                   ),
                   alignment: Alignment.center,
                   child: Text(
-                    vm.selesai ? 'Baca Hasil' : 'Menganalisis…',
+                    vm.selesai ? 'Baca Hasil' : 'Belum siap direview',
                     style: const TextStyle(
                       color: C.bg,
                       fontSize: 15,
@@ -205,9 +187,13 @@ class _ProgresAnalisisScreenState extends State<ProgresAnalisisScreen> {
           const Padding(
             padding: EdgeInsets.symmetric(horizontal: 24),
             child: Text(
-              'Anda dapat meninggalkan layar ini. Tidak ada perubahan kalender yang dibuat.',
+              'Tidak ada persentase atau ETA palsu. Client hanya menampilkan state yang benar-benar diketahui.',
               textAlign: TextAlign.center,
-              style: TextStyle(color: C.navInactive, fontSize: 11, height: 1.4),
+              style: TextStyle(
+                color: C.navInactive,
+                fontSize: 11,
+                height: 1.4,
+              ),
             ),
           ),
         ],
@@ -218,67 +204,71 @@ class _ProgresAnalisisScreenState extends State<ProgresAnalisisScreen> {
 
 class _StepRow extends StatelessWidget {
   const _StepRow({required this.step});
+
   final AnalysisStep step;
 
   @override
   Widget build(BuildContext context) {
-    late final IconData leadIcon;
-    late final Color leadColor;
-    late final String badge;
-    late final IconData badgeIcon;
-    switch (step.state) {
-      case AnalysisStepState.done:
-        leadIcon = Icons.check_circle;
-        leadColor = C.kosong;
-        badge = 'Selesai';
-        badgeIcon = Icons.check_circle_outline;
-        break;
-      case AnalysisStepState.process:
-        leadIcon = Icons.sync;
-        leadColor = C.accent;
-        badge = 'Proses';
-        badgeIcon = Icons.timelapse;
-        break;
-      case AnalysisStepState.waiting:
-        leadIcon = Icons.radio_button_unchecked;
-        leadColor = C.navInactive;
-        badge = 'Menunggu';
-        badgeIcon = Icons.schedule;
-        break;
-    }
+    final (icon, color, badge) = switch (step.state) {
+      AnalysisStepState.done => (
+          Icons.check_circle,
+          C.kosong,
+          'Selesai',
+        ),
+      AnalysisStepState.process => (
+          Icons.sync,
+          C.accent,
+          'Proses',
+        ),
+      AnalysisStepState.waiting => (
+          Icons.radio_button_unchecked,
+          C.navInactive,
+          'Menunggu',
+        ),
+    };
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 10),
+      padding: const EdgeInsets.symmetric(
+        horizontal: 8,
+        vertical: 10,
+      ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(leadIcon, color: leadColor, size: 20),
+          Icon(icon, color: color, size: 20),
           const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(step.title,
-                    style: const TextStyle(
-                        color: C.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700)),
+                Text(
+                  step.title,
+                  style: const TextStyle(
+                    color: C.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
                 if (step.detail.isNotEmpty) ...[
                   const SizedBox(height: 2),
-                  Text(step.detail,
-                      style: const TextStyle(
-                          color: C.detailMuted, fontSize: 11)),
+                  Text(
+                    step.detail,
+                    style: const TextStyle(
+                      color: C.detailMuted,
+                      fontSize: 11,
+                    ),
+                  ),
                 ],
               ],
             ),
           ),
           const SizedBox(width: 8),
-          Row(
-            children: [
-              Icon(badgeIcon, color: leadColor, size: 14),
-              const SizedBox(width: 4),
-              Text(badge, style: TextStyle(color: leadColor, fontSize: 11)),
-            ],
+          Text(
+            badge,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+            ),
           ),
         ],
       ),
@@ -286,39 +276,36 @@ class _StepRow extends StatelessWidget {
   }
 }
 
-/// Progress ring painter: track + arc.
-class _RingPainter extends CustomPainter {
-  _RingPainter(this.value);
-  final double value;
+class _ActionButton extends StatelessWidget {
+  const _ActionButton({
+    required this.label,
+    required this.onTap,
+  });
+
+  final String label;
+  final VoidCallback? onTap;
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final center = size.center(Offset.zero);
-    final radius = size.width / 2 - 8;
-    const stroke = 12.0;
-
-    final track = Paint()
-      ..color = C.bg.withValues(alpha: 0.35)
-      ..strokeWidth = stroke
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-    final arc = Paint()
-      ..color = C.bg
-      ..strokeWidth = stroke
-      ..style = PaintingStyle.stroke
-      ..strokeCap = StrokeCap.round;
-
-    canvas.drawCircle(center, radius, track);
-    canvas.drawArc(
-      Rect.fromCircle(center: center, radius: radius),
-      -math.pi / 2,
-      2 * math.pi * value,
-      false,
-      arc,
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: C.accent,
+          borderRadius: BorderRadius.circular(10),
+        ),
+        alignment: Alignment.center,
+        child: Text(
+          label,
+          style: const TextStyle(
+            color: C.bg,
+            fontSize: 13,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
     );
   }
-
-  @override
-  bool shouldRepaint(covariant _RingPainter oldDelegate) =>
-      oldDelegate.value != value;
 }
