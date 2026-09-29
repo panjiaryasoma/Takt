@@ -79,6 +79,12 @@ void main() {
     expect(find.text('Candidate 1'), findsOneWidget);
     expect(find.text('Candidate 2'), findsOneWidget);
     expect(find.text('Lihat sumber'), findsWidgets);
+
+    final firstSource = find.text('Lihat sumber').first;
+    await tester.tap(firstSource);
+    await tester.pumpAndSettle();
+    expect(find.text('Lihat selengkapnya'), findsOneWidget);
+
     expect(find.textContaining('Tambah Jadwal'), findsNothing);
     expect(find.textContaining('Simpan Jadwal'), findsNothing);
     expect(tester.takeException(), isNull);
@@ -102,7 +108,9 @@ CompetitionAnalyzeResponseWire _reviewResponse() {
         evidenceId: evidenceId,
         sourceId: source.sourceId,
         pageOrLocator: 'section:$name',
-        rawReference: '$name raw evidence',
+        rawReference: name == 'competition_name'
+            ? List<String>.filled(260, 'x').join()
+            : '$name raw evidence',
         fieldName: name,
         extractionPath: 'native',
       ),
