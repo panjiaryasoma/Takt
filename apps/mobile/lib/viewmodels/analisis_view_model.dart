@@ -57,7 +57,8 @@ class AnalisisViewModel extends ChangeNotifier {
     return code == 'ANALYSIS_CONTEXT_INVALID' ||
         code == 'REPORT_BUNDLE_INVALID' ||
         code == 'UNSUPPORTED_REPORT_CONTRACT' ||
-        code == 'LOCAL_CONTEXT_MISSING';
+        code == 'LOCAL_CONTEXT_MISSING' ||
+        code == 'LOCAL_CONTEXT_INVALID';
   }
 
   bool get hasCurrentCompetition =>
@@ -339,7 +340,14 @@ class AnalisisViewModel extends ChangeNotifier {
         snapshot.responseJson,
       );
     } on Object catch (error) {
-      throw AnalysisFailure.contract(error);
+      throw AnalysisFailure(
+        code: 'LOCAL_CONTEXT_INVALID',
+        stage: 'continuation',
+        message: 'Cached continuation response is invalid: $error',
+        userMessage:
+            'Konteks sumber sebelumnya rusak. Mulai analisis baru.',
+        retryable: false,
+      );
     }
   }
 
