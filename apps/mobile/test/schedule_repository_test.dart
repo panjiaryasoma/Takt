@@ -14,12 +14,12 @@ import 'package:takt_mobile/models/recurrence_rule.dart';
 import 'package:takt_mobile/viewmodels/jadwal_view_model.dart';
 
 void main() {
-  test('fresh database initializes strict schedule schema v1', () async {
+  test('fresh database initializes schedule plus analysis schema v2', () async {
     final db = AppDatabase.forTesting(NativeDatabase.memory());
     addTearDown(db.close);
     await db.initialize();
 
-    expect(await db.userVersion(), 1);
+    expect(await db.userVersion(), 2);
     await expectLater(
       db.customStatement(
         '''
@@ -32,6 +32,65 @@ INSERT INTO commitments (
          'Asia/Jakarta', 'test', 1, 1],
       ),
       throwsA(anything),
+    );
+  });
+
+
+  test('v1 to v2 migration preserves existing commitments', () async {
+    final dir = await Directory.systemTemp.createTemp('takt_v1_migration_');
+    final file = File('${dir.path}/takt.sqlite3');
+    addTearDown(() async {
+      if (await dir.exists()) await dir.delete(recursive: true);
+    });
+
+    final seed = AppDatabase.forTesting(NativeDatabase(file));
+    await seed.initialize();
+    await seed.customStatement('DROP TABLE analysis_snapshots');
+    await seed.customStatement('DROP TABLE competitions');
+    await seed.customStatement('PRAGMA user_version = 1');
+    await seed.customStatement(
+      '''
+INSERT INTO commitments (
+  id, title, category, type, start_at_epoch_ms, end_at_epoch_ms,
+  timezone, source, created_at_epoch_ms, updated_at_epoch_ms
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+''',
+      [
+        'cmt-v1',
+        'Existing v1 commitment',
+        null,
+        'FIXED',
+        60000,
+        120000,
+        'Asia/Jakarta',
+        'migration-test',
+        1,
+        1,
+      ],
+    );
+    await seed.close();
+
+    final migrated = AppDatabase.forTesting(NativeDatabase(file));
+    addTearDown(migrated.close);
+    await migrated.initialize();
+
+    expect(await migrated.userVersion(), 2);
+    final commitments = await migrated.customSelect(
+      'SELECT id FROM commitments WHERE id = ?',
+      variables: [Variable<String>('cmt-v1')],
+    ).get();
+    expect(commitments, hasLength(1));
+
+    final analysisTables = await migrated.customSelect(
+      '''
+SELECT name FROM sqlite_master
+WHERE type = 'table' AND name IN ('competitions', 'analysis_snapshots')
+ORDER BY name
+''',
+    ).get();
+    expect(
+      analysisTables.map((row) => row.data['name']),
+      ['analysis_snapshots', 'competitions'],
     );
   });
 
