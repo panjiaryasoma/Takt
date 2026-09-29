@@ -155,7 +155,7 @@ class _RekomendasiJadwalScreenState extends State<RekomendasiJadwalScreen> {
               const _Heading('Readiness'),
               Text(view.readinessLabel, style: const TextStyle(fontSize: 17, color: C.accent)),
               _TextList(title: 'Blockers', lines: view.response.readiness.blockingReasons.map(DecisionReportViewData.explain).toList()),
-              _TextList(title: 'Needs review', lines: view.response.readiness.reviewItems.map(DecisionReportViewData.explain).toList()),
+              _TextList(title: 'Review items', lines: view.response.readiness.reviewItems.map(DecisionReportViewData.explain).toList()),
               _TextList(title: 'Passed checks', lines: view.response.readiness.passedChecks.map(DecisionReportViewData.explain).toList()),
             ])),
             _ReportCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
