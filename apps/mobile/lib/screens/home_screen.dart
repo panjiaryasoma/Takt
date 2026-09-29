@@ -6,7 +6,7 @@ import '../viewmodels/jadwal_view_model.dart';
 import '../widgets/common.dart';
 
 /// HomeScreen — Figma node 11:1262 ("Home").
-/// Kapasitas pekan ini dihitung dari jadwal + PlanningPreferences lokal.
+/// Ringkasan jadwal lokal. Availability authoritative dihitung backend saat evaluasi.
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key, this.onLihatJadwal});
 
@@ -33,12 +33,7 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     final vm = context.watch<JadwalViewModel>();
     final terjadwalMenit = _scheduledThisWeek(vm);
-    final kapasitasMenit = vm.preferences.maxProjectMinutesPerDay * 7;
-    final tersediaMenit =
-        (kapasitasMenit - terjadwalMenit).clamp(0, kapasitasMenit).toInt();
-    final rasio = kapasitasMenit == 0
-        ? 0.0
-        : (terjadwalMenit / kapasitasMenit).clamp(0.0, 1.0).toDouble();
+    final batasProyekHarianMenit = vm.preferences.maxProjectMinutesPerDay;
     final adaJadwal = vm.all.isNotEmpty;
 
     return SingleChildScrollView(
@@ -77,7 +72,7 @@ class HomeScreen extends StatelessWidget {
                 ),
                 const SizedBox(width: 24),
                 const Text(
-                  'Welcome, Raka',
+                  'Selamat datang',
                   style: TextStyle(color: C.white, fontSize: 20),
                 ),
               ],
@@ -87,7 +82,7 @@ class HomeScreen extends StatelessWidget {
           if (vm.isLoading) const LinearProgressIndicator(minHeight: 2),
           const SizedBox(height: 16),
           SectionHeading(
-            title: 'Kapasitas pekan ini',
+            title: 'Ringkasan pekan ini',
             action: 'Lihat jadwal',
             onAction: onLihatJadwal,
           ),
@@ -104,26 +99,24 @@ class HomeScreen extends StatelessWidget {
                 Row(
                   children: [
                     _Metric(
-                      label: 'Terjadwal',
+                      label: 'Komitmen minggu ini',
                       value: _jam(terjadwalMenit),
                       color: C.accent,
                     ),
                     const SizedBox(width: 16),
                     _Metric(
-                      label: 'Tersedia',
-                      value: _jam(tersediaMenit),
+                      label: 'Batas proyek / hari',
+                      value: _jam(batasProyekHarianMenit),
                       color: C.white,
                     ),
                   ],
                 ),
                 const SizedBox(height: 12),
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(999),
-                  child: LinearProgressIndicator(
-                    value: rasio,
-                    minHeight: 8,
-                    backgroundColor: C.white,
-                    valueColor: const AlwaysStoppedAnimation<Color>(C.accent),
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Availability dihitung backend saat evaluasi rencana.',
+                    style: TextStyle(color: C.detailMuted, fontSize: 11),
                   ),
                 ),
               ],
