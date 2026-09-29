@@ -600,19 +600,30 @@ final class PlanningHostViewModel extends ChangeNotifier {
       candidateId: intent.candidateId,
       selectionSource: intent.selectionSource,
     );
-    final snapshot = _analysisSnapshot;
-    if (snapshot != null) {
-      _savedPlan = await _savedPlanRepository.planForCompetition(
-        snapshot.competitionId,
-      );
-    }
-    _priorEvaluation =
-        await _evaluationRepository.evaluationById(intent.evaluationId);
+
     _activeSession = null;
     _phase = PlanningHostPhase.accepted;
     _message = 'Plan accepted and saved locally.';
     _failure = null;
     notifyListeners();
+
+    final snapshot = _analysisSnapshot;
+    if (snapshot != null) {
+      try {
+        _savedPlan = await _savedPlanRepository.planForCompetition(
+          snapshot.competitionId,
+        );
+      } on Object {
+        // The decision is already durable. A read-model reload failure must
+        // not reclassify Accept as failed.
+      }
+    }
+    try {
+      _priorEvaluation =
+          await _evaluationRepository.evaluationById(intent.evaluationId);
+    } on Object {
+      // Re-evaluation can reload this persisted row on the next lifecycle.
+    }
   }
 
   void beginEditConstraints(EditConstraintsIntent intent) {
