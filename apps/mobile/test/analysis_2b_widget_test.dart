@@ -137,17 +137,17 @@ CompetitionAnalyzeResponseWire _reviewResponse() {
       CandidateFieldWire(
         rawValue: '2 Oct',
         normalizedValue: '2026-10-02T00:00:00Z',
-        evidenceIds: ['ev-organizer'],
+        evidenceIds: ['ev-submission-deadline-alt'],
       ),
     ],
     evidenceIds: [
       'ev-submission_deadline',
-      'ev-organizer',
+      'ev-submission-deadline-alt',
     ],
   );
   evidence.add(
     const EvidenceSpanWire(
-      evidenceId: 'ev-organizer',
+      evidenceId: 'ev-submission-deadline-alt',
       sourceId: 'src-1',
       pageOrLocator: 'faq',
       rawReference: 'Deadline 2 Oct',
@@ -183,7 +183,7 @@ CompetitionAnalyzeResponseWire _reviewResponse() {
           'cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc',
     ),
     provenance: AnalysisProvenanceWire(
-      sources: const [source],
+      sources: [source],
       evidence: evidence,
     ),
     reportChanged: true,
