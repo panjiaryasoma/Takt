@@ -305,9 +305,6 @@ final class PlanningDraft {
 }
 
 void _validateTasks(List<PlanningTaskDraft> tasks) {
-  if (tasks.isEmpty) {
-    throw const FormatException('At least one planning task is required.');
-  }
   final ids = tasks.map((task) => task.taskId).toSet();
   if (ids.length != tasks.length) {
     throw const FormatException('Task IDs must be unique.');
