@@ -123,9 +123,17 @@ class JadwalViewModel extends ChangeNotifier {
   List<ActiveAcceptedBlock> acceptedItemsOn(DateTime day) {
     final start = _dateOnly(day);
     final end = start.add(const Duration(days: 1));
+    return acceptedBlocksBetween(start, end);
+  }
+
+  List<ActiveAcceptedBlock> acceptedBlocksBetween(
+    DateTime startInclusive,
+    DateTime endExclusive,
+  ) {
     return _acceptedBlocks
         .where((block) =>
-            !block.startAt.isBefore(start) && block.startAt.isBefore(end))
+            !block.startAt.isBefore(startInclusive) &&
+            block.startAt.isBefore(endExclusive))
         .toList(growable: false)
       ..sort((a, b) => a.startAtEpochMs.compareTo(b.startAtEpochMs));
   }
