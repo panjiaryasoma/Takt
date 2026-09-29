@@ -577,6 +577,21 @@ void main() {
   });
 
   group('2B analysis state machine', () {
+    test('dispose closes owned analysis resources', () async {
+      final api = _FakeApiClient();
+      final repository = _MemoryAnalysisRepository();
+      final vm = AnalisisViewModel(
+        apiClient: api,
+        repository: repository,
+      );
+
+      vm.dispose();
+      await Future<void>.delayed(Duration.zero);
+
+      expect(api.closed, isTrue);
+      expect(repository.closed, isTrue);
+    });
+
     test('success persists original body before READY', () async {
       final api = _FakeApiClient();
       final repository = _MemoryAnalysisRepository();
@@ -997,6 +1012,11 @@ class _BlockingApiClient implements CompetitionApiClient {
       continuation: continuation,
     );
   }
+
+  @override
+  void close() {
+    closed = true;
+  }
 }
 
 class _FakeApiClient implements CompetitionApiClient {
@@ -1004,6 +1024,7 @@ class _FakeApiClient implements CompetitionApiClient {
 
   final bool failFirstRequest;
   int calls = 0;
+  bool closed = false;
   String? lastBody;
   AnalysisContinuationContext? lastContinuation;
   final List<String> competitionIds = [];
@@ -1095,6 +1116,7 @@ class _MemoryAnalysisRepository implements AnalysisRepository {
   bool failNextPersist;
   bool corruptLatestOnRead;
   int persistCalls = 0;
+  bool closed = false;
   String? lastPersistedBody;
   final List<AnalysisSnapshot> _snapshots = [];
 
@@ -1164,5 +1186,7 @@ class _MemoryAnalysisRepository implements AnalysisRepository {
   }
 
   @override
-  Future<void> close() async {}
+  Future<void> close() async {
+    closed = true;
+  }
 }
