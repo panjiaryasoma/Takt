@@ -169,6 +169,153 @@ void main() {
       );
     });
 
+
+    test('rejects empty source content_hash', () {
+      final raw = jsonDecode(_responseBody('cmp-empty-hash'))
+          as Map<String, dynamic>;
+      final artifact = _firstSourceArtifact(raw);
+      final source = artifact['source'] as Map<String, dynamic>;
+      source['content_hash'] = '';
+
+      expect(
+        () => CompetitionAnalyzeResponseWire.parse(jsonEncode(raw)),
+        throwsFormatException,
+      );
+    });
+
+    test('rejects candidate report field with empty evidence_ids', () {
+      final raw = jsonDecode(_responseBody('cmp-empty-candidate-evidence'))
+          as Map<String, dynamic>;
+      final report = _firstCandidateReport(raw);
+      report['fields'] = [
+        _reportCandidateField(
+          fieldName: 'organizer',
+          evidenceIds: const [],
+        ),
+      ];
+
+      expect(
+        () => CompetitionAnalyzeResponseWire.parse(jsonEncode(raw)),
+        throwsFormatException,
+      );
+    });
+
+    test('rejects duplicate candidate report field_name', () {
+      final raw = jsonDecode(_responseBody('cmp-duplicate-field'))
+          as Map<String, dynamic>;
+      final report = _firstCandidateReport(raw);
+      report['fields'] = [
+        _reportCandidateField(
+          fieldName: 'organizer',
+          evidenceIds: const ['report-ev-1'],
+        ),
+        _reportCandidateField(
+          fieldName: 'organizer',
+          evidenceIds: const ['report-ev-2'],
+        ),
+      ];
+      report['evidence'] = [
+        _reportEvidence(
+          evidenceId: 'report-ev-1',
+          fieldName: 'organizer',
+        ),
+        _reportEvidence(
+          evidenceId: 'report-ev-2',
+          fieldName: 'organizer',
+        ),
+      ];
+
+      expect(
+        () => CompetitionAnalyzeResponseWire.parse(jsonEncode(raw)),
+        throwsFormatException,
+      );
+    });
+
+    test('rejects duplicate candidate report evidence_id', () {
+      final raw = jsonDecode(_responseBody('cmp-duplicate-evidence'))
+          as Map<String, dynamic>;
+      final report = _firstCandidateReport(raw);
+      report['evidence'] = [
+        _reportEvidence(
+          evidenceId: 'report-ev-1',
+          fieldName: 'organizer',
+        ),
+        _reportEvidence(
+          evidenceId: 'report-ev-1',
+          fieldName: 'organizer',
+        ),
+      ];
+
+      expect(
+        () => CompetitionAnalyzeResponseWire.parse(jsonEncode(raw)),
+        throwsFormatException,
+      );
+    });
+
+    test('rejects candidate extraction path differing from report', () {
+      final raw = jsonDecode(_responseBody('cmp-path-mismatch'))
+          as Map<String, dynamic>;
+      final report = _firstCandidateReport(raw);
+      report['fields'] = [
+        _reportCandidateField(
+          fieldName: 'organizer',
+          evidenceIds: const ['report-ev-1'],
+          extractionPath: 'ocr',
+        ),
+      ];
+      report['evidence'] = [
+        _reportEvidence(
+          evidenceId: 'report-ev-1',
+          fieldName: 'organizer',
+        ),
+      ];
+
+      expect(
+        () => CompetitionAnalyzeResponseWire.parse(jsonEncode(raw)),
+        throwsFormatException,
+      );
+    });
+
+    test('rejects candidate evidence_id missing from report evidence', () {
+      final raw = jsonDecode(_responseBody('cmp-missing-report-evidence'))
+          as Map<String, dynamic>;
+      final report = _firstCandidateReport(raw);
+      report['fields'] = [
+        _reportCandidateField(
+          fieldName: 'organizer',
+          evidenceIds: const ['report-ev-missing'],
+        ),
+      ];
+
+      expect(
+        () => CompetitionAnalyzeResponseWire.parse(jsonEncode(raw)),
+        throwsFormatException,
+      );
+    });
+
+    test('rejects candidate evidence with mismatched field_name', () {
+      final raw = jsonDecode(_responseBody('cmp-evidence-field-mismatch'))
+          as Map<String, dynamic>;
+      final report = _firstCandidateReport(raw);
+      report['fields'] = [
+        _reportCandidateField(
+          fieldName: 'organizer',
+          evidenceIds: const ['report-ev-1'],
+        ),
+      ];
+      report['evidence'] = [
+        _reportEvidence(
+          evidenceId: 'report-ev-1',
+          fieldName: 'competition_name',
+        ),
+      ];
+
+      expect(
+        () => CompetitionAnalyzeResponseWire.parse(jsonEncode(raw)),
+        throwsFormatException,
+      );
+    });
+
     test('missing field remains null and has no candidates', () {
       final raw = jsonDecode(_responseBody('cmp-missing'))
           as Map<String, dynamic>;
@@ -457,6 +604,86 @@ void main() {
       );
 
       expect(recorder.calls, 0);
+    });
+
+
+    test('concrete ClientException becomes retryable network failure',
+        () async {
+      final recorder = _RecordingHttpClient(
+        _responseBody('cmp-client-exception'),
+        sendError: http.ClientException('offline'),
+      );
+      final client = HttpCompetitionApiClient(
+        baseUrl: 'https://example.test',
+        client: recorder,
+      );
+      addTearDown(client.close);
+
+      const source = AnalysisSourceMetadata(
+        sourceId: 'src-1',
+        sourceType: SourceTypeWire.officialRules,
+      );
+
+      await expectLater(
+        client.analyzeUrl(
+          competitionId: 'cmp-client-exception',
+          url: 'https://example.com/rules',
+          source: source,
+        ),
+        throwsA(
+          isA<AnalysisFailure>()
+              .having(
+                (error) => error.code,
+                'code',
+                'NETWORK_ERROR',
+              )
+              .having(
+                (error) => error.retryable,
+                'retryable',
+                isTrue,
+              ),
+        ),
+      );
+    });
+
+    test('concrete HTTP timeout becomes retryable network failure',
+        () async {
+      final recorder = _RecordingHttpClient(
+        _responseBody('cmp-timeout'),
+        sendDelay: const Duration(milliseconds: 50),
+      );
+      final client = HttpCompetitionApiClient(
+        baseUrl: 'https://example.test',
+        client: recorder,
+        timeout: const Duration(milliseconds: 5),
+      );
+      addTearDown(client.close);
+
+      const source = AnalysisSourceMetadata(
+        sourceId: 'src-1',
+        sourceType: SourceTypeWire.officialRules,
+      );
+
+      await expectLater(
+        client.analyzeUrl(
+          competitionId: 'cmp-timeout',
+          url: 'https://example.com/rules',
+          source: source,
+        ),
+        throwsA(
+          isA<AnalysisFailure>()
+              .having(
+                (error) => error.code,
+                'code',
+                'NETWORK_ERROR',
+              )
+              .having(
+                (error) => error.retryable,
+                'retryable',
+                isTrue,
+              ),
+        ),
+      );
     });
 
     test('unknown backend envelope fails safely without invented retry',
@@ -789,6 +1016,54 @@ void main() {
   });
 }
 
+
+Map<String, dynamic> _firstSourceArtifact(
+  Map<String, dynamic> raw,
+) {
+  final artifacts = raw['source_artifacts'] as List<dynamic>;
+  return artifacts.first as Map<String, dynamic>;
+}
+
+Map<String, dynamic> _firstCandidateReport(
+  Map<String, dynamic> raw,
+) {
+  final artifact = _firstSourceArtifact(raw);
+  final reports = artifact['candidate_reports'] as List<dynamic>;
+  return reports.first as Map<String, dynamic>;
+}
+
+Map<String, Object?> _reportCandidateField({
+  required String fieldName,
+  required List<String> evidenceIds,
+  String extractionPath = 'native',
+}) {
+  return {
+    'field_name': fieldName,
+    'raw_value': '$fieldName raw',
+    'normalized_value': '$fieldName normalized',
+    'evidence_ids': evidenceIds,
+    'extraction_path': extractionPath,
+    'confidence': null,
+    'scope': <String, Object?>{},
+  };
+}
+
+Map<String, Object?> _reportEvidence({
+  required String evidenceId,
+  required String fieldName,
+  String extractionPath = 'native',
+}) {
+  return {
+    'evidence_id': evidenceId,
+    'source_id': 'src-1',
+    'page_or_locator': 'section:$fieldName',
+    'raw_text_or_visual_reference': '$fieldName evidence',
+    'field_name': fieldName,
+    'extraction_path': extractionPath,
+    'extractor_version': 'test-v1',
+  };
+}
+
 Map<String, dynamic> _fieldMap(
   Map<String, dynamic> raw,
   String name,
@@ -940,10 +1215,14 @@ class _RecordingHttpClient extends http.BaseClient {
   _RecordingHttpClient(
     this.responseBody, {
     this.statusCode = 200,
+    this.sendError,
+    this.sendDelay,
   });
 
   final String responseBody;
   final int statusCode;
+  final Object? sendError;
+  final Duration? sendDelay;
   int calls = 0;
   String? method;
   Uri? url;
@@ -954,6 +1233,14 @@ class _RecordingHttpClient extends http.BaseClient {
   @override
   Future<http.StreamedResponse> send(http.BaseRequest request) async {
     calls += 1;
+    final delay = sendDelay;
+    if (delay != null) {
+      await Future<void>.delayed(delay);
+    }
+    final error = sendError;
+    if (error != null) {
+      throw error;
+    }
     method = request.method;
     url = request.url;
     if (request is http.MultipartRequest) {
