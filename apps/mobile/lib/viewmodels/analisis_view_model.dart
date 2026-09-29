@@ -52,6 +52,14 @@ class AnalisisViewModel extends ChangeNotifier {
       _phase == AnalysisPhase.persistenceError &&
       _pendingPersistence != null;
 
+  bool get requiresFreshAnalysis {
+    final code = _failure?.code;
+    return code == 'ANALYSIS_CONTEXT_INVALID' ||
+        code == 'REPORT_BUNDLE_INVALID' ||
+        code == 'UNSUPPORTED_REPORT_CONTRACT' ||
+        code == 'LOCAL_CONTEXT_MISSING';
+  }
+
   bool get hasCurrentCompetition =>
       _competitionId != null && _response != null;
 
