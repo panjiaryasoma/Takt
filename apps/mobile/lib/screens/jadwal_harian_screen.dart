@@ -388,17 +388,47 @@ class JadwalHarianScreen extends StatelessWidget {
           else if (vm.isLoading)
             const Center(child: CircularProgressIndicator(color: C.accent))
           else if (items.isEmpty && acceptedItems.isEmpty)
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20),
-              padding: const EdgeInsets.symmetric(vertical: 28),
-              decoration: BoxDecoration(
-                color: C.card,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              alignment: Alignment.center,
-              child: const Text(
-                'No schedule for this date',
-                style: TextStyle(color: C.detailMuted, fontSize: 13),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: PresentationCard(
+                child: Column(
+                  key: const Key('schedule-empty-state'),
+                  children: [
+                    const Icon(
+                      Icons.event_available_outlined,
+                      color: C.accent,
+                      size: 30,
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'No schedule for this date',
+                      style: TextStyle(
+                        color: C.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Add a commitment or import a calendar from the Add Schedule flow.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: C.detailMuted,
+                        fontSize: 12,
+                        height: 1.4,
+                      ),
+                    ),
+                    if (onAdd != null) ...[
+                      const SizedBox(height: 12),
+                      FilledButton.icon(
+                        key: const Key('empty-add-schedule'),
+                        onPressed: onAdd,
+                        icon: const Icon(Icons.add),
+                        label: const Text('Add schedule'),
+                      ),
+                    ],
+                  ],
+                ),
               ),
             )
           else ...[
@@ -623,8 +653,21 @@ class _ActivityCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  item.isRecurring ? '$duration · recurring' : duration,
-                  style: const TextStyle(color: C.detailMuted, fontSize: 11),
+                  [
+                    duration,
+                    item.commitment.type == CommitmentType.fixed
+                        ? 'fixed time'
+                        : 'flexible label · still blocks this time',
+                    if (item.isRecurring) 'recurring',
+                    if (item.startAtEpochMs != item.originalStartAtEpochMs)
+                      'moved occurrence',
+                  ].join(' · '),
+                  key: Key('occurrence-meta-${item.commitment.id}'),
+                  style: const TextStyle(
+                    color: C.detailMuted,
+                    fontSize: 11,
+                    height: 1.35,
+                  ),
                 ),
               ],
             ),
@@ -653,6 +696,7 @@ class _ActivityCard extends StatelessWidget {
               ],
             ),
           IconButton(
+            tooltip: 'Edit schedule',
             onPressed: onEdit,
             visualDensity: VisualDensity.compact,
             icon: const Icon(
@@ -662,6 +706,7 @@ class _ActivityCard extends StatelessWidget {
             ),
           ),
           IconButton(
+            tooltip: 'Delete schedule',
             onPressed: onDelete,
             visualDensity: VisualDensity.compact,
             icon: const Icon(Icons.close, color: C.detailMuted, size: 18),
