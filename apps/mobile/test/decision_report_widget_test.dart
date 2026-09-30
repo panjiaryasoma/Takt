@@ -187,7 +187,9 @@ void main() {
       isNull,
     );
 
-    await tester.tap(find.text('Retry acceptance save'));
+    final retrySave = find.text('Retry acceptance save');
+    await tester.ensureVisible(retrySave);
+    await tester.tap(retrySave);
     await tester.pump();
     expect(retries, 1);
     expect(cancels, 0);
