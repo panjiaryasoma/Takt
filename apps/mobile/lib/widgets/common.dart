@@ -253,15 +253,15 @@ class StatusPill extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
           decoration: BoxDecoration(
-            color: color.withValues(alpha: 0.14),
+            color: C.bg,
             borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: color.withValues(alpha: 0.75)),
+            border: Border.all(color: color, width: 1.5),
           ),
           child: Row(
             mainAxisSize: MainAxisSize.min,
             children: [
               if (icon != null) ...[
-                Icon(icon, size: 14, color: color),
+                Icon(icon, size: 14, color: C.white),
                 const SizedBox(width: 5),
               ],
               Flexible(
@@ -270,8 +270,8 @@ class StatusPill extends StatelessWidget {
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
-                    color: color,
-                    fontSize: 11,
+                    color: C.white,
+                    fontSize: 12,
                     fontWeight: FontWeight.w700,
                   ),
                 ),
