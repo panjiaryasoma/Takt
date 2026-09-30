@@ -35,15 +35,86 @@ class C {
 }
 
 class AppTheme {
-  static ThemeData get dark => ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: C.bg,
-        useMaterial3: true,
-        fontFamily: 'Roboto',
-        colorScheme: const ColorScheme.dark(
-          primary: C.accent,
-          secondary: C.accent,
-          surface: C.card,
+  static ThemeData get dark {
+    final scheme = const ColorScheme.dark(
+      primary: C.accent,
+      secondary: C.accent,
+      surface: C.card,
+      error: C.padat,
+    );
+    final base = ThemeData(
+      brightness: Brightness.dark,
+      scaffoldBackgroundColor: C.bg,
+      useMaterial3: true,
+      fontFamily: 'Roboto',
+      colorScheme: scheme,
+    );
+
+    return base.copyWith(
+      textTheme: base.textTheme.copyWith(
+        headlineSmall: const TextStyle(
+          color: C.white,
+          fontSize: 24,
+          fontWeight: FontWeight.w700,
+          height: 1.2,
         ),
-      );
+        titleMedium: const TextStyle(
+          color: C.white,
+          fontSize: 17,
+          fontWeight: FontWeight.w700,
+          height: 1.25,
+        ),
+        bodyMedium: const TextStyle(
+          color: C.white,
+          fontSize: 14,
+          height: 1.4,
+        ),
+        bodySmall: const TextStyle(
+          color: C.detailMuted,
+          fontSize: 12,
+          height: 1.4,
+        ),
+        labelLarge: const TextStyle(
+          fontSize: 14,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          minimumSize: const Size(0, 48),
+          foregroundColor: C.bg,
+          backgroundColor: C.accent,
+          disabledForegroundColor: C.detailMuted,
+          disabledBackgroundColor: C.navInactive.withValues(alpha: 0.35),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          minimumSize: const Size(0, 48),
+          foregroundColor: C.accent,
+          side: const BorderSide(color: C.accent),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+          ),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          minimumSize: const Size(44, 44),
+          foregroundColor: C.accent,
+        ),
+      ),
+      snackBarTheme: const SnackBarThemeData(
+        backgroundColor: C.card,
+        contentTextStyle: TextStyle(color: C.white),
+      ),
+      inputDecorationTheme: const InputDecorationTheme(
+        labelStyle: TextStyle(color: C.detailMuted),
+        hintStyle: TextStyle(color: C.detailMuted),
+      ),
+    );
+  }
 }
