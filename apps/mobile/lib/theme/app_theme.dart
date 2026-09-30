@@ -5,7 +5,7 @@ class C {
   C._();
 
   /// Path logo di header. Ganti file di assets/images/ untuk mengubah logo.
-  static const logoAsset = 'assets/images/logo.png';
+  static const logoAsset = 'assets/branding/logo.png';
 
   static const bg = Color(0xFF2D3250); // background utama
   static const card = Color(0xFF424769); // card gelap
