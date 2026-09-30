@@ -308,7 +308,9 @@ class _RootShellState extends State<RootShell> {
     final host = context.watch<PlanningHostViewModel>();
     if (analysis.canRetryPersistence || analysis.phase == AnalysisPhase.persisting ||
         host.canRetryPersistence || host.canRetryPublication ||
-        host.hasPendingAcceptance || host.navigationLockedByPersistence) return true;
+        host.hasPendingAcceptance || host.navigationLockedByPersistence) {
+      return true;
+    }
     if (_navIndex == 1 && _showTambahJadwal) return true;
     if (_navIndex == 3 && _selectedSavedPlanId != null) return true;
     if (_navIndex != 2) return false;

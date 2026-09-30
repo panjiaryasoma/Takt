@@ -30,6 +30,7 @@ final class SavedPlanDetailViewModel extends ChangeNotifier {
     _preparationFailed = false;
     notifyListeners();
     try {
+      await _repository.refresh();
       _detail = await _repository.loadDetail(savedPlanId);
       if (_detail == null) {
         _error = 'This saved plan is no longer available.';

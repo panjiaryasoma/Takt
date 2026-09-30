@@ -166,7 +166,9 @@ final class PlanningHostViewModel extends ChangeNotifier {
   Future<void> startPlanning(AnalysisSnapshot snapshot) async {
     // Unresolved local work can only leave through its explicit recovery action.
     if (_pendingPersistence != null || _pendingPublication != null ||
-        navigationLockedByPersistence) return;
+        navigationLockedByPersistence) {
+      return;
+    }
     if (_pendingAcceptance != null) {
       _failure = const PlanningHostFailure(
         code: 'LOCAL_ACCEPT_PERSISTENCE_FAILED',
@@ -244,7 +246,7 @@ final class PlanningHostViewModel extends ChangeNotifier {
     } on Object {
       if (contextGeneration != _generation) return;
       _phase = PlanningHostPhase.error;
-      _failure = PlanningHostFailure(
+      _failure = const PlanningHostFailure(
         code: 'LOCAL_CONTEXT_READ_FAILED',
         message: 'Planning context could not be loaded on this device. Reload the context to continue.',
         recoveryClass: RecoveryClass.reloadContext,
@@ -372,7 +374,7 @@ final class PlanningHostViewModel extends ChangeNotifier {
       if (_isCurrent(capturedGeneration, capturedRevision)) {
         _phase = PlanningHostPhase.setup;
         _failure = PlanningHostFailure(
-          code: error.code,
+          code: 'LOCAL_PLANNING_INPUT_INVALID',
           message: error.message,
           recoveryClass: RecoveryClass.editConstraints,
         );

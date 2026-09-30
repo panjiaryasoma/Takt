@@ -104,6 +104,7 @@ abstract final class RecoveryPolicy {
       };
 
   static RecoveryClass _local(String code) => switch (code) {
+        'LOCAL_PLANNING_INPUT_INVALID' => RecoveryClass.editConstraints,
         'LOCAL_CONTEXT_MISSING' || 'LOCAL_CONTEXT_INVALID' ||
         'LOCAL_CONTEXT_READ_FAILED' =>
           RecoveryClass.reloadContext,
