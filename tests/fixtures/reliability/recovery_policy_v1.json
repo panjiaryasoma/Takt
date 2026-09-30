@@ -1,0 +1,479 @@
+{
+  "version": "recovery-policy-v1",
+  "recovery_classes": [
+    "FIX_INPUT",
+    "RETRY_SAME_INPUT",
+    "REUPLOAD_SOURCE",
+    "EDIT_CONSTRAINTS",
+    "REEVALUATE",
+    "RELOAD_CONTEXT",
+    "NO_AUTOMATIC_RECOVERY"
+  ],
+  "scenarios": [
+    {
+      "scenario_id": "RequestValidationError",
+      "contract_key": "RequestValidationError",
+      "endpoints": [
+        "POST /api/v1/competitions/analyze/url",
+        "POST /api/v1/competitions/analyze/pdf",
+        "POST /api/v1/plans/evaluate",
+        "POST /api/v1/plans/re-evaluate"
+      ],
+      "recovery_class": "FIX_INPUT"
+    },
+    {
+      "scenario_id": "RequestValidationError[source]",
+      "contract_key": "RequestValidationError[source]",
+      "endpoints": [
+        "POST /api/v1/competitions/analyze/url",
+        "POST /api/v1/competitions/analyze/pdf"
+      ],
+      "recovery_class": "FIX_INPUT"
+    },
+    {
+      "scenario_id": "AnalysisInputError",
+      "contract_key": "AnalysisInputError",
+      "endpoints": [
+        "POST /api/v1/competitions/analyze/url",
+        "POST /api/v1/competitions/analyze/pdf"
+      ],
+      "recovery_class": "FIX_INPUT"
+    },
+    {
+      "scenario_id": "AnalysisContinuationError",
+      "contract_key": "AnalysisContinuationError",
+      "endpoints": [
+        "POST /api/v1/competitions/analyze/url",
+        "POST /api/v1/competitions/analyze/pdf"
+      ],
+      "recovery_class": "RELOAD_CONTEXT"
+    },
+    {
+      "scenario_id": "UnsupportedReportContractError",
+      "contract_key": "UnsupportedReportContractError",
+      "endpoints": [
+        "POST /api/v1/competitions/analyze/url",
+        "POST /api/v1/competitions/analyze/pdf",
+        "POST /api/v1/plans/evaluate"
+      ],
+      "recovery_class": "NO_AUTOMATIC_RECOVERY"
+    },
+    {
+      "scenario_id": "ReportBundleError",
+      "contract_key": "ReportBundleError",
+      "endpoints": [
+        "POST /api/v1/competitions/analyze/url",
+        "POST /api/v1/competitions/analyze/pdf",
+        "POST /api/v1/plans/evaluate"
+      ],
+      "recovery_class": "RELOAD_CONTEXT"
+    },
+    {
+      "scenario_id": "UNSAFE_SOURCE",
+      "contract_key": "InvalidSourceError",
+      "endpoints": [
+        "POST /api/v1/competitions/analyze/url",
+        "POST /api/v1/competitions/analyze/pdf"
+      ],
+      "recovery_class": "FIX_INPUT"
+    },
+    {
+      "scenario_id": "SOURCE_UNREACHABLE",
+      "contract_key": "SourceFetchError",
+      "endpoints": [
+        "POST /api/v1/competitions/analyze/url",
+        "POST /api/v1/competitions/analyze/pdf"
+      ],
+      "recovery_class": "RETRY_SAME_INPUT"
+    },
+    {
+      "scenario_id": "SourceLimitExceededError",
+      "contract_key": "SourceLimitExceededError",
+      "endpoints": [
+        "POST /api/v1/competitions/analyze/url",
+        "POST /api/v1/competitions/analyze/pdf"
+      ],
+      "recovery_class": "FIX_INPUT"
+    },
+    {
+      "scenario_id": "UnsupportedMediaTypeError",
+      "contract_key": "UnsupportedMediaTypeError",
+      "endpoints": [
+        "POST /api/v1/competitions/analyze/url",
+        "POST /api/v1/competitions/analyze/pdf"
+      ],
+      "recovery_class": "REUPLOAD_SOURCE"
+    },
+    {
+      "scenario_id": "OCRProviderUnavailableError",
+      "contract_key": "OCRProviderUnavailableError",
+      "endpoints": [
+        "POST /api/v1/competitions/analyze/url",
+        "POST /api/v1/competitions/analyze/pdf"
+      ],
+      "recovery_class": "RETRY_SAME_INPUT"
+    },
+    {
+      "scenario_id": "OCR_TIMEOUT",
+      "contract_key": "OCRTimeoutError",
+      "endpoints": [
+        "POST /api/v1/competitions/analyze/url",
+        "POST /api/v1/competitions/analyze/pdf"
+      ],
+      "recovery_class": "RETRY_SAME_INPUT"
+    },
+    {
+      "scenario_id": "OCRProviderError",
+      "contract_key": "OCRProviderError",
+      "endpoints": [
+        "POST /api/v1/competitions/analyze/url",
+        "POST /api/v1/competitions/analyze/pdf"
+      ],
+      "recovery_class": "RETRY_SAME_INPUT"
+    },
+    {
+      "scenario_id": "PDF_UNREADABLE",
+      "contract_key": "NativeExtractionError",
+      "endpoints": [
+        "POST /api/v1/competitions/analyze/url",
+        "POST /api/v1/competitions/analyze/pdf"
+      ],
+      "recovery_class": "REUPLOAD_SOURCE"
+    },
+    {
+      "scenario_id": "OCRExtractionError",
+      "contract_key": "OCRExtractionError",
+      "endpoints": [
+        "POST /api/v1/competitions/analyze/url",
+        "POST /api/v1/competitions/analyze/pdf"
+      ],
+      "recovery_class": "REUPLOAD_SOURCE"
+    },
+    {
+      "scenario_id": "CandidateNormalizationError",
+      "contract_key": "CandidateNormalizationError",
+      "endpoints": [
+        "POST /api/v1/competitions/analyze/url",
+        "POST /api/v1/competitions/analyze/pdf"
+      ],
+      "recovery_class": "NO_AUTOMATIC_RECOVERY"
+    },
+    {
+      "scenario_id": "SnapshotIntegrityError",
+      "contract_key": "SnapshotIntegrityError",
+      "endpoints": [
+        "POST /api/v1/competitions/analyze/url",
+        "POST /api/v1/competitions/analyze/pdf"
+      ],
+      "recovery_class": "NO_AUTOMATIC_RECOVERY"
+    },
+    {
+      "scenario_id": "SnapshotBatchError",
+      "contract_key": "SnapshotBatchError",
+      "endpoints": [
+        "POST /api/v1/competitions/analyze/url",
+        "POST /api/v1/competitions/analyze/pdf"
+      ],
+      "recovery_class": "NO_AUTOMATIC_RECOVERY"
+    },
+    {
+      "scenario_id": "AnalysisReconciliationError",
+      "contract_key": "AnalysisReconciliationError",
+      "endpoints": [
+        "POST /api/v1/competitions/analyze/url",
+        "POST /api/v1/competitions/analyze/pdf"
+      ],
+      "recovery_class": "NO_AUTOMATIC_RECOVERY"
+    },
+    {
+      "scenario_id": "AnalysisInvariantError",
+      "contract_key": "AnalysisInvariantError",
+      "endpoints": [
+        "POST /api/v1/competitions/analyze/url",
+        "POST /api/v1/competitions/analyze/pdf"
+      ],
+      "recovery_class": "NO_AUTOMATIC_RECOVERY"
+    },
+    {
+      "scenario_id": "UnhandledException",
+      "contract_key": "UnhandledException",
+      "endpoints": [
+        "POST /api/v1/competitions/analyze/url",
+        "POST /api/v1/competitions/analyze/pdf",
+        "POST /api/v1/plans/evaluate",
+        "POST /api/v1/plans/re-evaluate"
+      ],
+      "recovery_class": "NO_AUTOMATIC_RECOVERY"
+    },
+    {
+      "scenario_id": "PdfFormValidation",
+      "contract_key": "PdfFormValidation",
+      "endpoints": [
+        "POST /api/v1/competitions/analyze/pdf"
+      ],
+      "recovery_class": "FIX_INPUT"
+    },
+    {
+      "scenario_id": "PdfMetadataInvalidJson",
+      "contract_key": "PdfMetadataInvalidJson",
+      "endpoints": [
+        "POST /api/v1/competitions/analyze/pdf"
+      ],
+      "recovery_class": "FIX_INPUT"
+    },
+    {
+      "scenario_id": "PdfMetadataValidation",
+      "contract_key": "PdfMetadataValidation",
+      "endpoints": [
+        "POST /api/v1/competitions/analyze/pdf"
+      ],
+      "recovery_class": "FIX_INPUT"
+    },
+    {
+      "scenario_id": "PdfMetadataValidation[source]",
+      "contract_key": "PdfMetadataValidation[source]",
+      "endpoints": [
+        "POST /api/v1/competitions/analyze/pdf"
+      ],
+      "recovery_class": "FIX_INPUT"
+    },
+    {
+      "scenario_id": "PdfUploadUnsupportedMediaType",
+      "contract_key": "PdfUploadUnsupportedMediaType",
+      "endpoints": [
+        "POST /api/v1/competitions/analyze/pdf"
+      ],
+      "recovery_class": "REUPLOAD_SOURCE"
+    },
+    {
+      "scenario_id": "UnsupportedReportContractValidation",
+      "contract_key": "UnsupportedReportContractValidation",
+      "endpoints": [
+        "POST /api/v1/plans/evaluate",
+        "POST /api/v1/plans/re-evaluate"
+      ],
+      "recovery_class": "NO_AUTOMATIC_RECOVERY"
+    },
+    {
+      "scenario_id": "ReportBundleInvalidValidation",
+      "contract_key": "ReportBundleInvalidValidation",
+      "endpoints": [
+        "POST /api/v1/plans/evaluate",
+        "POST /api/v1/plans/re-evaluate"
+      ],
+      "recovery_class": "RELOAD_CONTEXT"
+    },
+    {
+      "scenario_id": "PLANNING_INPUT_INVALID",
+      "contract_key": "PlanEvaluationInputError",
+      "endpoints": [
+        "POST /api/v1/plans/evaluate"
+      ],
+      "recovery_class": "FIX_INPUT"
+    },
+    {
+      "scenario_id": "SOLVER_UNKNOWN",
+      "contract_key": "PlanEvaluationIndeterminateError",
+      "endpoints": [
+        "POST /api/v1/plans/evaluate"
+      ],
+      "recovery_class": "EDIT_CONSTRAINTS"
+    },
+    {
+      "scenario_id": "AVAILABILITY_CRASH",
+      "contract_key": "PlanEvaluationAvailabilityError",
+      "endpoints": [
+        "POST /api/v1/plans/evaluate"
+      ],
+      "recovery_class": "RETRY_SAME_INPUT"
+    },
+    {
+      "scenario_id": "SOLVER_CRASH",
+      "contract_key": "PlanEvaluationSolverExecutionError",
+      "endpoints": [
+        "POST /api/v1/plans/evaluate"
+      ],
+      "recovery_class": "RETRY_SAME_INPUT"
+    },
+    {
+      "scenario_id": "PlanEvaluationRuntimeError",
+      "contract_key": "PlanEvaluationRuntimeError",
+      "endpoints": [
+        "POST /api/v1/plans/evaluate"
+      ],
+      "recovery_class": "RETRY_SAME_INPUT"
+    },
+    {
+      "scenario_id": "PlanEvaluationExecutionError",
+      "contract_key": "PlanEvaluationExecutionError",
+      "endpoints": [
+        "POST /api/v1/plans/evaluate"
+      ],
+      "recovery_class": "NO_AUTOMATIC_RECOVERY"
+    },
+    {
+      "scenario_id": "PlanEvaluationInvariantError",
+      "contract_key": "PlanEvaluationInvariantError",
+      "endpoints": [
+        "POST /api/v1/plans/evaluate"
+      ],
+      "recovery_class": "NO_AUTOMATIC_RECOVERY"
+    },
+    {
+      "scenario_id": "ReevaluationContextInvalid",
+      "contract_key": "ReevaluationContextInvalid",
+      "endpoints": [
+        "POST /api/v1/plans/re-evaluate"
+      ],
+      "recovery_class": "RELOAD_CONTEXT"
+    },
+    {
+      "scenario_id": "ReevaluationExecutionFailure[UnsupportedReportContractError]",
+      "contract_key": "ReevaluationExecutionFailure[UnsupportedReportContractError]",
+      "endpoints": [
+        "POST /api/v1/plans/re-evaluate"
+      ],
+      "recovery_class": "NO_AUTOMATIC_RECOVERY"
+    },
+    {
+      "scenario_id": "ReevaluationExecutionFailure[ReportBundleError]",
+      "contract_key": "ReevaluationExecutionFailure[ReportBundleError]",
+      "endpoints": [
+        "POST /api/v1/plans/re-evaluate"
+      ],
+      "recovery_class": "RELOAD_CONTEXT"
+    },
+    {
+      "scenario_id": "ReevaluationExecutionFailure[PlanEvaluationInputError]",
+      "contract_key": "ReevaluationExecutionFailure[PlanEvaluationInputError]",
+      "endpoints": [
+        "POST /api/v1/plans/re-evaluate"
+      ],
+      "recovery_class": "FIX_INPUT"
+    },
+    {
+      "scenario_id": "ReevaluationExecutionFailure[PlanEvaluationIndeterminateError]",
+      "contract_key": "ReevaluationExecutionFailure[PlanEvaluationIndeterminateError]",
+      "endpoints": [
+        "POST /api/v1/plans/re-evaluate"
+      ],
+      "recovery_class": "EDIT_CONSTRAINTS"
+    },
+    {
+      "scenario_id": "ReevaluationExecutionFailure[PlanEvaluationAvailabilityError]",
+      "contract_key": "ReevaluationExecutionFailure[PlanEvaluationAvailabilityError]",
+      "endpoints": [
+        "POST /api/v1/plans/re-evaluate"
+      ],
+      "recovery_class": "RETRY_SAME_INPUT"
+    },
+    {
+      "scenario_id": "ReevaluationExecutionFailure[PlanEvaluationSolverExecutionError]",
+      "contract_key": "ReevaluationExecutionFailure[PlanEvaluationSolverExecutionError]",
+      "endpoints": [
+        "POST /api/v1/plans/re-evaluate"
+      ],
+      "recovery_class": "RETRY_SAME_INPUT"
+    },
+    {
+      "scenario_id": "ReevaluationExecutionFailure[PlanEvaluationRuntimeError]",
+      "contract_key": "ReevaluationExecutionFailure[PlanEvaluationRuntimeError]",
+      "endpoints": [
+        "POST /api/v1/plans/re-evaluate"
+      ],
+      "recovery_class": "RETRY_SAME_INPUT"
+    },
+    {
+      "scenario_id": "ReevaluationExecutionFailure[PlanEvaluationExecutionError]",
+      "contract_key": "ReevaluationExecutionFailure[PlanEvaluationExecutionError]",
+      "endpoints": [
+        "POST /api/v1/plans/re-evaluate"
+      ],
+      "recovery_class": "NO_AUTOMATIC_RECOVERY"
+    },
+    {
+      "scenario_id": "ReevaluationExecutionFailure[PlanEvaluationInvariantError]",
+      "contract_key": "ReevaluationExecutionFailure[PlanEvaluationInvariantError]",
+      "endpoints": [
+        "POST /api/v1/plans/re-evaluate"
+      ],
+      "recovery_class": "NO_AUTOMATIC_RECOVERY"
+    },
+    {
+      "scenario_id": "ReevaluationExecutionFailure[UnhandledException]",
+      "contract_key": "ReevaluationExecutionFailure[UnhandledException]",
+      "endpoints": [
+        "POST /api/v1/plans/re-evaluate"
+      ],
+      "recovery_class": "NO_AUTOMATIC_RECOVERY"
+    },
+    {
+      "scenario_id": "UnsupportedReevaluationContract",
+      "contract_key": "UnsupportedReevaluationContract",
+      "endpoints": [
+        "POST /api/v1/plans/re-evaluate"
+      ],
+      "recovery_class": "NO_AUTOMATIC_RECOVERY"
+    },
+    {
+      "scenario_id": "DEADLINE_PASSED",
+      "contract_key": null,
+      "expected_state": "DEADLINE_PASSED",
+      "recovery_class": "NO_AUTOMATIC_RECOVERY"
+    },
+    {
+      "scenario_id": "FAILED_ELIGIBILITY",
+      "contract_key": null,
+      "expected_state": "ELIGIBILITY_BLOCKED",
+      "recovery_class": "NO_AUTOMATIC_RECOVERY"
+    },
+    {
+      "scenario_id": "UNKNOWN_USER_ATTRIBUTE",
+      "contract_key": null,
+      "expected_state": "NEEDS_REVIEW",
+      "recovery_class": "FIX_INPUT"
+    },
+    {
+      "scenario_id": "CRITICAL_CONFLICT",
+      "contract_key": null,
+      "expected_state": "NEEDS_REVIEW",
+      "recovery_class": "FIX_INPUT"
+    },
+    {
+      "scenario_id": "MISSING_MANDATORY_INFORMATION",
+      "contract_key": null,
+      "expected_state": "INSUFFICIENT_INFORMATION",
+      "recovery_class": "FIX_INPUT"
+    },
+    {
+      "scenario_id": "ZERO_USABLE_AVAILABILITY",
+      "contract_key": null,
+      "expected_state": "NOT_FEASIBLE_UNDER_CURRENT_CONSTRAINTS",
+      "recovery_class": "EDIT_CONSTRAINTS"
+    },
+    {
+      "scenario_id": "NARROW_CAPACITY",
+      "contract_key": null,
+      "expected_state": "TIGHT_CAPACITY",
+      "recovery_class": "EDIT_CONSTRAINTS"
+    },
+    {
+      "scenario_id": "SOLVER_INFEASIBLE",
+      "contract_key": null,
+      "expected_state": "NOT_FEASIBLE_UNDER_CURRENT_CONSTRAINTS",
+      "recovery_class": "EDIT_CONSTRAINTS"
+    },
+    {
+      "scenario_id": "STALE_SUPERSEDED",
+      "contract_key": null,
+      "expected_state": "SUPERSEDED",
+      "recovery_class": "REEVALUATE"
+    },
+    {
+      "scenario_id": "BASIS_UNCHANGED",
+      "contract_key": null,
+      "expected_state": "UNCHANGED",
+      "recovery_class": "NO_AUTOMATIC_RECOVERY"
+    }
+  ]
+}
