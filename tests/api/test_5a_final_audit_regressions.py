@@ -16,13 +16,13 @@ from apps.api.errors import PlanReevaluateContractError, unhandled_error_handler
 from apps.api.main import app
 from apps.api.services.reevaluation import ReevaluationExecutionFailure
 from tests.support.public_error_matrix import (
+    _ANALYSIS_FAILURES,
+    _ANALYSIS_VALIDATION_FAILURES,
     ANALYSIS_ENDPOINTS,
     PLAN_FAILURES,
     PUBLIC_ERROR_MATRIX,
     TRANSITION_NULL,
     TRANSITION_PASSTHROUGH,
-    _ANALYSIS_FAILURES,
-    _ANALYSIS_VALIDATION_FAILURES,
 )
 
 
