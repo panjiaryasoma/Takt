@@ -1,0 +1,157 @@
+{
+  "format": "6a-observational-baseline-v1",
+  "measured_at_utc": "2026-09-30T13:03:32.673855+00:00",
+  "base_sha": "7986a6fd967f93327b1fcf272095523f90190ad5",
+  "measurement_code_sha256": "8225437f74d7871b927fea84995e1db0cfd6b29fc1cce93260518526a7e13c59",
+  "environment": {
+    "python": "3.12.14",
+    "os": "Linux",
+    "architecture": "x86_64",
+    "logical_cpus": 9,
+    "dependencies": {
+      "ortools": "9.15.6755",
+      "pymupdf": "1.28.2",
+      "fastapi": "0.141.1",
+      "httpx": "0.28.1"
+    },
+    "tesseract": "tesseract 5.3.4"
+  },
+  "method": {
+    "clock": "perf_counter",
+    "unit": "milliseconds",
+    "warmups_per_stage": 1,
+    "repetitions": 5,
+    "latency_thresholds": null,
+    "network": "MockTransport and fixed public DNS; external network and Railway excluded",
+    "e2e": "In-process HTTP request validation, service execution and response serialization",
+    "ocr": "Real two-page image PDF, rasterization and Tesseract; provider initialized before timing",
+    "solver": "One LIKELY candidate-pool solve; plan E2E includes all four scenarios",
+    "reconciliation": "All canonical fields plus report assembly; extraction outside timing",
+    "planning_fixture": "One mandatory 60-minute task; one clipped work window with 99 usable minutes",
+    "scope": "Small warm fixture baseline, not production load, concurrency, cold start or SLO evidence"
+  },
+  "fixtures": {
+    "native_competition.html": {
+      "bytes": 608,
+      "sha256": "eb6317f8255448fb525e9b0ec307f87f01f834ccc69ffbe6d051d0369f89fed3"
+    },
+    "native_competition.pdf": {
+      "bytes": 1540,
+      "sha256": "01509f7a7f3c075161d9252a78ee37b2eb577afddc9bd3e0e444fc76d0a69b41"
+    },
+    "ocr_competition.pdf": {
+      "bytes": 106923,
+      "sha256": "a707a87b4518bae6789e3eb91934badb20e9ad205d1a028335a58938f020d0c3"
+    }
+  },
+  "metrics": {
+    "native_html": {
+      "samples_ms": [
+        0.34557100025267573,
+        0.3479239999251149,
+        0.36943599980077124,
+        0.31984199995349627,
+        0.3273530001024483
+      ],
+      "min_ms": 0.31984199995349627,
+      "median_ms": 0.34557100025267573,
+      "max_ms": 0.36943599980077124
+    },
+    "native_pdf": {
+      "samples_ms": [
+        0.9591949997229676,
+        0.9159299997918424,
+        0.8512229996995302,
+        0.8585340001445729,
+        0.9060849997695186
+      ],
+      "min_ms": 0.8512229996995302,
+      "median_ms": 0.9060849997695186,
+      "max_ms": 0.9591949997229676
+    },
+    "ocr_fixture": {
+      "samples_ms": [
+        460.6852100000651,
+        465.95592999983637,
+        441.03676499980793,
+        444.0504399999554,
+        454.09083999993527
+      ],
+      "min_ms": 441.03676499980793,
+      "median_ms": 454.09083999993527,
+      "max_ms": 465.95592999983637
+    },
+    "reconciliation": {
+      "samples_ms": [
+        1.1450750002950372,
+        1.1451450000095065,
+        1.6921390001698455,
+        1.14289099974485,
+        1.1701029998221202
+      ],
+      "min_ms": 1.14289099974485,
+      "median_ms": 1.1451450000095065,
+      "max_ms": 1.6921390001698455
+    },
+    "availability": {
+      "samples_ms": [
+        0.0472310002805898,
+        0.03911900012099068,
+        0.03740599959201063,
+        0.03323999999338412,
+        0.03390099982425454
+      ],
+      "min_ms": 0.03323999999338412,
+      "median_ms": 0.03740599959201063,
+      "max_ms": 0.0472310002805898
+    },
+    "solver": {
+      "samples_ms": [
+        2.0934839999426913,
+        2.089347000037378,
+        2.7253959997324273,
+        2.1770799999103474,
+        2.0755660002578225
+      ],
+      "min_ms": 2.0755660002578225,
+      "median_ms": 2.0934839999426913,
+      "max_ms": 2.7253959997324273
+    },
+    "plan_evaluate_e2e": {
+      "samples_ms": [
+        14.81274499974461,
+        13.22825900024327,
+        13.662754000051791,
+        13.75491199996759,
+        13.356061999729718
+      ],
+      "min_ms": 13.22825900024327,
+      "median_ms": 13.662754000051791,
+      "max_ms": 14.81274499974461
+    },
+    "competition_analysis_e2e": {
+      "samples_ms": [
+        3.5637279997899896,
+        4.451056000107201,
+        3.5068729998783965,
+        3.5623270000542107,
+        4.1621099999247235
+      ],
+      "min_ms": 3.5068729998783965,
+      "median_ms": 3.5637279997899896,
+      "max_ms": 4.451056000107201
+    },
+    "reevaluation_unchanged_e2e": {
+      "samples_ms": [
+        4.056081000271661,
+        5.649283999900945,
+        7.324553999751515,
+        4.704573000253731,
+        4.146947000208456
+      ],
+      "min_ms": 4.056081000271661,
+      "median_ms": 4.704573000253731,
+      "max_ms": 7.324553999751515
+    }
+  }
+}
