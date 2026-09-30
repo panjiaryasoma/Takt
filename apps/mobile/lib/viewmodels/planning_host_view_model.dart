@@ -107,9 +107,8 @@ final class PlanningHostViewModel extends ChangeNotifier {
       _phase == PlanningHostPhase.persistenceError &&
       _pendingPersistence != null;
   PersistenceExitKind? get persistenceExitKind => switch (_pendingPersistence) {
-        _PendingInitial() || _PendingReevaluationSuccess() =>
-          PersistenceExitKind.discardableResult,
-        _PendingReevaluationFailure() =>
+        _PendingInitial() => PersistenceExitKind.discardableResult,
+        _PendingReevaluationSuccess() || _PendingReevaluationFailure() =>
           PersistenceExitKind.correctnessBearing,
         null => null,
       };
@@ -117,8 +116,13 @@ final class PlanningHostViewModel extends ChangeNotifier {
       persistenceExitKind == PersistenceExitKind.discardableResult;
   bool get hasKnownUnpersistedStaleWitness {
     final pending = _pendingPersistence;
-    return pending is _PendingReevaluationFailure &&
-        pending.failure.transition?.priorEvaluationFreshness == 'STALE';
+    return switch (pending) {
+      _PendingReevaluationSuccess() =>
+        pending.transport.success.transition.priorEvaluationFreshness == 'STALE',
+      _PendingReevaluationFailure() =>
+        pending.failure.transition?.priorEvaluationFreshness == 'STALE',
+      _ => false,
+    };
   }
   bool get acceptanceSaving => _acceptanceSaving;
   bool get canRetryAcceptancePersistence =>
@@ -880,6 +884,7 @@ final class PlanningHostViewModel extends ChangeNotifier {
     }
     _draft = next;
     _inputRevision++;
+    _lastRequest = null;
     _activeSession = null;
     _phase = PlanningHostPhase.setup;
     _failure = null;
@@ -894,6 +899,22 @@ final class PlanningHostViewModel extends ChangeNotifier {
     }
     return value;
   }
+
+  bool abandonRequest() {
+    if (_phase != PlanningHostPhase.requesting) return false;
+    _generation++;
+    _lastRequest = null;
+    _pendingPersistence = null;
+    _failure = null;
+    _activeSession = null;
+    _phase = PlanningHostPhase.setup;
+    _message = 'Planning request abandoned. Late results from it will be ignored.';
+    notifyListeners();
+    return true;
+  }
+
+  bool get navigationLockedByPersistence =>
+      _phase == PlanningHostPhase.persisting || _acceptanceSaving;
 
   bool _isCurrent(int generation, int revision) =>
       generation == _generation && revision == _inputRevision;
