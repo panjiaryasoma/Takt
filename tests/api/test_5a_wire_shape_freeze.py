@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-import apps.api.contracts as wire
+from apps.api import contracts as wire
 
 
 PUBLIC_WIRE_FIELDS = {
