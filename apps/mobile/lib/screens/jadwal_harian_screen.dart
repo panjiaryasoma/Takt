@@ -533,7 +533,7 @@ class _CancelledOccurrenceCard extends StatelessWidget {
             SizedBox(
               width: 44,
               child: Text(
-                _hhmm(item.startAt),
+                JadwalHarianScreen._hhmm(item.startAt),
                 style: const TextStyle(
                   color: C.detailMuted,
                   fontSize: 14,
