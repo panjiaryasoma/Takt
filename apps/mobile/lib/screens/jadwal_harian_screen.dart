@@ -223,6 +223,7 @@ class JadwalHarianScreen extends StatelessWidget {
     final vm = context.watch<JadwalViewModel>();
     final selected = vm.selectedDate;
     final items = vm.itemsForSelectedDate;
+    final cancelledItems = vm.cancelledItemsForSelectedDate;
     final acceptedItems = vm.acceptedItemsForSelectedDate;
     final eventDays = vm.eventDaysOfMonth(selected);
     final header =
@@ -397,7 +398,7 @@ class JadwalHarianScreen extends StatelessWidget {
             _RetryCard(message: vm.errorMessage!, onRetry: vm.retry)
           else if (vm.isLoading)
             const Center(child: CircularProgressIndicator(color: C.accent))
-          else if (items.isEmpty && acceptedItems.isEmpty)
+          else if (items.isEmpty && cancelledItems.isEmpty && acceptedItems.isEmpty)
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: PresentationCard(
@@ -459,6 +460,10 @@ class JadwalHarianScreen extends StatelessWidget {
               ),
               const SizedBox(height: 16),
             ],
+            for (final cancelled in cancelledItems) ...[
+              _CancelledOccurrenceCard(item: cancelled),
+              const SizedBox(height: 16),
+            ],
             for (final block in acceptedItems) ...[
               _AcceptedPlanCard(
                 block: block,
@@ -490,6 +495,75 @@ class JadwalHarianScreen extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _CancelledOccurrenceCard extends StatelessWidget {
+  const _CancelledOccurrenceCard({required this.item});
+
+  final CancelledScheduleOccurrence item;
+
+  @override
+  Widget build(BuildContext context) {
+    final duration = _duration(item.durationMinutes);
+    return Semantics(
+      label:
+          '${item.commitment.title}, cancelled occurrence, does not block planning',
+      child: Container(
+        key: Key(
+          'cancelled-occurrence-${item.commitment.id}-${item.originalStartAtEpochMs}',
+        ),
+        margin: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: C.card,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: C.detailMuted),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.event_busy_outlined, color: C.detailMuted, size: 20),
+            const SizedBox(width: 12),
+            SizedBox(
+              width: 44,
+              child: Text(
+                _hhmm(item.startAt),
+                style: const TextStyle(
+                  color: C.detailMuted,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.commitment.title,
+                    style: const TextStyle(
+                      color: C.detailMuted,
+                      fontSize: 13,
+                      decoration: TextDecoration.lineThrough,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '$duration · cancelled occurrence · does not block planning',
+                    style: const TextStyle(
+                      color: C.detailMuted,
+                      fontSize: 11,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
