@@ -13,6 +13,7 @@ import '../models/evaluation.dart';
 import '../models/evaluation_session.dart';
 import '../models/planning_input_draft.dart';
 import '../models/planning_preferences.dart';
+import '../models/recovery_policy.dart';
 import '../models/saved_plan.dart';
 import '../services/planning_request_assembler.dart';
 
@@ -33,12 +34,18 @@ final class PlanningHostFailure {
   const PlanningHostFailure({
     required this.code,
     required this.message,
-    required this.retryable,
+    required this.recoveryClass,
+    this.stage = 'local',
+    this.statusCode,
   });
 
   final String code;
   final String message;
-  final bool retryable;
+  final RecoveryClass recoveryClass;
+  final String stage;
+  final int? statusCode;
+
+  bool get retryable => recoveryClass == RecoveryClass.retrySameInput;
 }
 
 final class PlanningHostViewModel extends ChangeNotifier {
@@ -74,6 +81,9 @@ final class PlanningHostViewModel extends ChangeNotifier {
   EvaluationSession? _activeSession;
   PlanningHostFailure? _failure;
   _PendingPersistence? _pendingPersistence;
+  _PlanRequestContext? _lastRequest;
+  _PendingAcceptance? _pendingAcceptance;
+  bool _acceptanceSaving = false;
   String? _message;
   int _inputRevision = 0;
   int _generation = 0;
@@ -91,13 +101,38 @@ final class PlanningHostViewModel extends ChangeNotifier {
   bool get hasAcceptedPlan => _savedPlan != null;
   bool get busy => _phase == PlanningHostPhase.loading ||
       _phase == PlanningHostPhase.requesting ||
-      _phase == PlanningHostPhase.persisting;
+      _phase == PlanningHostPhase.persisting ||
+      _acceptanceSaving;
   bool get canRetryPersistence =>
       _phase == PlanningHostPhase.persistenceError &&
       _pendingPersistence != null;
-  bool get inputsLocked => busy || canRetryPersistence;
+  PersistenceExitKind? get persistenceExitKind => switch (_pendingPersistence) {
+        _PendingInitial() || _PendingReevaluationSuccess() =>
+          PersistenceExitKind.discardableResult,
+        _PendingReevaluationFailure() =>
+          PersistenceExitKind.correctnessBearing,
+        null => null,
+      };
+  bool get canDiscardPendingResult =>
+      persistenceExitKind == PersistenceExitKind.discardableResult;
+  bool get hasKnownUnpersistedStaleWitness =>
+      _pendingPersistence case _PendingReevaluationFailure(
+        failure: final failure,
+      ) when failure.transition?.kind.name == 'superseded' =>
+        true,
+      _ => false,
+      };
+  bool get acceptanceSaving => _acceptanceSaving;
+  bool get canRetryAcceptancePersistence =>
+      _pendingAcceptance != null && !_acceptanceSaving;
+  bool get canCancelPendingAcceptance =>
+      _pendingAcceptance != null && !_acceptanceSaving;
+  bool get hasPendingAcceptance => _pendingAcceptance != null;
+  bool get inputsLocked => busy || canRetryPersistence || hasPendingAcceptance;
   bool get canRetryRequest =>
-      _phase == PlanningHostPhase.error && (_failure?.retryable ?? false);
+      _phase == PlanningHostPhase.error &&
+      _failure?.recoveryClass == RecoveryClass.retrySameInput &&
+      _lastRequest != null;
   bool get canCreateFreshBaseline =>
       _phase == PlanningHostPhase.error &&
       _failure?.code == 'UNSUPPORTED_REEVALUATION_CONTRACT' &&
