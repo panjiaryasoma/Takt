@@ -514,6 +514,28 @@ class _RootShellState extends State<RootShell> {
     );
   }
 
+  void _selectRootTab(int index) {
+    if (index < 0 || index > 3 || index == _navIndex) return;
+    if (index == 3) {
+      unawaited(context.read<SavedPlansViewModel>().refresh());
+    }
+    setState(() {
+      _navIndex = index;
+      if (index != 3) _selectedSavedPlanId = null;
+      if (index == 1) {
+        _showTambahJadwal = false;
+        _editingCommitment = null;
+      }
+    });
+  }
+
+  void _handleRootSwipe(DragEndDetails details) {
+    final velocity = details.primaryVelocity ?? 0;
+    if (velocity.abs() < 500) return;
+    final target = velocity < 0 ? _navIndex + 1 : _navIndex - 1;
+    _selectRootTab(target);
+  }
+
   Widget _body() {
     switch (_navIndex) {
       case 1:
@@ -581,23 +603,16 @@ class _RootShellState extends State<RootShell> {
       backgroundColor: C.bg,
       body: SafeArea(
         bottom: false,
-        child: _body(),
+        child: GestureDetector(
+          key: const Key('root-tab-swipe-area'),
+          behavior: HitTestBehavior.translucent,
+          onHorizontalDragEnd: _handleRootSwipe,
+          child: _body(),
+        ),
       ),
       bottomNavigationBar: _BottomNav(
         activeIndex: _navIndex,
-        onTap: (index) {
-          if (index == 3) {
-            unawaited(context.read<SavedPlansViewModel>().refresh());
-          }
-          setState(() {
-            _navIndex = index;
-            if (index != 3) _selectedSavedPlanId = null;
-            if (index == 1) {
-              _showTambahJadwal = false;
-              _editingCommitment = null;
-            }
-          });
-        },
+        onTap: _selectRootTab,
       ),
     );
   }
