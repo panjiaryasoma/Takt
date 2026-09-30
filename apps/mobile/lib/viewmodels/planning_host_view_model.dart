@@ -345,7 +345,7 @@ final class PlanningHostViewModel extends ChangeNotifier {
         _failure = PlanningHostFailure(
           code: error.code,
           message: error.message,
-          retryable: false,
+          recoveryClass: RecoveryClass.editConstraints,
         );
         notifyListeners();
       }
@@ -648,6 +648,19 @@ final class PlanningHostViewModel extends ChangeNotifier {
     }
   }
 
+  void discardPendingResult() {
+    if (!canDiscardPendingResult) return;
+    _generation++;
+    _pendingPersistence = null;
+    _lastRequest = null;
+    _failure = null;
+    _activeSession = null;
+    _phase = PlanningHostPhase.setup;
+    _message =
+        'Unsaved evaluation result discarded. Prior durable planning state was not changed.';
+    notifyListeners();
+  }
+
   Future<void> _publishPersisted(
     Evaluation persisted,
     int generation,
@@ -814,7 +827,9 @@ final class PlanningHostViewModel extends ChangeNotifier {
     _failure = PlanningHostFailure(
       code: error.code,
       message: _publicMessage(error.code),
-      retryable: error.retryable,
+      recoveryClass: error.recoveryClass,
+      stage: error.stage,
+      statusCode: error.statusCode,
     );
     notifyListeners();
   }
@@ -824,18 +839,28 @@ final class PlanningHostViewModel extends ChangeNotifier {
     _failure = PlanningHostFailure(
       code: code,
       message: message,
-      retryable: false,
+      recoveryClass: RecoveryPolicy.classify(
+        FailureIdentity(
+          code: code,
+          stage: 'local',
+          origin: FailureOrigin.local,
+        ),
+      ),
     );
     notifyListeners();
   }
 
   void _setPersistenceFailure(Object error) {
     _phase = PlanningHostPhase.persistenceError;
-    _failure = const PlanningHostFailure(
-      code: 'PERSISTENCE_ERROR',
-      message:
-          'The evaluated result is safe in memory but could not be saved locally. Retry saving without calling the backend again.',
-      retryable: true,
+    final correctnessBearing =
+        persistenceExitKind == PersistenceExitKind.correctnessBearing;
+    _failure = PlanningHostFailure(
+      code: 'LOCAL_PERSISTENCE_FAILED',
+      message: correctnessBearing
+          ? 'A trusted re-evaluation transition is known in this lifecycle but could not be saved locally. Retry saving before treating the prior evaluation as fresh.'
+          : 'The evaluated result is safe in memory but could not be saved locally. Retry saving without calling the backend again.',
+      recoveryClass: RecoveryClass.noAutomaticRecovery,
+      stage: 'persistence',
     );
     notifyListeners();
   }
@@ -852,7 +877,9 @@ final class PlanningHostViewModel extends ChangeNotifier {
         'The prior and current planning context no longer compare safely. Reload the saved plan before trying again.',
       'UNSUPPORTED_REEVALUATION_CONTRACT' =>
         'This saved plan uses an older re-evaluation contract. A fresh baseline can be created explicitly.',
-      'NETWORK' || 'TIMEOUT' =>
+      'CLIENT_NETWORK_ERROR' ||
+      'CLIENT_TIMEOUT' ||
+      'CLIENT_CONNECTION_FAILED' =>
         'The planning service could not be reached. Try the request again.',
       'RESPONSE_CONTRACT_INVALID' =>
         'The planning service returned a response this app cannot use safely.',
