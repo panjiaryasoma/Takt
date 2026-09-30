@@ -155,7 +155,7 @@ void main() {
     await tester.pump();
 
     Text day(String value) =>
-        tester.widget<Text>(find.byKey(Key('weekly-day-' + value)));
+        tester.widget<Text>(find.byKey(Key('weekly-day-$value')));
     expect(day('Wed').style?.color, C.accent);
     expect(day('Sat').style?.color, C.white);
 
