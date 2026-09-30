@@ -235,121 +235,150 @@ class JadwalHarianScreen extends StatelessWidget {
           const SizedBox(height: 16),
           JadwalTabs(activeIndex: 0, onChanged: onSwitchTab),
           const SizedBox(height: 16),
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 20),
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-            decoration: BoxDecoration(
-              color: C.accent,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                GestureDetector(
-                  onTap: () => vm.selectDate(
-                    DateTime(selected.year, selected.month - 1, 1),
-                  ),
-                  child: const Icon(Icons.chevron_left, color: C.bg),
-                ),
-                Text(
-                  '${_monthNames[selected.month - 1]} ${selected.year}',
-                  style: const TextStyle(
-                    color: C.bg,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
-                GestureDetector(
-                  onTap: () => vm.selectDate(
-                    DateTime(selected.year, selected.month + 1, 1),
-                  ),
-                  child: const Icon(Icons.chevron_right, color: C.bg),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 16),
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 20),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-            decoration: BoxDecoration(
-              color: C.cardAlt,
-              borderRadius: BorderRadius.circular(16),
-            ),
+          GestureDetector(
+            key: const Key('month-calendar-swipe-area'),
+            behavior: HitTestBehavior.opaque,
+            onHorizontalDragEnd: (details) {
+              final velocity = details.primaryVelocity ?? 0;
+              if (velocity.abs() < 180) return;
+              final offset = velocity < 0 ? 1 : -1;
+              vm.selectDate(
+                DateTime(selected.year, selected.month + offset, 1),
+              );
+            },
             child: Column(
               children: [
-                Row(
-                  children: [
-                    for (final day in _dayHeaders)
-                      Expanded(
-                        child: Center(
-                          child: Text(
-                            day,
-                            style: const TextStyle(
-                              color: C.dayHeader,
-                              fontSize: 12,
-                            ),
-                          ),
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 20),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 16,
+                  ),
+                  decoration: BoxDecoration(
+                    color: C.accent,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      GestureDetector(
+                        onTap: () => vm.selectDate(
+                          DateTime(selected.year, selected.month - 1, 1),
+                        ),
+                        child: const Icon(Icons.chevron_left, color: C.bg),
+                      ),
+                      Text(
+                        '${_monthNames[selected.month - 1]} ${selected.year}',
+                        key: const Key('calendar-month-label'),
+                        style: const TextStyle(
+                          color: C.bg,
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
                         ),
                       ),
-                  ],
+                      GestureDetector(
+                        onTap: () => vm.selectDate(
+                          DateTime(selected.year, selected.month + 1, 1),
+                        ),
+                        child: const Icon(Icons.chevron_right, color: C.bg),
+                      ),
+                    ],
+                  ),
                 ),
-                const SizedBox(height: 8),
-                for (final week in _weeks(selected))
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Row(
-                      children: [
-                        for (final day in week)
-                          Expanded(
-                            child: GestureDetector(
-                              behavior: HitTestBehavior.opaque,
-                              onTap: day == null
-                                  ? null
-                                  : () => vm.selectDay(day, inMonth: selected),
-                              child: Container(
-                                height: 44,
-                                margin: const EdgeInsets.symmetric(horizontal: 2),
-                                decoration: BoxDecoration(
-                                  color: day == selected.day
-                                      ? C.accent
-                                      : Colors.transparent,
-                                  borderRadius: BorderRadius.circular(12),
-                                ),
-                                child: Column(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      day?.toString() ?? '',
-                                      style: TextStyle(
-                                        color: day == selected.day
-                                            ? C.bg
-                                            : C.white,
-                                        fontSize: 14,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Container(
-                                      width: 5,
-                                      height: 5,
-                                      decoration: BoxDecoration(
-                                        shape: BoxShape.circle,
-                                        color: day != null &&
-                                                eventDays.contains(day)
-                                            ? (day == selected.day
-                                                ? C.bg
-                                                : C.accent)
-                                            : Colors.transparent,
-                                      ),
-                                    ),
-                                  ],
+                const SizedBox(height: 16),
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 20),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 16,
+                  ),
+                  decoration: BoxDecoration(
+                    color: C.cardAlt,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    children: [
+                      Row(
+                        children: [
+                          for (final day in _dayHeaders)
+                            Expanded(
+                              child: Center(
+                                child: Text(
+                                  day,
+                                  style: const TextStyle(
+                                    color: C.dayHeader,
+                                    fontSize: 12,
+                                  ),
                                 ),
                               ),
                             ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      for (final week in _weeks(selected))
+                        Padding(
+                          padding: const EdgeInsets.only(bottom: 4),
+                          child: Row(
+                            children: [
+                              for (final day in week)
+                                Expanded(
+                                  child: GestureDetector(
+                                    behavior: HitTestBehavior.opaque,
+                                    onTap: day == null
+                                        ? null
+                                        : () => vm.selectDay(
+                                              day,
+                                              inMonth: selected,
+                                            ),
+                                    child: Container(
+                                      height: 44,
+                                      margin: const EdgeInsets.symmetric(
+                                        horizontal: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: day == selected.day
+                                            ? C.accent
+                                            : Colors.transparent,
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Column(
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            day?.toString() ?? '',
+                                            style: TextStyle(
+                                              color: day == selected.day
+                                                  ? C.bg
+                                                  : C.white,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 4),
+                                          Container(
+                                            width: 5,
+                                            height: 5,
+                                            decoration: BoxDecoration(
+                                              shape: BoxShape.circle,
+                                              color: day != null &&
+                                                      eventDays.contains(day)
+                                                  ? (day == selected.day
+                                                      ? C.bg
+                                                      : C.accent)
+                                                  : Colors.transparent,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
                           ),
-                      ],
-                    ),
+                        ),
+                    ],
                   ),
+                ),
               ],
             ),
           ),
