@@ -344,9 +344,13 @@ class JadwalHarianScreen extends StatelessWidget {
                                               inMonth: selected,
                                             ),
                                     child: Container(
-                                      height: 44,
+                                      constraints:
+                                          const BoxConstraints(minHeight: 44),
                                       margin: const EdgeInsets.symmetric(
                                         horizontal: 2,
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 6,
                                       ),
                                       decoration: BoxDecoration(
                                         color: day == selected.day
@@ -355,6 +359,7 @@ class JadwalHarianScreen extends StatelessWidget {
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       child: Column(
+                                        mainAxisSize: MainAxisSize.min,
                                         mainAxisAlignment:
                                             MainAxisAlignment.center,
                                         children: [
