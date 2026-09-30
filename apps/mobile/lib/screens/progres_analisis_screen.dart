@@ -308,24 +308,3 @@ class _StepRow extends StatelessWidget {
     );
   }
 }
-
-class _ActionButton extends StatelessWidget {
-  const _ActionButton({
-    required this.label,
-    required this.onTap,
-  });
-
-  final String label;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: FilledButton(
-        onPressed: onTap,
-        child: Text(label),
-      ),
-    );
-  }
-}
