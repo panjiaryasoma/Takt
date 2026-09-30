@@ -1,39 +1,74 @@
+import 'recovery_policy.dart';
+
 class AnalysisFailure implements Exception {
   const AnalysisFailure({
     required this.code,
     required this.stage,
     required this.message,
     required this.userMessage,
-    required this.retryable,
+    this.statusCode,
+    this.origin = FailureOrigin.backend,
+    bool? retryable,
   });
 
   final String code;
   final String stage;
   final String message;
   final String userMessage;
-  final bool retryable;
+  final int? statusCode;
+  final FailureOrigin origin;
+
+  FailureIdentity get identity => FailureIdentity(
+        code: code,
+        stage: stage,
+        statusCode: statusCode,
+        origin: origin,
+      );
+
+  RecoveryClass get recoveryClass => RecoveryPolicy.classify(identity);
+
+  /// Compatibility projection only. RecoveryClass is the authority.
+  bool get retryable => recoveryClass == RecoveryClass.retrySameInput;
 
   factory AnalysisFailure.fromBackend({
     required String code,
     required String stage,
     required String message,
+    required int statusCode,
   }) {
     return AnalysisFailure(
       code: code,
       stage: stage,
       message: message,
+      statusCode: statusCode,
+      origin: FailureOrigin.backend,
       userMessage: _knownMessages[code] ??
           'Analysis failed with a response this app does not recognize.',
-      retryable: _retryableCodes.contains(code),
     );
   }
 
-  factory AnalysisFailure.network(Object error) => AnalysisFailure(
-        code: 'NETWORK_ERROR',
+  factory AnalysisFailure.timeout(Object error) => AnalysisFailure(
+        code: 'CLIENT_TIMEOUT',
+        stage: 'transport',
+        message: error.toString(),
+        userMessage: 'The connection to the Takt server timed out.',
+        origin: FailureOrigin.clientTransport,
+      );
+
+  factory AnalysisFailure.connection(Object error) => AnalysisFailure(
+        code: 'CLIENT_CONNECTION_FAILED',
         stage: 'transport',
         message: error.toString(),
         userMessage: 'Could not connect to the Takt server.',
-        retryable: true,
+        origin: FailureOrigin.clientTransport,
+      );
+
+  factory AnalysisFailure.network(Object error) => AnalysisFailure(
+        code: 'CLIENT_NETWORK_ERROR',
+        stage: 'transport',
+        message: error.toString(),
+        userMessage: 'Could not connect to the Takt server.',
+        origin: FailureOrigin.clientTransport,
       );
 
   factory AnalysisFailure.contract(Object error) => AnalysisFailure(
@@ -41,7 +76,7 @@ class AnalysisFailure implements Exception {
         stage: 'response',
         message: error.toString(),
         userMessage: 'The server response does not match the app contract.',
-        retryable: false,
+        origin: FailureOrigin.local,
       );
 
   factory AnalysisFailure.persistence(Object error) => AnalysisFailure(
@@ -50,15 +85,8 @@ class AnalysisFailure implements Exception {
         message: error.toString(),
         userMessage:
             'The analysis result was received, but could not be saved on this device.',
-        retryable: true,
+        origin: FailureOrigin.local,
       );
-
-  static const _retryableCodes = <String>{
-    'SOURCE_FETCH_FAILED',
-    'OCR_PROVIDER_UNAVAILABLE',
-    'OCR_TIMEOUT',
-    'OCR_PROVIDER_ERROR',
-  };
 
   static const _knownMessages = <String, String>{
     'VALIDATION_ERROR': 'The request data is invalid.',
