@@ -450,7 +450,7 @@ class JadwalViewModel extends ChangeNotifier {
       final recurrenceRule = rrule == null
           ? null
           : RecurrenceRule(
-              id: 'rr_' + id,
+              id: 'rr_$id',
               commitmentId: id,
               rrule: rrule,
               timezone: event.timezone,
