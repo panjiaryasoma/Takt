@@ -515,7 +515,7 @@ class _RootShellState extends State<RootShell> {
   }
 
   void _selectRootTab(int index) {
-    if (index < 0 || index > 3 || index == _navIndex) return;
+    if (index < 0 || index > 3) return;
     if (index == 3) {
       unawaited(context.read<SavedPlansViewModel>().refresh());
     }
@@ -636,43 +636,55 @@ class _BottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: C.card,
-      padding: EdgeInsets.only(
-        top: 10,
-        bottom: 8 + MediaQuery.of(context).padding.bottom,
-        left: 10,
-        right: 10,
-      ),
-      child: Row(
-        children: List.generate(_items.length, (index) {
-          final active = index == activeIndex;
-          return Expanded(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => onTap(index),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    _items[index].$1,
-                    size: 20,
-                    color: active ? C.accent : C.navInactive,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _items[index].$2,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
+    return GestureDetector(
+      key: const Key('bottom-nav-swipe-area'),
+      behavior: HitTestBehavior.opaque,
+      onHorizontalDragEnd: (details) {
+        final velocity = details.primaryVelocity ?? 0;
+        if (velocity.abs() < 500) return;
+        final target = velocity < 0 ? activeIndex + 1 : activeIndex - 1;
+        if (target >= 0 && target < _items.length) {
+          onTap(target);
+        }
+      },
+      child: Container(
+        color: C.card,
+        padding: EdgeInsets.only(
+          top: 10,
+          bottom: 8 + MediaQuery.of(context).padding.bottom,
+          left: 10,
+          right: 10,
+        ),
+        child: Row(
+          children: List.generate(_items.length, (index) {
+            final active = index == activeIndex;
+            return Expanded(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => onTap(index),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _items[index].$1,
+                      size: 20,
                       color: active ? C.accent : C.navInactive,
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 4),
+                    Text(
+                      _items[index].$2,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: active ? C.accent : C.navInactive,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          );
-        }),
+            );
+          }),
+        ),
       ),
     );
   }
