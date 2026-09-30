@@ -28,7 +28,7 @@ void main() {
     expect(source, contains('Traceability & evaluation details'));
   });
 
-  test('5B leaves domain and backend contract directories outside its diff scope',
+  test('5B presentation keeps explicit domain-authority and schedule-semantics markers',
       () {
     final viewModel = File(
       'lib/viewmodels/decision_report_view_model.dart',
