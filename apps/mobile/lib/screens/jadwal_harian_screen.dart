@@ -24,21 +24,28 @@ class JadwalTabs extends StatelessWidget {
     Widget tab(String label, int index) {
       final active = index == activeIndex;
       return Expanded(
-        child: GestureDetector(
-          onTap: () => onChanged(index),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            decoration: BoxDecoration(
+        child: Semantics(
+          button: true,
+          selected: active,
+          label: label,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 48),
+            child: Material(
               color: active ? C.accent : Colors.transparent,
               borderRadius: BorderRadius.circular(10),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              label,
-              style: TextStyle(
-                color: active ? C.bg : C.navInactive,
-                fontSize: 13,
-                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+              child: InkWell(
+                onTap: () => onChanged(index),
+                borderRadius: BorderRadius.circular(10),
+                child: Center(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      color: active ? C.bg : C.navInactive,
+                      fontSize: 13,
+                      fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
@@ -260,11 +267,12 @@ class JadwalHarianScreen extends StatelessWidget {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      GestureDetector(
-                        onTap: () => vm.selectDate(
+                      IconButton(
+                        tooltip: 'Previous month',
+                        onPressed: () => vm.selectDate(
                           DateTime(selected.year, selected.month - 1, 1),
                         ),
-                        child: const Icon(Icons.chevron_left, color: C.bg),
+                        icon: const Icon(Icons.chevron_left, color: C.bg),
                       ),
                       Text(
                         '${_monthNames[selected.month - 1]} ${selected.year}',
@@ -275,11 +283,12 @@ class JadwalHarianScreen extends StatelessWidget {
                           fontWeight: FontWeight.w700,
                         ),
                       ),
-                      GestureDetector(
-                        onTap: () => vm.selectDate(
+                      IconButton(
+                        tooltip: 'Next month',
+                        onPressed: () => vm.selectDate(
                           DateTime(selected.year, selected.month + 1, 1),
                         ),
-                        child: const Icon(Icons.chevron_right, color: C.bg),
+                        icon: const Icon(Icons.chevron_right, color: C.bg),
                       ),
                     ],
                   ),
