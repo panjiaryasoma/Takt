@@ -340,6 +340,9 @@ void main() {
       isNotNull,
     );
     expect(viewModel.all, isEmpty);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _pumpBounded(tester, frames: 2);
   });
 
   testWidgets('ICS preview renders wall-clock time in the event TZID',
@@ -390,6 +393,9 @@ void main() {
       find.text('30/09/2026 · 09:00–10:00 · America/New_York'),
       findsOneWidget,
     );
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _pumpBounded(tester, frames: 2);
   });
 
   testWidgets('the entire From and To cards change their time values',
@@ -447,6 +453,9 @@ void main() {
     await _pumpBounded(tester);
     expect(find.text('17:45'), findsOneWidget);
     expect(calls, 2);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _pumpBounded(tester, frames: 2);
   });
 
   testWidgets('calendar swipes change month without leaving Schedule',
@@ -500,6 +509,9 @@ void main() {
 
     expect(viewModel.selectedDate, DateTime(2026, 9, 1));
     expect(find.text('September 2026'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _pumpBounded(tester, frames: 2);
   });
 
   testWidgets('root body and bottom bar swipe through navigation tabs',
@@ -595,5 +607,8 @@ void main() {
     for (final label in ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']) {
       expect(day(label).style?.color, C.white);
     }
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _pumpBounded(tester, frames: 2);
   });
 }
