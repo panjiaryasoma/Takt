@@ -4,8 +4,8 @@ import 'package:flutter/material.dart';
 class C {
   C._();
 
-  /// Path logo di header. Ganti file di assets/images/ untuk mengubah logo.
-  static const logoAsset = 'assets/images/logo.png';
+  /// Canonical Takt branding asset used by the in-app header.
+  static const logoAsset = 'assets/branding/logo.jpg';
 
   static const bg = Color(0xFF2D3250); // background utama
   static const card = Color(0xFF424769); // card gelap

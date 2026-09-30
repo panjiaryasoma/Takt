@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../calendar/ics_import.dart';
 import '../data/repositories/saved_plan_repository.dart';
 import '../data/repositories/schedule_repository.dart';
 import '../models/active_accepted_block.dart';
@@ -11,6 +12,20 @@ import '../models/planning_preferences.dart';
 import '../models/recurrence_exception.dart';
 import '../models/recurrence_rule.dart';
 import '../models/schedule_occurrence.dart';
+
+final class IcsImportSaveResult {
+  const IcsImportSaveResult({
+    required this.success,
+    required this.imported,
+    required this.skippedDuplicates,
+    required this.rejected,
+  });
+
+  final bool success;
+  final int imported;
+  final int skippedDuplicates;
+  final int rejected;
+}
 
 /// Presentation state for My Schedule.
 ///
@@ -394,6 +409,84 @@ class JadwalViewModel extends ChangeNotifier {
       notifyListeners();
     }
     return ok;
+  }
+
+  Future<IcsImportSaveResult> importIcsEvents(
+    Iterable<IcsImportEvent> events,
+  ) async {
+    final existingIds = _state.commitments.map((item) => item.id).toSet();
+    final seenIds = <String>{};
+    final entries = <ScheduleImportEntry>[];
+    var skippedDuplicates = 0;
+    var rejected = 0;
+
+    for (final event in events) {
+      if (!event.supported ||
+          event.title.trim().isEmpty ||
+          event.endAtEpochMs <= event.startAtEpochMs) {
+        rejected++;
+        continue;
+      }
+      final id = event.commitmentId;
+      if (existingIds.contains(id) || !seenIds.add(id)) {
+        skippedDuplicates++;
+        continue;
+      }
+
+      final now = DateTime.now().millisecondsSinceEpoch;
+      final commitment = Commitment(
+        id: id,
+        title: event.title.trim(),
+        category: 'Calendar',
+        type: CommitmentType.fixed,
+        startAtEpochMs: _floorToMinute(event.startAtEpochMs),
+        endAtEpochMs: _floorToMinute(event.endAtEpochMs),
+        timezone: event.timezone,
+        source: 'ics',
+        createdAtEpochMs: now,
+        updatedAtEpochMs: now,
+      );
+      final rrule = event.rrule;
+      final recurrenceRule = rrule == null
+          ? null
+          : RecurrenceRule(
+              id: 'rr_$id',
+              commitmentId: id,
+              rrule: rrule,
+              timezone: event.timezone,
+              activeFromEpochMs: commitment.startAtEpochMs,
+              activeUntilEpochMs: event.activeUntilEpochMs,
+            );
+      entries.add(
+        ScheduleImportEntry(
+          commitment: commitment,
+          recurrenceRule: recurrenceRule,
+        ),
+      );
+    }
+
+    if (entries.isEmpty) {
+      return IcsImportSaveResult(
+        success: true,
+        imported: 0,
+        skippedDuplicates: skippedDuplicates,
+        rejected: rejected,
+      );
+    }
+
+    final ok = await _save(
+      () => _repository.createCommitmentsBatch(entries),
+    );
+    if (ok) {
+      _selectedDate = _dateOnly(entries.first.commitment.startAt);
+      notifyListeners();
+    }
+    return IcsImportSaveResult(
+      success: ok,
+      imported: ok ? entries.length : 0,
+      skippedDuplicates: skippedDuplicates,
+      rejected: rejected,
+    );
   }
 
   Future<bool> ubah({

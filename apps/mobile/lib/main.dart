@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import 'config/api_config.dart';
@@ -42,6 +43,15 @@ import 'widgets/common.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: C.bg,
+      statusBarIconBrightness: Brightness.light,
+      statusBarBrightness: Brightness.dark,
+      systemNavigationBarColor: C.bg,
+      systemNavigationBarIconBrightness: Brightness.light,
+    ),
+  );
   final monetization = await bootstrapRevenueCat();
   if (monetization.configurationError != null) {
     debugPrint('RevenueCat disabled: ${monetization.configurationError}');
@@ -505,6 +515,21 @@ class _RootShellState extends State<RootShell> {
     );
   }
 
+  void _selectRootTab(int index) {
+    if (index < 0 || index > 3) return;
+    if (index == 3) {
+      unawaited(context.read<SavedPlansViewModel>().refresh());
+    }
+    setState(() {
+      _navIndex = index;
+      if (index != 3) _selectedSavedPlanId = null;
+      if (index == 1) {
+        _showTambahJadwal = false;
+        _editingCommitment = null;
+      }
+    });
+  }
+
   Widget _body() {
     switch (_navIndex) {
       case 1:
@@ -572,28 +597,16 @@ class _RootShellState extends State<RootShell> {
       backgroundColor: C.bg,
       body: SafeArea(
         bottom: false,
-        child: Column(
-          children: [
-            const StatusBarMock(),
-            Expanded(child: _body()),
-          ],
+        child: HorizontalSwipeSurface(
+          key: const Key('root-tab-swipe-area'),
+          onSwipeLeft: () => _selectRootTab(_navIndex + 1),
+          onSwipeRight: () => _selectRootTab(_navIndex - 1),
+          child: _body(),
         ),
       ),
       bottomNavigationBar: _BottomNav(
         activeIndex: _navIndex,
-        onTap: (index) {
-          if (index == 3) {
-            unawaited(context.read<SavedPlansViewModel>().refresh());
-          }
-          setState(() {
-            _navIndex = index;
-            if (index != 3) _selectedSavedPlanId = null;
-            if (index == 1) {
-              _showTambahJadwal = false;
-              _editingCommitment = null;
-            }
-          });
-        },
+        onTap: _selectRootTab,
       ),
     );
   }
@@ -617,43 +630,55 @@ class _BottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      color: C.card,
-      padding: EdgeInsets.only(
-        top: 10,
-        bottom: 8 + MediaQuery.of(context).padding.bottom,
-        left: 10,
-        right: 10,
-      ),
-      child: Row(
-        children: List.generate(_items.length, (index) {
-          final active = index == activeIndex;
-          return Expanded(
-            child: GestureDetector(
-              behavior: HitTestBehavior.opaque,
-              onTap: () => onTap(index),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(
-                    _items[index].$1,
-                    size: 20,
-                    color: active ? C.accent : C.navInactive,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    _items[index].$2,
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.w600,
+    return HorizontalSwipeSurface(
+      key: const Key('bottom-nav-swipe-area'),
+      behavior: HitTestBehavior.opaque,
+      onSwipeLeft: () {
+        final target = activeIndex + 1;
+        if (target < _items.length) onTap(target);
+      },
+      onSwipeRight: () {
+        final target = activeIndex - 1;
+        if (target >= 0) onTap(target);
+      },
+      child: Container(
+        color: C.card,
+        padding: EdgeInsets.only(
+          top: 10,
+          bottom: 8 + MediaQuery.of(context).padding.bottom,
+          left: 10,
+          right: 10,
+        ),
+        child: Row(
+          children: List.generate(_items.length, (index) {
+            final active = index == activeIndex;
+            return Expanded(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => onTap(index),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _items[index].$1,
+                      size: 20,
                       color: active ? C.accent : C.navInactive,
                     ),
-                  ),
-                ],
+                    const SizedBox(height: 4),
+                    Text(
+                      _items[index].$2,
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
+                        color: active ? C.accent : C.navInactive,
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            ),
-          );
-        }),
+            );
+          }),
+        ),
       ),
     );
   }

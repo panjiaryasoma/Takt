@@ -183,6 +183,24 @@ ON CONFLICT(commitment_id) DO UPDATE SET
   }
 
   @override
+  Future<void> createCommitmentsBatch(
+    List<ScheduleImportEntry> entries,
+  ) async {
+    if (entries.isEmpty) return;
+    await initialize();
+    await _db.transaction(() async {
+      for (final entry in entries) {
+        await _insertCommitment(entry.commitment);
+        final rule = entry.recurrenceRule;
+        if (rule != null) {
+          await _insertRecurrenceRule(rule);
+        }
+      }
+    });
+    await refresh();
+  }
+
+  @override
   Future<void> deleteCommitment(String commitmentId) async {
     await initialize();
     await _db.customStatement(

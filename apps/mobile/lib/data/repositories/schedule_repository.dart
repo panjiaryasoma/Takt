@@ -3,6 +3,16 @@ import '../../models/planning_preferences.dart';
 import '../../models/recurrence_exception.dart';
 import '../../models/recurrence_rule.dart';
 
+final class ScheduleImportEntry {
+  const ScheduleImportEntry({
+    required this.commitment,
+    this.recurrenceRule,
+  });
+
+  final Commitment commitment;
+  final RecurrenceRule? recurrenceRule;
+}
+
 class ScheduleState {
   const ScheduleState({
     required this.commitments,
@@ -42,6 +52,8 @@ abstract class ScheduleRepository {
     Commitment commitment, {
     RecurrenceRule? recurrenceRule,
   });
+
+  Future<void> createCommitmentsBatch(List<ScheduleImportEntry> entries);
 
   Future<void> deleteCommitment(String commitmentId);
 
