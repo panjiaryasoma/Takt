@@ -787,6 +787,50 @@ void main() {
       );
     });
 
+    test('syntactically valid localhost is left to backend ingestion policy',
+        () async {
+      final recorder = _RecordingHttpClient(
+        jsonEncode({
+          'error': {
+            'code': 'INVALID_SOURCE',
+            'stage': 'ingestion',
+            'message': 'Source reference is invalid or not allowed.',
+            'details': <Object?>[],
+          },
+        }),
+        statusCode: 400,
+      );
+      final client = HttpCompetitionApiClient(
+        baseUrl: 'https://example.test',
+        client: recorder,
+      );
+      addTearDown(client.close);
+
+      const source = AnalysisSourceMetadata(
+        sourceId: 'src-localhost',
+        sourceType: SourceTypeWire.officialRules,
+      );
+
+      await expectLater(
+        client.analyzeUrl(
+          competitionId: 'cmp-localhost',
+          url: 'http://localhost/rules',
+          source: source,
+        ),
+        throwsA(
+          isA<AnalysisFailure>()
+              .having((error) => error.code, 'code', 'INVALID_SOURCE')
+              .having(
+                (error) => error.recoveryClass,
+                'recoveryClass',
+                RecoveryClass.fixInput,
+              ),
+        ),
+      );
+
+      expect(recorder.calls, 1);
+    });
+
     test('unknown backend envelope fails safely without invented retry',
         () async {
       final recorder = _RecordingHttpClient(
@@ -1172,10 +1216,15 @@ void main() {
         stage: 'internal',
         message: 'future failure',
         userMessage: 'safe fallback',
+        retryable: true,
       );
 
       expect(failure.recoveryClass, RecoveryClass.noAutomaticRecovery);
-      expect(failure.retryable, isFalse);
+      expect(
+        failure.retryable,
+        isFalse,
+        reason: 'legacy retryable input must not override RecoveryClass',
+      );
     });
 
     test('add-source continuation reuses competition and exact cache context',
