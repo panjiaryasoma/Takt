@@ -71,7 +71,7 @@ class _IcsImportScreenState extends State<IcsImportScreen> {
         _selected.clear();
         _error = parsed.skippedCancelled == 0
             ? null
-            : '\${parsed.skippedCancelled} cancelled event(s) were ignored.';
+            : '${parsed.skippedCancelled} cancelled event(s) were ignored.';
       });
     } on FormatException catch (error) {
       if (!mounted) return;
@@ -111,12 +111,12 @@ class _IcsImportScreenState extends State<IcsImportScreen> {
       return;
     }
 
-    final parts = <String>['\${result.imported} imported'];
+    final parts = <String>['${result.imported} imported'];
     if (result.skippedDuplicates > 0) {
-      parts.add('\${result.skippedDuplicates} duplicate(s) skipped');
+      parts.add('${result.skippedDuplicates} duplicate(s) skipped');
     }
     if (result.rejected > 0) {
-      parts.add('\${result.rejected} unsupported event(s) skipped');
+      parts.add('${result.rejected} unsupported event(s) skipped');
     }
     messenger.showSnackBar(SnackBar(content: Text(parts.join(' · '))));
     if (result.imported > 0) {
@@ -128,10 +128,10 @@ class _IcsImportScreenState extends State<IcsImportScreen> {
     final start = DateTime.fromMillisecondsSinceEpoch(event.startAtEpochMs);
     final end = DateTime.fromMillisecondsSinceEpoch(event.endAtEpochMs);
     String two(int value) => value.toString().padLeft(2, '0');
-    final date = '\${two(start.day)}/\${two(start.month)}/\${start.year}';
+    final date = '${two(start.day)}/${two(start.month)}/${start.year}';
     final time =
-        '\${two(start.hour)}:\${two(start.minute)}–\${two(end.hour)}:\${two(end.minute)}';
-    return '$date · $time · \${event.timezone}';
+        '${two(start.hour)}:${two(start.minute)}–${two(end.hour)}:${two(end.minute)}';
+    return '$date · $time · ${event.timezone}';
   }
 
   @override
@@ -220,7 +220,7 @@ class _IcsImportScreenState extends State<IcsImportScreen> {
                     children: [
                       Expanded(
                         child: Text(
-                          '\${_events.length} event(s) found · $supportedCount supported',
+                          '${_events.length} event(s) found · $supportedCount supported',
                           style: const TextStyle(
                             color: C.white,
                             fontWeight: FontWeight.w700,
@@ -255,7 +255,7 @@ class _IcsImportScreenState extends State<IcsImportScreen> {
                       borderRadius: BorderRadius.circular(14),
                     ),
                     child: CheckboxListTile(
-                      key: Key('ics-event-' + event.commitmentId),
+                      key: Key('ics-event-${event.commitmentId}'),
                       value: event.supported &&
                           _selected.contains(event.commitmentId),
                       onChanged: !event.supported || _importing
@@ -298,7 +298,7 @@ class _IcsImportScreenState extends State<IcsImportScreen> {
                     child: Text(
                       _importing
                           ? 'Importing…'
-                          : 'Import selected (\${_selected.length})',
+                          : 'Import selected (${_selected.length})',
                     ),
                   ),
                 ),
