@@ -170,7 +170,7 @@ void main() {
     expect(viewModel.all, isEmpty);
   });
 
-  testWidgets('the entire From and To cards open the native time picker',
+  testWidgets('the entire From and To cards change their time values',
       (tester) async {
     final database = AppDatabase.forTesting(NativeDatabase.memory());
     final repository = DriftScheduleRepository(database);
@@ -179,12 +179,25 @@ void main() {
     await viewModel.initialize();
     await Future<void>.delayed(Duration.zero);
 
+    var calls = 0;
+    Future<TimeOfDay?> picker(
+      BuildContext context,
+      TimeOfDay initialTime,
+    ) async {
+      calls++;
+      return calls == 1
+          ? const TimeOfDay(hour: 14, minute: 30)
+          : const TimeOfDay(hour: 17, minute: 45);
+    }
+
     await tester.pumpWidget(
       ChangeNotifierProvider.value(
         value: viewModel,
         child: MaterialApp(
           theme: AppTheme.dark,
-          home: const Scaffold(body: TambahJadwalScreen()),
+          home: Scaffold(
+            body: TambahJadwalScreen(pickTime: picker),
+          ),
         ),
       ),
     );
@@ -194,16 +207,14 @@ void main() {
     await tester.ensureVisible(from);
     await tester.tapAt(tester.getTopLeft(from) + const Offset(8, 8));
     await tester.pumpAndSettle();
-    expect(find.byType(TimePickerDialog), findsOneWidget);
-
-    await tester.tap(find.text('Cancel'));
-    await tester.pumpAndSettle();
+    expect(find.text('14:30'), findsOneWidget);
 
     final to = find.byKey(const Key('to-time-card'));
     await tester.ensureVisible(to);
     await tester.tapAt(tester.getBottomRight(to) - const Offset(8, 8));
     await tester.pumpAndSettle();
-    expect(find.byType(TimePickerDialog), findsOneWidget);
+    expect(find.text('17:45'), findsOneWidget);
+    expect(calls, 2);
   });
 
   testWidgets('weekly summary highlights device-local today only in current week',
