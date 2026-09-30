@@ -328,6 +328,8 @@ class _RootShellState extends State<RootShell> {
         if (analysis.response != null) setState(() => _analisisStep = 1);
         return;
       case 1:
+        if (analysis.busy) return;
+        analysis.beginSourceEdit();
         setState(() => _analisisStep = 0);
         return;
       case 0:
@@ -371,6 +373,27 @@ class _RootShellState extends State<RootShell> {
         ),
       ),
     );
+  }
+
+  Future<void> _retryAcceptanceSave() async {
+    final host = context.read<PlanningHostViewModel>();
+    try {
+      await host.retryAcceptancePersistence();
+    } on AcceptancePersistenceExceptionProxy {
+      return;
+    }
+    if (!mounted || host.phase != PlanningHostPhase.accepted) return;
+    await _refreshAcceptedProjections();
+    if (!mounted) return;
+    setState(() {
+      _selectedSavedPlanId = host.savedPlan?.id;
+      _navIndex = 3;
+      _analisisStep = 2;
+    });
+  }
+
+  void _cancelPendingAcceptance() {
+    context.read<PlanningHostViewModel>().cancelPendingAcceptance();
   }
 
   Future<void> _openPlanningFromCurrentAnalysis() async {
@@ -502,12 +525,23 @@ class _RootShellState extends State<RootShell> {
             }
             _closeDecision();
           },
+          acceptancePersistencePending: host.hasPendingAcceptance,
+          acceptancePersistenceMessage: host.hasPendingAcceptance
+              ? host.failure?.message
+              : null,
+          onRetryAcceptanceSave:
+              host.hasPendingAcceptance ? _retryAcceptanceSave : null,
+          onCancelPendingAcceptance:
+              host.hasPendingAcceptance ? _cancelPendingAcceptance : null,
           onBack: _closeDecision,
         );
       case 1:
         return ProgresAnalisisScreen(
           onReadResult: () => setState(() => _analisisStep = 2),
-          onBackToInput: () => setState(() => _analisisStep = 0),
+          onBackToInput: () {
+            vm.beginSourceEdit();
+            setState(() => _analisisStep = 0);
+          },
           onStartNewAnalysis: () {
             vm.resetForNewCompetition();
             setState(() {
@@ -527,10 +561,13 @@ class _RootShellState extends State<RootShell> {
         return ReviewBriefScreen(
           response: response,
           onBack: () => setState(() => _analisisStep = 1),
-          onAddSource: () => setState(() {
-            _addingSource = true;
-            _analisisStep = 0;
-          }),
+          onAddSource: () {
+            vm.ensureSourceDraft(continuation: true);
+            setState(() {
+              _addingSource = true;
+              _analisisStep = 0;
+            });
+          },
           onNewAnalysis: () {
             vm.resetForNewCompetition();
             setState(() {
