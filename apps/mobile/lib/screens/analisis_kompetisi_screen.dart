@@ -291,26 +291,33 @@ class _AnalisisKompetisiScreenState
 
   Widget _segment(String label, int index) {
     final active = index == _mode;
-    return GestureDetector(
-      onTap: _submitting
-          ? null
-          : () => setState(() {
-                _mode = index;
-                _error = null;
-              }),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
+    return Semantics(
+      button: true,
+      selected: active,
+      label: label,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 48),
+        child: Material(
           color: active ? C.accent : C.card,
           borderRadius: BorderRadius.circular(10),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          label,
-          style: TextStyle(
-            color: active ? C.bg : C.white,
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
+          child: InkWell(
+            onTap: _submitting
+                ? null
+                : () => setState(() {
+                      _mode = index;
+                      _error = null;
+                    }),
+            borderRadius: BorderRadius.circular(10),
+            child: Center(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: active ? C.bg : C.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -385,11 +392,12 @@ class _AnalisisKompetisiScreenState
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 10,
+                    runSpacing: 8,
                     children: [
                       _outlineButton('Replace', _pickFile),
-                      const SizedBox(width: 10),
                       _outlineButton(
                         'Remove',
                         () => setState(() => _picked = null),
@@ -482,25 +490,14 @@ class _AnalisisKompetisiScreenState
   }
 
   Widget _outlineButton(String label, VoidCallback action) {
-    return GestureDetector(
-      onTap: _submitting ? null : action,
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 18,
-          vertical: 8,
-        ),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: C.accent),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(
-            color: C.accent,
-            fontSize: 12,
-          ),
-        ),
+    return OutlinedButton(
+      onPressed: _submitting ? null : action,
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(44, 44),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+        shape: const StadiumBorder(),
       ),
+      child: Text(label, style: const TextStyle(fontSize: 12)),
     );
   }
 
