@@ -13,8 +13,10 @@ import 'package:takt_mobile/data/repositories/analysis_repository.dart';
 import 'package:takt_mobile/data/repositories/drift_analysis_repository.dart';
 import 'package:takt_mobile/models/analysis_failure.dart';
 import 'package:takt_mobile/models/analysis_snapshot.dart';
+import 'package:takt_mobile/models/analysis_source_draft.dart';
 import 'package:takt_mobile/models/analysis_step.dart';
 import 'package:takt_mobile/models/competition_analysis_wire.dart';
+import 'package:takt_mobile/models/recovery_policy.dart';
 import 'package:takt_mobile/utils/source_identity.dart';
 import 'package:takt_mobile/viewmodels/analisis_view_model.dart';
 
@@ -734,7 +736,7 @@ void main() {
               .having(
                 (error) => error.code,
                 'code',
-                'NETWORK_ERROR',
+                'CLIENT_CONNECTION_FAILED',
               )
               .having(
                 (error) => error.retryable,
@@ -774,7 +776,7 @@ void main() {
               .having(
                 (error) => error.code,
                 'code',
-                'NETWORK_ERROR',
+                'CLIENT_TIMEOUT',
               )
               .having(
                 (error) => error.retryable,
@@ -1075,6 +1077,105 @@ void main() {
 
       expect(vm.phase, AnalysisPhase.ready);
       expect(repository.persistCalls, 1);
+    });
+
+    test('discarding unsaved analysis result never repeats backend request',
+        () async {
+      final api = _FakeApiClient();
+      final repository = _MemoryAnalysisRepository(failNextPersist: true);
+      final vm = AnalisisViewModel(apiClient: api, repository: repository);
+      vm.updateSourceDraft(
+        const AnalysisSourceDraft(
+          mode: AnalysisSourceMode.url,
+          continuation: false,
+          url: 'https://example.com/rules',
+          sourceType: SourceTypeWire.officialRules,
+        ),
+      );
+
+      await vm.analyzeUrl(
+        url: 'https://example.com/rules',
+        sourceType: SourceTypeWire.officialRules,
+        continuation: false,
+      );
+
+      expect(vm.phase, AnalysisPhase.persistenceError);
+      expect(vm.canDiscardUnsavedResult, isTrue);
+      expect(api.calls, 1);
+
+      vm.discardUnsavedResult();
+
+      expect(vm.phase, AnalysisPhase.idle);
+      expect(vm.operationIdentity, isNull);
+      expect(vm.canRetryPersistence, isFalse);
+      expect(vm.sourceDraft?.url, 'https://example.com/rules');
+      expect(api.calls, 1);
+    });
+
+    test('late response cannot revive an explicitly abandoned operation',
+        () async {
+      final api = _BlockingApiClient();
+      final repository = _MemoryAnalysisRepository();
+      final vm = AnalisisViewModel(apiClient: api, repository: repository);
+
+      final pending = vm.analyzeUrl(
+        url: 'https://example.com/rules',
+        sourceType: SourceTypeWire.officialRules,
+        continuation: false,
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(vm.phase, AnalysisPhase.submitting);
+
+      vm.resetForNewCompetition();
+      expect(vm.phase, AnalysisPhase.idle);
+
+      api.complete();
+      await pending;
+
+      expect(vm.phase, AnalysisPhase.idle);
+      expect(vm.response, isNull);
+      expect(repository.persistCalls, 0);
+    });
+
+    test('recoverable source edit preserves the draft and invalidates old retry',
+        () async {
+      final api = _FakeApiClient(failFirstRequest: true);
+      final repository = _MemoryAnalysisRepository();
+      final vm = AnalisisViewModel(apiClient: api, repository: repository);
+      vm.updateSourceDraft(
+        const AnalysisSourceDraft(
+          mode: AnalysisSourceMode.url,
+          continuation: false,
+          url: 'https://example.com/rules',
+          sourceType: SourceTypeWire.officialRules,
+        ),
+      );
+
+      await vm.analyzeUrl(
+        url: 'https://example.com/rules',
+        sourceType: SourceTypeWire.officialRules,
+        continuation: false,
+      );
+      expect(vm.canRetryRequest, isTrue);
+
+      vm.beginSourceEdit();
+
+      expect(vm.phase, AnalysisPhase.idle);
+      expect(vm.sourceDraft?.url, 'https://example.com/rules');
+      expect(vm.canRetryRequest, isFalse);
+      expect(vm.operationIdentity, isNull);
+    });
+
+    test('unknown backend failure is fail-closed by recovery policy', () {
+      const failure = AnalysisFailure(
+        code: 'SOME_NEW_BACKEND_CODE',
+        stage: 'internal',
+        message: 'future failure',
+        userMessage: 'safe fallback',
+      );
+
+      expect(failure.recoveryClass, RecoveryClass.noAutomaticRecovery);
+      expect(failure.retryable, isFalse);
     });
 
     test('add-source continuation reuses competition and exact cache context',
