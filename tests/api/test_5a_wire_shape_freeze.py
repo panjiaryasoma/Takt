@@ -2,11 +2,11 @@
 
 from typing import get_args
 
-from apps.api import contracts as wire
+import apps.api.contracts
 
 
 PUBLIC_WIRE_FIELDS = {
-    wire.CanonicalReportRefV1: (
+    apps.api.contracts.CanonicalReportRefV1: (
         "domain_schema_version",
         "competition_id",
         "report_version",
@@ -18,36 +18,36 @@ PUBLIC_WIRE_FIELDS = {
         "wire_fingerprint_version",
         "wire_fingerprint",
     ),
-    wire.CanonicalReportBundleV1: ("report", "ref"),
-    wire.ReadinessUserContextV1: ("age", "student_status", "country"),
-    wire.ReadinessContextV1: (
+    apps.api.contracts.CanonicalReportBundleV1: ("report", "ref"),
+    apps.api.contracts.ReadinessUserContextV1: ("age", "student_status", "country"),
+    apps.api.contracts.ReadinessContextV1: (
         "user",
         "selected_scope",
         "require_technology_information",
     ),
-    wire.PlanEvaluatePlanningV1: ("workload", "availability"),
-    wire.PlanEvaluateRequestV1: ("report_bundle", "readiness_context", "planning"),
-    wire.ReportBasisV1: (
+    apps.api.contracts.PlanEvaluatePlanningV1: ("workload", "availability"),
+    apps.api.contracts.PlanEvaluateRequestV1: ("report_bundle", "readiness_context", "planning"),
+    apps.api.contracts.ReportBasisV1: (
         "competition_id",
         "report_version",
         "reconciliation_policy_version",
         "assembly_policy_version",
         "assembly_material_fingerprint",
     ),
-    wire.ReadinessBasisV1: (
+    apps.api.contracts.ReadinessBasisV1: (
         "basis_version",
         "basis_fingerprint",
         "projection_version",
         "rule_version",
     ),
-    wire.PlanningBasisV1: (
+    apps.api.contracts.PlanningBasisV1: (
         "basis_version",
         "basis_fingerprint",
         "policy_version",
         "solver_backend",
         "solver_backend_version",
     ),
-    wire.EvaluationBasisV1: (
+    apps.api.contracts.EvaluationBasisV1: (
         "version",
         "domain_schema_version",
         "fingerprint",
@@ -55,8 +55,8 @@ PUBLIC_WIRE_FIELDS = {
         "readiness",
         "planning",
     ),
-    wire.CandidateRefV1: ("evaluation_id", "candidate_id"),
-    wire.RecommendedNextWorkV1: (
+    apps.api.contracts.CandidateRefV1: ("evaluation_id", "candidate_id"),
+    apps.api.contracts.RecommendedNextWorkV1: (
         "task_id",
         "task_name",
         "start",
@@ -64,22 +64,22 @@ PUBLIC_WIRE_FIELDS = {
         "allocated_minutes",
         "availability_source",
     ),
-    wire.SuggestedWorkWindowV1: (
+    apps.api.contracts.SuggestedWorkWindowV1: (
         "task_id",
         "start",
         "end",
         "allocated_minutes",
         "availability_source",
     ),
-    wire.RecommendationAlternativeV1: (
+    apps.api.contracts.RecommendationAlternativeV1: (
         "candidate_id",
         "buffer_minutes",
         "recommended_next_work",
         "suggested_windows",
         "tradeoffs",
     ),
-    wire.RecommendationAssumptionV1: ("task_id", "description"),
-    wire.RecommendationV1: (
+    apps.api.contracts.RecommendationAssumptionV1: ("task_id", "description"),
+    apps.api.contracts.RecommendationV1: (
         "recommended_candidate_id",
         "recommended_next_work",
         "suggested_windows",
@@ -88,8 +88,8 @@ PUBLIC_WIRE_FIELDS = {
         "tradeoffs",
         "assumptions",
     ),
-    wire.PublicCandidateV1: ("ref", "work_blocks", "buffer_minutes", "assumptions"),
-    wire.RecommendationTraceV1: (
+    apps.api.contracts.PublicCandidateV1: ("ref", "work_blocks", "buffer_minutes", "assumptions"),
+    apps.api.contracts.RecommendationTraceV1: (
         "competition_id",
         "report_version",
         "assembly_material_fingerprint",
@@ -97,13 +97,13 @@ PUBLIC_WIRE_FIELDS = {
         "planning_basis_fingerprint",
         "planning_policy_version",
     ),
-    wire.RecommendationSetV1: (
+    apps.api.contracts.RecommendationSetV1: (
         "primary_candidate",
         "alternative_candidates",
         "recommendation",
         "trace",
     ),
-    wire.PlanningDecisionV1: (
+    apps.api.contracts.PlanningDecisionV1: (
         "feasibility",
         "candidates",
         "allowed_actions",
@@ -112,34 +112,34 @@ PUBLIC_WIRE_FIELDS = {
         "sensitivity_codes",
         "recommendation",
     ),
-    wire.PlanEvaluateResponseV1: (
+    apps.api.contracts.PlanEvaluateResponseV1: (
         "evaluation_id",
         "evaluated_at",
         "basis",
         "readiness",
         "planning",
     ),
-    wire.PriorReportBasisSnapshotV1: (
+    apps.api.contracts.PriorReportBasisSnapshotV1: (
         "competition_id",
         "report_version",
         "reconciliation_policy_version",
         "assembly_policy_version",
         "assembly_material_fingerprint",
     ),
-    wire.PriorReadinessBasisSnapshotV1: (
+    apps.api.contracts.PriorReadinessBasisSnapshotV1: (
         "basis_version",
         "basis_fingerprint",
         "projection_version",
         "rule_version",
     ),
-    wire.PriorPlanningBasisSnapshotV1: (
+    apps.api.contracts.PriorPlanningBasisSnapshotV1: (
         "basis_version",
         "basis_fingerprint",
         "policy_version",
         "solver_backend",
         "solver_backend_version",
     ),
-    wire.PriorEvaluationBasisSnapshotV1: (
+    apps.api.contracts.PriorEvaluationBasisSnapshotV1: (
         "version",
         "domain_schema_version",
         "fingerprint",
@@ -147,9 +147,9 @@ PUBLIC_WIRE_FIELDS = {
         "readiness",
         "planning",
     ),
-    wire.PriorEvaluationV1: ("evaluation_id", "basis"),
-    wire.PlanReevaluateRequestV1: ("prior", "current"),
-    wire.ReevaluationTransitionV1: (
+    apps.api.contracts.PriorEvaluationV1: ("evaluation_id", "basis"),
+    apps.api.contracts.PlanReevaluateRequestV1: ("prior", "current"),
+    apps.api.contracts.ReevaluationTransitionV1: (
         "kind",
         "prior_evaluation_id",
         "prior_basis_fingerprint",
@@ -157,45 +157,45 @@ PUBLIC_WIRE_FIELDS = {
         "prior_evaluation_freshness",
         "change_reasons",
     ),
-    wire.PlanReevaluateResponseV1: ("transition", "evaluation"),
-    wire.ApiErrorDetailV1: ("path", "message", "code"),
-    wire.ApiErrorBodyV1: ("code", "message", "stage", "details"),
-    wire.ApiErrorResponseV1: ("error",),
-    wire.PlanReevaluateErrorResponseV1: ("error", "transition"),
-    wire.SourceMetadataV1: (
+    apps.api.contracts.PlanReevaluateResponseV1: ("transition", "evaluation"),
+    apps.api.contracts.ApiErrorDetailV1: ("path", "message", "code"),
+    apps.api.contracts.ApiErrorBodyV1: ("code", "message", "stage", "details"),
+    apps.api.contracts.ApiErrorResponseV1: ("error",),
+    apps.api.contracts.PlanReevaluateErrorResponseV1: ("error", "transition"),
+    apps.api.contracts.SourceMetadataV1: (
         "source_id",
         "source_type",
         "authority_rank",
         "scope",
         "freshness_metadata",
     ),
-    wire.ExtractionRunAuditV1: (
+    apps.api.contracts.ExtractionRunAuditV1: (
         "source_id",
         "snapshot_id",
         "extraction_path",
         "extractor_version",
     ),
-    wire.SourceAnalysisArtifactV1: (
+    apps.api.contracts.SourceAnalysisArtifactV1: (
         "source",
         "candidate_reports",
         "extraction_runs",
     ),
-    wire.CompetitionAnalyzeUrlRequestV1: (
+    apps.api.contracts.CompetitionAnalyzeUrlRequestV1: (
         "competition_id",
         "url",
         "source",
         "previous_report_bundle",
         "prior_source_artifacts",
     ),
-    wire.CompetitionAnalyzePdfMetadataV1: (
+    apps.api.contracts.CompetitionAnalyzePdfMetadataV1: (
         "competition_id",
         "document_id",
         "source",
         "previous_report_bundle",
         "prior_source_artifacts",
     ),
-    wire.AnalysisProvenanceV1: ("sources", "extraction_runs", "evidence"),
-    wire.CompetitionAnalyzeResponseV1: (
+    apps.api.contracts.AnalysisProvenanceV1: ("sources", "extraction_runs", "evidence"),
+    apps.api.contracts.CompetitionAnalyzeResponseV1: (
         "report_bundle",
         "source_artifacts",
         "provenance",
@@ -205,7 +205,7 @@ PUBLIC_WIRE_FIELDS = {
 
 
 PUBLIC_WIRE_DEFAULTED_FIELDS = {
-    wire.CanonicalReportRefV1: {
+    apps.api.contracts.CanonicalReportRefV1: {
         "domain_schema_version",
         "reconciliation_policy_version",
         "assembly_policy_version",
@@ -213,49 +213,49 @@ PUBLIC_WIRE_DEFAULTED_FIELDS = {
         "source_set_fingerprint",
         "wire_fingerprint_version",
     },
-    wire.ReadinessUserContextV1: {"age", "student_status", "country"},
-    wire.ReadinessContextV1: {"selected_scope", "require_technology_information"},
-    wire.ReadinessBasisV1: {"basis_version", "projection_version"},
-    wire.PlanningBasisV1: {"basis_version", "policy_version", "solver_backend"},
-    wire.EvaluationBasisV1: {"version", "domain_schema_version", "planning"},
-    wire.RecommendationAssumptionV1: {"task_id"},
-    wire.RecommendationV1: {"alternatives"},
-    wire.PublicCandidateV1: {"assumptions"},
-    wire.RecommendationTraceV1: {"planning_policy_version"},
-    wire.RecommendationSetV1: {"alternative_candidates"},
-    wire.PlanningDecisionV1: {
+    apps.api.contracts.ReadinessUserContextV1: {"age", "student_status", "country"},
+    apps.api.contracts.ReadinessContextV1: {"selected_scope", "require_technology_information"},
+    apps.api.contracts.ReadinessBasisV1: {"basis_version", "projection_version"},
+    apps.api.contracts.PlanningBasisV1: {"basis_version", "policy_version", "solver_backend"},
+    apps.api.contracts.EvaluationBasisV1: {"version", "domain_schema_version", "planning"},
+    apps.api.contracts.RecommendationAssumptionV1: {"task_id"},
+    apps.api.contracts.RecommendationV1: {"alternatives"},
+    apps.api.contracts.PublicCandidateV1: {"assumptions"},
+    apps.api.contracts.RecommendationTraceV1: {"planning_policy_version"},
+    apps.api.contracts.RecommendationSetV1: {"alternative_candidates"},
+    apps.api.contracts.PlanningDecisionV1: {
         "reason_codes",
         "tradeoff_codes",
         "sensitivity_codes",
     },
-    wire.PriorEvaluationBasisSnapshotV1: {"planning"},
-    wire.ReevaluationTransitionV1: {"change_reasons"},
-    wire.ApiErrorBodyV1: {"details"},
-    wire.CompetitionAnalyzeUrlRequestV1: {
+    apps.api.contracts.PriorEvaluationBasisSnapshotV1: {"planning"},
+    apps.api.contracts.ReevaluationTransitionV1: {"change_reasons"},
+    apps.api.contracts.ApiErrorBodyV1: {"details"},
+    apps.api.contracts.CompetitionAnalyzeUrlRequestV1: {
         "previous_report_bundle",
         "prior_source_artifacts",
     },
-    wire.CompetitionAnalyzePdfMetadataV1: {
+    apps.api.contracts.CompetitionAnalyzePdfMetadataV1: {
         "previous_report_bundle",
         "prior_source_artifacts",
     },
 }
 
 PUBLIC_WIRE_NULLABLE_FIELDS = {
-    wire.CanonicalReportRefV1: {"source_set_fingerprint"},
-    wire.ReadinessUserContextV1: {"age", "student_status", "country"},
-    wire.ReadinessContextV1: {"selected_scope"},
-    wire.EvaluationBasisV1: {"planning"},
-    wire.RecommendationAlternativeV1: {"recommended_next_work"},
-    wire.RecommendationAssumptionV1: {"task_id"},
-    wire.RecommendationV1: {"recommended_next_work"},
-    wire.PlanningDecisionV1: {"recommendation"},
-    wire.PriorEvaluationBasisSnapshotV1: {"planning"},
-    wire.ReevaluationTransitionV1: {"current_basis_fingerprint"},
-    wire.PlanReevaluateResponseV1: {"evaluation"},
-    wire.PlanReevaluateErrorResponseV1: {"transition"},
-    wire.CompetitionAnalyzeUrlRequestV1: {"previous_report_bundle"},
-    wire.CompetitionAnalyzePdfMetadataV1: {"previous_report_bundle"},
+    apps.api.contracts.CanonicalReportRefV1: {"source_set_fingerprint"},
+    apps.api.contracts.ReadinessUserContextV1: {"age", "student_status", "country"},
+    apps.api.contracts.ReadinessContextV1: {"selected_scope"},
+    apps.api.contracts.EvaluationBasisV1: {"planning"},
+    apps.api.contracts.RecommendationAlternativeV1: {"recommended_next_work"},
+    apps.api.contracts.RecommendationAssumptionV1: {"task_id"},
+    apps.api.contracts.RecommendationV1: {"recommended_next_work"},
+    apps.api.contracts.PlanningDecisionV1: {"recommendation"},
+    apps.api.contracts.PriorEvaluationBasisSnapshotV1: {"planning"},
+    apps.api.contracts.ReevaluationTransitionV1: {"current_basis_fingerprint"},
+    apps.api.contracts.PlanReevaluateResponseV1: {"evaluation"},
+    apps.api.contracts.PlanReevaluateErrorResponseV1: {"transition"},
+    apps.api.contracts.CompetitionAnalyzeUrlRequestV1: {"previous_report_bundle"},
+    apps.api.contracts.CompetitionAnalyzePdfMetadataV1: {"previous_report_bundle"},
 }
 
 
@@ -264,7 +264,7 @@ def _allows_none(annotation) -> bool:
 
 
 def test_public_wire_requiredness_and_nullability_are_frozen() -> None:
-    for model, expected_fields in PUBLIC_WIRE_FIELDS.items():
+    for model in PUBLIC_WIRE_FIELDS:
         defaulted = {
             name for name, field in model.model_fields.items() if not field.is_required()
         }
@@ -283,9 +283,9 @@ def test_all_public_api_wrapper_field_sets_are_frozen() -> None:
         model
         for name, model in vars(wire).items()
         if isinstance(model, type)
-        and issubclass(model, wire.ApiModel)
-        and model is not wire.ApiModel
-        and model.__module__ == wire.__name__
+        and issubclass(model, apps.api.contracts.ApiModel)
+        and model is not apps.api.contracts.ApiModel
+        and model.__module__ == apps.api.contracts.__name__
     }
     assert set(PUBLIC_WIRE_FIELDS) == public_models
 
