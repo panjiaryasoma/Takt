@@ -19,19 +19,25 @@ class AppHeader extends StatelessWidget {
       child: Row(
         children: [
           if (onBack != null) ...[
-            GestureDetector(
-              onTap: onBack,
-              child: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: C.card,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: C.accent.withValues(alpha: 0.6)),
+            Material(
+              color: C.card,
+              shape: CircleBorder(
+                side: BorderSide(
+                  color: C.accent.withValues(alpha: 0.6),
                 ),
-                alignment: Alignment.center,
-                child:
-                    const Icon(Icons.chevron_left, color: C.accent, size: 22),
+              ),
+              child: IconButton(
+                tooltip: 'Back',
+                onPressed: onBack,
+                constraints: const BoxConstraints(
+                  minWidth: 48,
+                  minHeight: 48,
+                ),
+                icon: const Icon(
+                  Icons.chevron_left,
+                  color: C.accent,
+                  size: 22,
+                ),
               ),
             ),
             const SizedBox(width: 12),
@@ -93,33 +99,25 @@ class AddButton extends StatelessWidget {
   final String label;
 
   @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: C.accent,
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.add, color: C.bg, size: 16),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: const TextStyle(
-                color: C.bg,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-              ),
+  Widget build(BuildContext context) => ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 44),
+        child: FilledButton.icon(
+          onPressed: onTap,
+          style: FilledButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            visualDensity: VisualDensity.compact,
+          ),
+          icon: const Icon(Icons.add, size: 16),
+          label: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
             ),
-          ],
+          ),
         ),
-      ),
-    );
-  }
+      );
 }
 
 /// Divider putih tebal (rounded) di bawah header.
@@ -163,12 +161,11 @@ class SectionHeading extends StatelessWidget {
             ),
           ),
           if (action != null)
-            GestureDetector(
-              onTap: onAction,
+            TextButton(
+              onPressed: onAction,
               child: Text(
                 action!,
                 style: const TextStyle(
-                  color: C.accent,
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                 ),
