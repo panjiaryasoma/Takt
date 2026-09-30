@@ -275,13 +275,17 @@ class JadwalHarianScreen extends StatelessWidget {
                         ),
                         icon: const Icon(Icons.chevron_left, color: C.bg),
                       ),
-                      Text(
-                        '${_monthNames[selected.month - 1]} ${selected.year}',
-                        key: const Key('calendar-month-label'),
-                        style: const TextStyle(
-                          color: C.bg,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
+                      Expanded(
+                        child: Text(
+                          '${_monthNames[selected.month - 1]} ${selected.year}',
+                          key: const Key('calendar-month-label'),
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          style: const TextStyle(
+                            color: C.bg,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
                       IconButton(
