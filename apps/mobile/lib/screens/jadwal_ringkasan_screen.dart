@@ -105,6 +105,8 @@ class JadwalRingkasanScreen extends StatelessWidget {
         currentDay.subtract(Duration(days: currentDay.weekday - 1));
     final isCurrentWeek = monday == currentMonday;
     final occurrences = vm.occurrencesBetween(monday, nextMonday);
+    final cancelledOccurrences =
+        vm.cancelledOccurrencesBetween(monday, nextMonday);
     final acceptedBlocks = vm.acceptedBlocksBetween(monday, nextMonday);
     final tasks = _tasksForWeek(occurrences, acceptedBlocks);
     final fixedCount = occurrences
@@ -215,7 +217,9 @@ class JadwalRingkasanScreen extends StatelessWidget {
                       ],
                     ),
                   ),
-                if (occurrences.isEmpty && acceptedBlocks.isEmpty)
+                if (occurrences.isEmpty &&
+                    acceptedBlocks.isEmpty &&
+                    cancelledOccurrences.isEmpty)
                   const Padding(
                     padding: EdgeInsets.only(top: 8),
                     child: Text(
@@ -223,6 +227,48 @@ class JadwalRingkasanScreen extends StatelessWidget {
                       style: TextStyle(color: C.detailMuted, fontSize: 11),
                     ),
                   ),
+                if (cancelledOccurrences.isNotEmpty) ...[
+                  const SizedBox(height: 12),
+                  const Divider(color: C.navInactive),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'Cancelled occurrences',
+                    style: TextStyle(
+                      color: C.white,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  const SizedBox(height: 6),
+                  for (final item in cancelledOccurrences)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 6),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Icon(
+                            Icons.event_busy_outlined,
+                            color: C.detailMuted,
+                            size: 16,
+                          ),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '${_days[item.startAt.weekday - 1]} '
+                              '${_timeLabel(item.startAt)} · '
+                              '${item.commitment.title} · cancelled · '
+                              'does not block planning',
+                              style: const TextStyle(
+                                color: C.detailMuted,
+                                fontSize: 10,
+                                height: 1.35,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
               ],
             ),
           ),
@@ -272,6 +318,11 @@ class JadwalRingkasanScreen extends StatelessWidget {
       ),
     );
   }
+}
+
+String _timeLabel(DateTime value) {
+  String two(int v) => v.toString().padLeft(2, '0');
+  return '${two(value.hour)}:${two(value.minute)}';
 }
 
 class _Legend extends StatelessWidget {
