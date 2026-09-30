@@ -5,6 +5,7 @@ import '../models/commitment.dart';
 import '../models/enums.dart';
 import '../models/recurrence_rule.dart';
 import '../theme/app_theme.dart';
+import 'ics_import_screen.dart';
 import '../viewmodels/jadwal_view_model.dart';
 
 enum _PolaJadwal { rutin, sekali }
@@ -118,6 +119,21 @@ class _TambahJadwalScreenState extends State<TambahJadwalScreen> {
         Align(alignment: Alignment.centerLeft, child: GestureDetector(onTap: vm.isSaving ? null : widget.onBack, child: Container(width:40,height:40,decoration:BoxDecoration(color:C.card,shape:BoxShape.circle,border:Border.all(color:C.accent.withValues(alpha:0.6))),alignment:Alignment.center,child:const Icon(Icons.chevron_left,color:C.accent,size:22)))),
         const SizedBox(height:14),
         Text(widget.isEditing ? 'Edit Schedule' : 'Add Schedule', style: const TextStyle(color:C.white,fontSize:24)),
+        if (!widget.isEditing) ...[
+          const SizedBox(height: 14),
+          OutlinedButton.icon(
+            key: const Key('open-ics-import'),
+            onPressed: vm.isSaving
+                ? null
+                : () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const IcsImportScreen(),
+                      ),
+                    ),
+            icon: const Icon(Icons.calendar_month_outlined),
+            label: const Text('Import Google Calendar (.ics)'),
+          ),
+        ],
         const SizedBox(height:24),
         _FieldCard(label:'Schedule Title', child:_input(_titleCtrl,'Research Methods Class')),
         const SizedBox(height:16),
@@ -131,7 +147,21 @@ class _TambahJadwalScreenState extends State<TambahJadwalScreen> {
           _FieldCard(label:'Every day',child:Wrap(spacing:8,runSpacing:8,children:List.generate(7,(index){final weekday=index+1;final active=_hari.contains(weekday);return _Chip(label:_namaHari[index],active:active,onTap:()=>setState((){if(active){_hari.remove(weekday);}else{_hari.add(weekday);}}));})))
         else _FieldCard(label:'Date', child:_TapValue(value:_tanggalLabel,onTap:_pilihTanggal)),
         const SizedBox(height:16),
-        Row(children:[Expanded(child:_FieldCard(label:'From',child:_TapValue(value:_hhmm(_mulai),onTap:()=>_pilihWaktu(mulai:true)))),const SizedBox(width:16),Expanded(child:_FieldCard(label:'To',child:_TapValue(value:_hhmm(_selesai),onTap:()=>_pilihWaktu(mulai:false))))]),
+        Row(children:[
+          Expanded(child:_FieldCard(
+            key: const Key('from-time-card'),
+            label:'From',
+            onTap:()=>_pilihWaktu(mulai:true),
+            child:Text(_hhmm(_mulai),style:const TextStyle(color:C.white,fontSize:16)),
+          )),
+          const SizedBox(width:16),
+          Expanded(child:_FieldCard(
+            key: const Key('to-time-card'),
+            label:'To',
+            onTap:()=>_pilihWaktu(mulai:false),
+            child:Text(_hhmm(_selesai),style:const TextStyle(color:C.white,fontSize:16)),
+          )),
+        ]),
         const SizedBox(height:24),
         GestureDetector(onTap:vm.isSaving?null:_simpan,child:Container(padding:const EdgeInsets.symmetric(vertical:18),decoration:BoxDecoration(color:C.accent,borderRadius:BorderRadius.circular(14)),alignment:Alignment.center,child:vm.isSaving?const SizedBox(width:20,height:20,child:CircularProgressIndicator(strokeWidth:2,color:C.bg)):Text(widget.isEditing?'Save Changes':'Add Schedule',style:const TextStyle(color:C.bg,fontSize:16,fontWeight:FontWeight.w700)))),
         const SizedBox(height:12),
@@ -144,4 +174,42 @@ class _TambahJadwalScreenState extends State<TambahJadwalScreen> {
 
 class _TapValue extends StatelessWidget { const _TapValue({required this.value,required this.onTap}); final String value; final VoidCallback onTap; @override Widget build(BuildContext context)=>GestureDetector(onTap:onTap,behavior:HitTestBehavior.opaque,child:Text(value,style:const TextStyle(color:C.white,fontSize:16))); }
 class _Chip extends StatelessWidget { const _Chip({required this.label,required this.active,required this.onTap}); final String label; final bool active; final VoidCallback onTap; @override Widget build(BuildContext context)=>GestureDetector(onTap:onTap,child:Container(padding:const EdgeInsets.symmetric(horizontal:16,vertical:10),decoration:BoxDecoration(color:active?C.accent:C.bg,borderRadius:BorderRadius.circular(999)),child:Text(label,style:TextStyle(color:active?C.bg:C.white,fontSize:13,fontWeight:FontWeight.w700)))); }
-class _FieldCard extends StatelessWidget { const _FieldCard({required this.label,required this.child}); final String label; final Widget child; @override Widget build(BuildContext context)=>Container(padding:const EdgeInsets.all(16),decoration:BoxDecoration(color:C.card,borderRadius:BorderRadius.circular(14),border:Border.all(color:C.accentSub.withValues(alpha:0.5))),child:Column(crossAxisAlignment:CrossAxisAlignment.start,children:[Text(label,style:const TextStyle(color:C.accent,fontSize:13,fontWeight:FontWeight.w700)),const SizedBox(height:8),child])); }
+class _FieldCard extends StatelessWidget {
+  const _FieldCard({
+    super.key,
+    required this.label,
+    required this.child,
+    this.onTap,
+  });
+
+  final String label;
+  final Widget child;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    final card = Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: C.card,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: C.accentSub.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(label, style: const TextStyle(color:C.accent,fontSize:13,fontWeight:FontWeight.w700)),
+          const SizedBox(height: 8),
+          child,
+        ],
+      ),
+    );
+    final handler = onTap;
+    if (handler == null) return card;
+    return GestureDetector(
+      behavior: HitTestBehavior.opaque,
+      onTap: handler,
+      child: card,
+    );
+  }
+}
