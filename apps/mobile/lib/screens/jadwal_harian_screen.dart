@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../models/active_accepted_block.dart';
 import '../models/commitment.dart';
+import '../models/enums.dart';
 import '../models/schedule_occurrence.dart';
 import '../theme/app_theme.dart';
 import '../viewmodels/jadwal_view_model.dart';
