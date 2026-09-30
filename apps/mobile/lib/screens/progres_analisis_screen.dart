@@ -173,25 +173,12 @@ class ProgresAnalisisScreen extends StatelessWidget {
           const SizedBox(height: 16),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: GestureDetector(
-              onTap: vm.selesai ? onReadResult : null,
-              child: Opacity(
-                opacity: vm.selesai ? 1 : 0.45,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  decoration: BoxDecoration(
-                    color: C.accent,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    vm.selesai ? 'View Results' : 'Not ready for review',
-                    style: const TextStyle(
-                      color: C.bg,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+            child: SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: vm.selesai ? onReadResult : null,
+                child: Text(
+                  vm.selesai ? 'View Results' : 'Not ready for review',
                 ),
               ),
             ),
@@ -300,24 +287,11 @@ class _ActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
-          color: C.accent,
-          borderRadius: BorderRadius.circular(10),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          label,
-          style: const TextStyle(
-            color: C.bg,
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
+    return SizedBox(
+      width: double.infinity,
+      child: FilledButton(
+        onPressed: onTap,
+        child: Text(label),
       ),
     );
   }
