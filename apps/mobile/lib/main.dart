@@ -320,12 +320,16 @@ class _RootShellState extends State<RootShell> {
     switch (_effectiveAnalysisStepFor(host)) {
       case 4:
         setState(() => _analisisStep = 2);
+        return;
       case 3:
         _closeDecision();
+        return;
       case 2:
         if (analysis.response != null) setState(() => _analisisStep = 1);
+        return;
       case 1:
         setState(() => _analisisStep = 0);
+        return;
       case 0:
         if (_addingSource && analysis.response != null) {
           setState(() {
@@ -333,6 +337,7 @@ class _RootShellState extends State<RootShell> {
             _analisisStep = 2;
           });
         }
+        return;
     }
   }
 
