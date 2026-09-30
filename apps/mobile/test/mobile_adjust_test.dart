@@ -227,19 +227,9 @@ void main() {
   test('calendar import is deterministic and skips a second identical import',
       () async {
     final database = AppDatabase.forTesting(NativeDatabase.memory());
-    final repository = DriftScheduleRepository(
-      database,
-      closeDatabaseOnDispose: false,
-    );
-    final viewModel = JadwalViewModel(
-      repository,
-      closeScheduleRepositoryOnDispose: false,
-    );
-    addTearDown(() async {
-      viewModel.dispose();
-      await repository.close();
-      await database.close();
-    });
+    final repository = DriftScheduleRepository(database);
+    final viewModel = JadwalViewModel(repository);
+    addTearDown(repository.close);
 
     await viewModel.initialize();
     await Future<void>.delayed(Duration.zero);
@@ -298,19 +288,9 @@ void main() {
   testWidgets('the entire From and To cards change their time values',
       (tester) async {
     final database = AppDatabase.forTesting(NativeDatabase.memory());
-    final repository = DriftScheduleRepository(
-      database,
-      closeDatabaseOnDispose: false,
-    );
-    final viewModel = JadwalViewModel(
-      repository,
-      closeScheduleRepositoryOnDispose: false,
-    );
-    addTearDown(() async {
-      viewModel.dispose();
-      await repository.close();
-      await database.close();
-    });
+    final repository = DriftScheduleRepository(database);
+    final viewModel = JadwalViewModel(repository);
+    addTearDown(repository.close);
     await viewModel.initialize();
     await Future<void>.delayed(Duration.zero);
 
@@ -358,19 +338,9 @@ void main() {
   testWidgets('calendar swipes change month without leaving Schedule',
       (tester) async {
     final database = AppDatabase.forTesting(NativeDatabase.memory());
-    final repository = DriftScheduleRepository(
-      database,
-      closeDatabaseOnDispose: false,
-    );
-    final viewModel = JadwalViewModel(
-      repository,
-      closeScheduleRepositoryOnDispose: false,
-    );
-    addTearDown(() async {
-      viewModel.dispose();
-      await repository.close();
-      await database.close();
-    });
+    final repository = DriftScheduleRepository(database);
+    final viewModel = JadwalViewModel(repository);
+    addTearDown(repository.close);
     await viewModel.initialize();
     await Future<void>.delayed(Duration.zero);
     viewModel.selectDate(DateTime(2026, 9, 1));
@@ -461,19 +431,9 @@ void main() {
   testWidgets('weekly summary highlights device-local today only in current week',
       (tester) async {
     final database = AppDatabase.forTesting(NativeDatabase.memory());
-    final repository = DriftScheduleRepository(
-      database,
-      closeDatabaseOnDispose: false,
-    );
-    final viewModel = JadwalViewModel(
-      repository,
-      closeScheduleRepositoryOnDispose: false,
-    );
-    addTearDown(() async {
-      viewModel.dispose();
-      await repository.close();
-      await database.close();
-    });
+    final repository = DriftScheduleRepository(database);
+    final viewModel = JadwalViewModel(repository);
+    addTearDown(repository.close);
     await viewModel.initialize();
     await Future<void>.delayed(Duration.zero);
     viewModel.selectDate(DateTime(2026, 9, 30));
