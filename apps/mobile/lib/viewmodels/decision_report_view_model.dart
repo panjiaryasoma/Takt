@@ -38,7 +38,9 @@ class DecisionReportViewModel extends ChangeNotifier {
 
   EvaluationSession? get session => _session;
   int get currentInputRevision => _currentInputRevision;
-  bool get isStale => _session != null && _invalidated;
+  /// Presentation-only invalidation: the displayed session no longer matches
+  /// the host's current input revision. This is not persisted SUPERSEDED state.
+  bool get isSessionOutdated => _session != null && _invalidated;
   bool get isDismissed => _dismissed;
   bool get isActive => _session != null && !_invalidated && !_dismissed;
   bool get handoffPending => _handoff != null;
@@ -79,8 +81,13 @@ class DecisionReportViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  bool can(RecommendationAction action) => isActive && !handoffPending &&
-      !_handoffComplete && (planning?.allowedActions.contains(action) ?? false);
+  /// Backend [allowedActions] remains the only domain action authority.
+  /// Mobile may only further disable an existing action for local session/
+  /// handoff safety. It must never reconstruct policy from feasibility/readiness.
+  bool can(RecommendationAction action) => isActive &&
+      !handoffPending &&
+      !_handoffComplete &&
+      (planning?.allowedActions.contains(action) ?? false);
 
   bool chooseCandidate(String candidateId) {
     if (!can(RecommendationAction.chooseAlternative) ||
