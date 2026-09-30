@@ -31,7 +31,15 @@ class _SavedPlanDetailScreenState extends State<SavedPlanDetailScreen> {
   void initState() {
     super.initState();
     widget.viewModel.addListener(_changed);
-    widget.viewModel.load(widget.savedPlanId);
+    _scheduleLoad();
+  }
+
+  void _scheduleLoad() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        widget.viewModel.load(widget.savedPlanId);
+      }
+    });
   }
 
   @override
@@ -42,7 +50,7 @@ class _SavedPlanDetailScreenState extends State<SavedPlanDetailScreen> {
       widget.viewModel.addListener(_changed);
     }
     if (oldWidget.savedPlanId != widget.savedPlanId) {
-      widget.viewModel.load(widget.savedPlanId);
+      _scheduleLoad();
     }
   }
 
