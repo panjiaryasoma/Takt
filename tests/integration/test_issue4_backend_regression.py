@@ -460,6 +460,56 @@ def test_issue4_conflict_path_regression() -> None:
     assert "unresolved_critical_field:eligibility" in evaluation.readiness.review_items
 
 
+def test_5a_tight_capacity_path_keeps_advisory_recommendation() -> None:
+    base = _evaluation_request(_bundle(_canonical_report()))
+    task = base.planning.workload.tasks[0].model_copy(
+        update={
+            "effort_min_minutes": 30,
+            "effort_likely_minutes": 60,
+            "effort_max_minutes": 200,
+        }
+    )
+    request = base.model_copy(
+        update={
+            "planning": base.planning.model_copy(
+                update={"workload": WorkloadInput(tasks=(task,))}
+            )
+        }
+    )
+
+    result = evaluate_plan(
+        request,
+        clock=_clock,
+        evaluation_id_factory=_id_one,
+    )
+
+    assert result.readiness.status is ReadinessStatus.READY_TO_EVALUATE
+    assert result.planning is not None
+    assert result.planning.feasibility is FeasibilityStatus.TIGHT_CAPACITY
+    assert result.planning.recommendation is not None
+    assert RecommendationAction.ACCEPT in result.planning.allowed_actions
+    assert RecommendationAction.EDIT_CONSTRAINTS in result.planning.allowed_actions
+    assert RecommendationAction.IGNORE in result.planning.allowed_actions
+
+
+def test_5a_recommendation_actions_remain_advisory_without_commit_side_effect() -> None:
+    result = evaluate_plan(
+        _evaluation_request(_bundle(_canonical_report())),
+        clock=_clock,
+        evaluation_id_factory=_id_one,
+    )
+
+    assert result.planning is not None
+    assert RecommendationAction.ACCEPT in result.planning.allowed_actions
+    assert RecommendationAction.IGNORE in result.planning.allowed_actions
+
+    serialized = result.model_dump(mode="json", warnings=False)
+    assert "accepted_commitment" not in str(serialized).lower()
+    assert "saved_plan" not in str(serialized).lower()
+    assert "recommended_to_join" not in str(serialized).lower()
+    assert "do_not_join" not in str(serialized).lower()
+
+
 def test_issue4_infeasible_path_regression(monkeypatch) -> None:
     request = _evaluation_request(
         _bundle(_canonical_report()),
