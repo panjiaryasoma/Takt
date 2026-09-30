@@ -37,8 +37,8 @@ Future<void> _pumpBounded(
 
 void main() {
   test('Android launcher and native splash use the canonical Takt logo', () {
-    expect(File('assets/branding/logo.jpg').existsSync(), isTrue);
-    expect(File('assets/breanding/logo.png').existsSync(), isFalse);
+    expect(File('assets/branding/logo.png').existsSync(), isTrue);
+    expect(File('assets/branding/logo.jpg').existsSync(), isFalse);
 
     final manifest =
         File('android/app/src/main/AndroidManifest.xml').readAsStringSync();
@@ -50,7 +50,7 @@ void main() {
             .readAsStringSync();
 
     expect(manifest, contains('android:icon="@mipmap/ic_launcher"'));
-    expect(File('android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.jpg').existsSync(), isTrue);
+    expect(File('android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png').existsSync(), isTrue);
     expect(splash, contains('@drawable/takt_logo'));
     expect(splash, contains('@color/takt_bg'));
     expect(android12, contains('android:windowSplashScreenAnimatedIcon'));
@@ -72,13 +72,13 @@ void main() {
 
     expect(
       File(
-        'ios/Runner/Assets.xcassets/TaktLogo.imageset/takt_logo.jpg',
+        'ios/Runner/Assets.xcassets/TaktLogo.imageset/takt_logo.png',
       ).existsSync(),
       isTrue,
     );
     expect(launchScreen, contains('image="TaktLogo"'));
     expect(launchScreen, contains('red="0.1764705882"'));
-    expect(imageSet, contains('"filename" : "takt_logo.jpg"'));
+    expect(imageSet, contains('"filename" : "takt_logo.png"'));
     expect(project, contains('Generate Takt Branding'));
     expect(project, contains('PRODUCT_BUNDLE_IDENTIFIER = com.panjiaryasoma.takt;'));
     expect(project, isNot(contains('com.example.taktMobile')));
