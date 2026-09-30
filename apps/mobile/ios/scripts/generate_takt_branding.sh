@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 
-SOURCE="$SRCROOT/../assets/branding/logo.jpg"
+SOURCE="$SRCROOT/../assets/branding/logo.png"
 APPICON_DIR="$SRCROOT/Runner/Assets.xcassets/AppIcon.appiconset"
 
 if [ ! -f "$SOURCE" ]; then

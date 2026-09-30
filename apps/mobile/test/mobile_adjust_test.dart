@@ -9,6 +9,8 @@ import 'package:takt_mobile/data/database/app_database.dart';
 import 'package:takt_mobile/data/repositories/drift_schedule_repository.dart';
 import 'package:takt_mobile/data/repositories/schedule_repository.dart';
 import 'package:takt_mobile/main.dart';
+import 'package:takt_mobile/models/commitment.dart';
+import 'package:takt_mobile/models/enums.dart';
 import 'package:takt_mobile/screens/ics_import_screen.dart';
 import 'package:takt_mobile/screens/jadwal_harian_screen.dart';
 import 'package:takt_mobile/screens/jadwal_ringkasan_screen.dart';
@@ -36,9 +38,15 @@ Future<void> _pumpBounded(
 }
 
 void main() {
+  test('in-app branding uses the transparent Takt mark', () {
+    expect(File('assets/branding/logo_in_app.png').existsSync(), isTrue);
+    expect(C.logoAsset, 'assets/branding/logo_in_app.png');
+    expect(C.logoAsset, isNot('assets/branding/logo.png'));
+  });
+
   test('Android launcher and native splash use the canonical Takt logo', () {
-    expect(File('assets/branding/logo.jpg').existsSync(), isTrue);
-    expect(File('assets/breanding/logo.png').existsSync(), isFalse);
+    expect(File('assets/branding/logo.png').existsSync(), isTrue);
+    expect(File('assets/branding/logo.jpg').existsSync(), isFalse);
 
     final manifest =
         File('android/app/src/main/AndroidManifest.xml').readAsStringSync();
@@ -50,7 +58,7 @@ void main() {
             .readAsStringSync();
 
     expect(manifest, contains('android:icon="@mipmap/ic_launcher"'));
-    expect(File('android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.jpg').existsSync(), isTrue);
+    expect(File('android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.png').existsSync(), isTrue);
     expect(splash, contains('@drawable/takt_logo'));
     expect(splash, contains('@color/takt_bg'));
     expect(android12, contains('android:windowSplashScreenAnimatedIcon'));
@@ -72,13 +80,13 @@ void main() {
 
     expect(
       File(
-        'ios/Runner/Assets.xcassets/TaktLogo.imageset/takt_logo.jpg',
+        'ios/Runner/Assets.xcassets/TaktLogo.imageset/takt_logo.png',
       ).existsSync(),
       isTrue,
     );
     expect(launchScreen, contains('image="TaktLogo"'));
     expect(launchScreen, contains('red="0.1764705882"'));
-    expect(imageSet, contains('"filename" : "takt_logo.jpg"'));
+    expect(imageSet, contains('"filename" : "takt_logo.png"'));
     expect(project, contains('Generate Takt Branding'));
     expect(project, contains('PRODUCT_BUNDLE_IDENTIFIER = com.panjiaryasoma.takt;'));
     expect(project, isNot(contains('com.example.taktMobile')));
@@ -296,6 +304,91 @@ void main() {
     await _pumpBounded(tester, frames: 2);
   });
 
+  testWidgets('FIXED and FLEXIBLE copy matches planning semantics',
+      (tester) async {
+    final viewModel = JadwalViewModel(
+      _UnusedScheduleRepository(),
+      closeScheduleRepositoryOnDispose: false,
+    );
+    addTearDown(viewModel.dispose);
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: viewModel,
+        child: MaterialApp(
+          theme: AppTheme.dark,
+          home: const Scaffold(body: TambahJadwalScreen()),
+        ),
+      ),
+    );
+    await _pumpBounded(tester);
+
+    expect(
+      find.text('Scheduled time is treated as unavailable during planning.'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('FLEXIBLE'));
+    await tester.pump();
+
+    expect(
+      find.textContaining(
+        'its currently scheduled time is still treated as unavailable during planning',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('Takt does not move it automatically'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Takt can move'), findsNothing);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _pumpBounded(tester, frames: 2);
+  });
+
+  testWidgets('Add Schedule keeps critical controls reachable at 320px and 2x text',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final viewModel = JadwalViewModel(
+      _UnusedScheduleRepository(),
+      closeScheduleRepositoryOnDispose: false,
+    );
+    addTearDown(viewModel.dispose);
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: viewModel,
+        child: MaterialApp(
+          theme: AppTheme.dark,
+          home: Builder(
+            builder: (context) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                textScaler: const TextScaler.linear(2),
+              ),
+              child: const Scaffold(body: TambahJadwalScreen()),
+            ),
+          ),
+        ),
+      ),
+    );
+    await _pumpBounded(tester);
+
+    final save = find.byKey(const Key('save-schedule'));
+    await tester.ensureVisible(save);
+    await _pumpBounded(tester, frames: 2);
+    expect(save, findsOneWidget);
+    expect(find.byKey(const Key('commitment-type-explanation')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _pumpBounded(tester, frames: 2);
+  });
+
   testWidgets('the entire From and To cards change their time values',
       (tester) async {
     final viewModel = JadwalViewModel(
@@ -435,6 +528,151 @@ void main() {
     // Dispose TaktApp-owned providers/repositories before the database teardown.
     await tester.pumpWidget(const SizedBox.shrink());
     await _pumpBounded(tester);
+  });
+
+  testWidgets('root navigation remains reachable at 320px and 2x text',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final viewModel = JadwalViewModel(
+      _UnusedScheduleRepository(),
+      closeScheduleRepositoryOnDispose: false,
+    );
+    addTearDown(viewModel.dispose);
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: viewModel,
+        child: MaterialApp(
+          theme: AppTheme.dark,
+          home: Builder(
+            builder: (context) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                textScaler: const TextScaler.linear(2),
+              ),
+              child: const RootShell(),
+            ),
+          ),
+        ),
+      ),
+    );
+    await _pumpBounded(tester);
+
+    expect(find.text('Home'), findsOneWidget);
+    expect(find.text('Schedule'), findsOneWidget);
+    expect(find.text('Analysis'), findsOneWidget);
+    expect(find.text('Plans'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('system back closes Add Schedule before the root route',
+      (tester) async {
+    final database = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(database.close);
+
+    await tester.pumpWidget(TaktApp(database: database));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Schedule'));
+    await _pumpBounded(tester);
+    await tester.tap(find.text('Add'));
+    await _pumpBounded(tester);
+    expect(find.byType(TambahJadwalScreen), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await _pumpBounded(tester);
+    expect(find.byType(TambahJadwalScreen), findsNothing);
+    expect(find.text('My Schedule'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _pumpBounded(tester, frames: 2);
+  });
+
+  testWidgets('cancelled recurrence presentation is explicit and read-only',
+      (tester) async {
+    final start = DateTime(2026, 9, 30, 9);
+    final commitment = Commitment(
+      id: 'cancelled-class',
+      title: 'Cancelled class',
+      type: CommitmentType.fixed,
+      startAtEpochMs: start.millisecondsSinceEpoch,
+      endAtEpochMs: start.add(const Duration(hours: 1)).millisecondsSinceEpoch,
+      timezone: 'Asia/Jakarta',
+      source: 'manual',
+      createdAtEpochMs: start.millisecondsSinceEpoch,
+      updatedAtEpochMs: start.millisecondsSinceEpoch,
+    );
+    final item = CancelledScheduleOccurrence(
+      commitment: commitment,
+      recurrenceRuleId: 'rule-cancelled-class',
+      originalStartAtEpochMs: start.millisecondsSinceEpoch,
+    );
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.dark,
+        home: Scaffold(body: CancelledOccurrenceCard(item: item)),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('Cancelled class'), findsOneWidget);
+    expect(find.textContaining('cancelled occurrence'), findsOneWidget);
+    expect(find.textContaining('does not block planning'), findsOneWidget);
+    expect(find.byIcon(Icons.event_busy_outlined), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('Schedule daily and weekly remain reachable at 320px and 2x text',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final viewModel = JadwalViewModel(
+      _UnusedScheduleRepository(),
+      closeScheduleRepositoryOnDispose: false,
+    );
+    addTearDown(viewModel.dispose);
+    viewModel.selectDate(DateTime(2026, 9, 30));
+
+    Widget shell(Widget child) => ChangeNotifierProvider.value(
+          value: viewModel,
+          child: MaterialApp(
+            theme: AppTheme.dark,
+            home: Builder(
+              builder: (context) => MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  textScaler: const TextScaler.linear(2),
+                ),
+                child: Scaffold(body: child),
+              ),
+            ),
+          ),
+        );
+
+    await tester.pumpWidget(shell(JadwalHarianScreen(onSwitchTab: (_) {})));
+    await _pumpBounded(tester);
+    expect(find.text('My Schedule'), findsOneWidget);
+    expect(find.text('Daily Schedule'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpWidget(
+      shell(JadwalRingkasanScreen(
+        onSwitchTab: (_) {},
+        now: DateTime(2026, 9, 30, 10),
+      )),
+    );
+    await _pumpBounded(tester);
+    expect(find.text('Weekly Summary'), findsWidgets);
+    expect(find.byKey(const Key('weekly-time-type-explanation')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _pumpBounded(tester, frames: 2);
   });
 
   testWidgets('weekly summary highlights device-local today only in current week',

@@ -57,8 +57,10 @@ void main() {
     expect(find.text('Tight capacity'), findsOneWidget);
     expect(find.text('System primary recommendation'), findsOneWidget);
     expect(find.text('Suggested schedule · Not added to calendar'), findsWidgets);
-    expect(find.text('Remaining buffer: 180 min'), findsOneWidget);
-    expect(find.text('Remaining buffer: 120 min'), findsOneWidget);
+    expect(find.byKey(const Key('buffer-$primaryId')), findsOneWidget);
+    expect(find.byKey(const Key('buffer-$alternativeId')), findsOneWidget);
+    expect(find.text('Recommendation'), findsOneWidget);
+    expect(find.byKey(const Key('recommendation-advisory-copy')), findsOneWidget);
     expect(find.text('EFFORT_OVERRUN_BREAKS_PLAN'), findsNothing);
     expect(find.textContaining('not your ability'), findsOneWidget);
     expect(find.textContaining('Next work: Build prototype'), findsNWidgets(2));
@@ -69,6 +71,35 @@ void main() {
         matching: find.text('Your selected option')), findsOneWidget);
     expect(find.text('System primary recommendation'), findsOneWidget);
     expect(find.text('Saved'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets('critical Decision Report semantics survive 320px width at 2x text', (tester) async {
+    tester.view.physicalSize = const Size(320, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(report(
+      testSession(alternatives: false),
+      scale: 2,
+      onAccept: (_, _) async {},
+      onEdit: (_) {},
+      onIgnore: (_) {},
+    ));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Readiness'), findsOneWidget);
+    expect(find.text('Feasibility'), findsOneWidget);
+    expect(find.text('Recommendation'), findsOneWidget);
+    expect(find.byKey(const Key('accept-candidate')), findsOneWidget);
+
+    await tester.ensureVisible(find.byKey(const Key('accept-candidate')));
+    await tester.pumpAndSettle();
+    expect(
+      tester.widget<FilledButton>(find.byKey(const Key('accept-candidate'))).onPressed,
+      isNotNull,
+    );
     expect(tester.takeException(), isNull);
   });
 
@@ -121,8 +152,8 @@ void main() {
     expect(find.byKey(const Key('candidate-$alternativeId')), findsNothing);
     expect(find.byKey(const Key('alternatives-locked')), findsOneWidget);
     expect(find.byKey(const Key('choose-$alternativeId')), findsNothing);
-    expect(find.text('Remaining buffer: 180 min'), findsOneWidget);
-    expect(find.text('Remaining buffer: 120 min'), findsNothing);
+    expect(find.byKey(const Key('buffer-$primaryId')), findsOneWidget);
+    expect(find.byKey(const Key('buffer-$alternativeId')), findsNothing);
 
     await tapKey(tester, 'open-pro-alternatives');
     expect(openedPro, 1);
@@ -259,6 +290,7 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.byKey(const Key('confirm-accept')), findsNothing);
     expect(find.byKey(const Key('stale-notice')), findsOneWidget);
+    expect(find.byKey(const Key('session-outdated-notice')), findsOneWidget);
     expect(find.text('Your selected option'), findsNothing);
     expect(tester.widget<FilledButton>(find.byKey(const Key('accept-candidate'))).onPressed, isNull);
     expect(calls, 0);

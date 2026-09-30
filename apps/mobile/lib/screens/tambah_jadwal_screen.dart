@@ -133,7 +133,21 @@ class _TambahJadwalScreenState extends State<TambahJadwalScreen> {
     return SingleChildScrollView(
       padding: const EdgeInsets.fromLTRB(20,16,20,24),
       child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-        Align(alignment: Alignment.centerLeft, child: GestureDetector(onTap: vm.isSaving ? null : widget.onBack, child: Container(width:40,height:40,decoration:BoxDecoration(color:C.card,shape:BoxShape.circle,border:Border.all(color:C.accent.withValues(alpha:0.6))),alignment:Alignment.center,child:const Icon(Icons.chevron_left,color:C.accent,size:22)))),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Material(
+            color: C.card,
+            shape: CircleBorder(
+              side: BorderSide(color: C.accent.withValues(alpha: 0.6)),
+            ),
+            child: IconButton(
+              tooltip: 'Back',
+              onPressed: vm.isSaving ? null : widget.onBack,
+              constraints: const BoxConstraints(minWidth: 48, minHeight: 48),
+              icon: const Icon(Icons.chevron_left, color: C.accent, size: 22),
+            ),
+          ),
+        ),
         const SizedBox(height:14),
         Text(widget.isEditing ? 'Edit Schedule' : 'Add Schedule', style: const TextStyle(color:C.white,fontSize:24)),
         if (!widget.isEditing) ...[
@@ -156,9 +170,62 @@ class _TambahJadwalScreenState extends State<TambahJadwalScreen> {
         const SizedBox(height:16),
         _FieldCard(label:'Category', child:_input(_categoryCtrl,'Class, work, team, competition')),
         const SizedBox(height:16),
-        _FieldCard(label:'Schedule Pattern', child:Row(children:[_Chip(label:'Recurring',active:_pola==_PolaJadwal.rutin,onTap:()=>setState(()=>_pola=_PolaJadwal.rutin)),const SizedBox(width:10),_Chip(label:'One-time',active:_pola==_PolaJadwal.sekali,onTap:()=>setState(()=>_pola=_PolaJadwal.sekali))])),
+        _FieldCard(
+          label:'Schedule Pattern',
+          child: Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            children: [
+              _Chip(
+                label:'Recurring',
+                active:_pola==_PolaJadwal.rutin,
+                onTap:()=>setState(()=>_pola=_PolaJadwal.rutin),
+              ),
+              _Chip(
+                label:'One-time',
+                active:_pola==_PolaJadwal.sekali,
+                onTap:()=>setState(()=>_pola=_PolaJadwal.sekali),
+              ),
+            ],
+          ),
+        ),
         const SizedBox(height:16),
-        _FieldCard(label:'Time Type', child:Row(children:[_Chip(label:'FIXED',active:_type==CommitmentType.fixed,onTap:()=>setState(()=>_type=CommitmentType.fixed)),const SizedBox(width:10),_Chip(label:'FLEXIBLE',active:_type==CommitmentType.flexible,onTap:()=>setState(()=>_type=CommitmentType.flexible))])),
+        _FieldCard(
+          label:'Time Type',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  _Chip(
+                    label:'FIXED',
+                    active:_type==CommitmentType.fixed,
+                    onTap:()=>setState(()=>_type=CommitmentType.fixed),
+                  ),
+                  _Chip(
+                    label:'FLEXIBLE',
+                    active:_type==CommitmentType.flexible,
+                    onTap:()=>setState(()=>_type=CommitmentType.flexible),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Text(
+                _type == CommitmentType.fixed
+                    ? 'Scheduled time is treated as unavailable during planning.'
+                    : 'You marked this commitment as flexible, but its currently scheduled time is still treated as unavailable during planning. Takt does not move it automatically. You can reschedule it yourself.',
+                key: const Key('commitment-type-explanation'),
+                style: const TextStyle(
+                  color: C.detailMuted,
+                  fontSize: 12,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+        ),
         const SizedBox(height:16),
         if (_pola == _PolaJadwal.rutin)
           _FieldCard(label:'Every day',child:Wrap(spacing:8,runSpacing:8,children:List.generate(7,(index){final weekday=index+1;final active=_hari.contains(weekday);return _Chip(label:_namaHari[index],active:active,onTap:()=>setState((){if(active){_hari.remove(weekday);}else{_hari.add(weekday);}}));})))
@@ -180,17 +247,97 @@ class _TambahJadwalScreenState extends State<TambahJadwalScreen> {
           )),
         ]),
         const SizedBox(height:24),
-        GestureDetector(onTap:vm.isSaving?null:_simpan,child:Container(padding:const EdgeInsets.symmetric(vertical:18),decoration:BoxDecoration(color:C.accent,borderRadius:BorderRadius.circular(14)),alignment:Alignment.center,child:vm.isSaving?const SizedBox(width:20,height:20,child:CircularProgressIndicator(strokeWidth:2,color:C.bg)):Text(widget.isEditing?'Save Changes':'Add Schedule',style:const TextStyle(color:C.bg,fontSize:16,fontWeight:FontWeight.w700)))),
+        SizedBox(
+          height: 52,
+          child: FilledButton(
+            key: const Key('save-schedule'),
+            onPressed: vm.isSaving ? null : _simpan,
+            child: vm.isSaving
+                ? const SizedBox(
+                    width:20,
+                    height:20,
+                    child:CircularProgressIndicator(
+                      strokeWidth:2,
+                      color:C.bg,
+                    ),
+                  )
+                : Text(widget.isEditing?'Save Changes':'Add Schedule'),
+          ),
+        ),
         const SizedBox(height:12),
-        GestureDetector(onTap:vm.isSaving?null:widget.onBack,child:Container(padding:const EdgeInsets.symmetric(vertical:16),decoration:BoxDecoration(color:C.card,borderRadius:BorderRadius.circular(14)),alignment:Alignment.center,child:const Text('Cancel',style:TextStyle(color:C.white,fontSize:15)))),
+        SizedBox(
+          height: 48,
+          child: OutlinedButton(
+            onPressed: vm.isSaving ? null : widget.onBack,
+            child: const Text('Cancel'),
+          ),
+        ),
       ]),
     );
   }
   Widget _input(TextEditingController controller,String hint,{int maxLines=1}) => TextField(controller:controller,maxLines:maxLines,style:const TextStyle(color:C.white,fontSize:16),cursorColor:C.accent,decoration:InputDecoration(isDense:true,contentPadding:EdgeInsets.zero,border:InputBorder.none,hintText:hint,hintStyle:const TextStyle(color:C.detailMuted,fontSize:16)));
 }
 
-class _TapValue extends StatelessWidget { const _TapValue({required this.value,required this.onTap}); final String value; final VoidCallback onTap; @override Widget build(BuildContext context)=>GestureDetector(onTap:onTap,behavior:HitTestBehavior.opaque,child:Text(value,style:const TextStyle(color:C.white,fontSize:16))); }
-class _Chip extends StatelessWidget { const _Chip({required this.label,required this.active,required this.onTap}); final String label; final bool active; final VoidCallback onTap; @override Widget build(BuildContext context)=>GestureDetector(onTap:onTap,child:Container(padding:const EdgeInsets.symmetric(horizontal:16,vertical:10),decoration:BoxDecoration(color:active?C.accent:C.bg,borderRadius:BorderRadius.circular(999)),child:Text(label,style:TextStyle(color:active?C.bg:C.white,fontSize:13,fontWeight:FontWeight.w700)))); }
+class _TapValue extends StatelessWidget {
+  const _TapValue({required this.value, required this.onTap});
+  final String value;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 44),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(8),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(value, style: const TextStyle(color: C.white, fontSize: 16)),
+            ),
+          ),
+        ),
+      );
+}
+
+class _Chip extends StatelessWidget {
+  const _Chip({required this.label, required this.active, required this.onTap});
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+        button: true,
+        selected: active,
+        label: label,
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(minHeight: 44),
+          child: Material(
+            color: active ? C.accent : C.bg,
+            borderRadius: BorderRadius.circular(999),
+            child: InkWell(
+              onTap: onTap,
+              borderRadius: BorderRadius.circular(999),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                child: Center(
+                  widthFactor: 1,
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      color: active ? C.bg : C.white,
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+}
 class _FieldCard extends StatelessWidget {
   const _FieldCard({
     super.key,
@@ -223,10 +370,13 @@ class _FieldCard extends StatelessWidget {
     );
     final handler = onTap;
     if (handler == null) return card;
-    return GestureDetector(
-      behavior: HitTestBehavior.opaque,
-      onTap: handler,
-      child: card,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: handler,
+        borderRadius: BorderRadius.circular(14),
+        child: card,
+      ),
     );
   }
 }

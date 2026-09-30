@@ -103,10 +103,27 @@ class _PlanCard extends StatelessWidget {
                       ),
                     ),
                   ),
-                  _StatusBadge(stale: item.stale),
+                  StatusPill(
+                    label: item.stale ? 'SUPERSEDED' : 'ACCEPTED',
+                    color: item.stale ? C.padat : C.accent,
+                    icon: item.stale
+                        ? Icons.history_toggle_off_rounded
+                        : Icons.check_circle_outline_rounded,
+                    semanticLabel: item.stale
+                        ? 'Persisted evaluation stale. A newer evaluation superseded this saved plan source.'
+                        : 'Accepted plan. This badge does not assert source-evaluation freshness.',
+                  ),
                 ],
               ),
               const SizedBox(height: 10),
+              const Text(
+                'Accepted plan',
+                style: TextStyle(
+                  color: C.accent,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+              const SizedBox(height: 4),
               Text(
                 'Revision ${revision.revisionNumber} · ${revision.selectedCandidateId}',
                 style: const TextStyle(color: C.detailMuted),
@@ -121,6 +138,14 @@ class _PlanCard extends StatelessWidget {
                 'Deadline ${_dateTime(deadline)}',
                 style: const TextStyle(color: C.detailMuted),
               ),
+              if (item.stale) ...[
+                const SizedBox(height: 10),
+                const Text(
+                  'A trusted re-evaluation superseded the evaluation this revision came from. The accepted revision remains historical; re-evaluate before treating it as current planning guidance.',
+                  key: Key('persisted-stale-summary'),
+                  style: TextStyle(color: C.detailMuted, fontSize: 12, height: 1.35),
+                ),
+              ],
               const SizedBox(height: 12),
               Align(
                 alignment: Alignment.centerRight,
@@ -135,29 +160,6 @@ class _PlanCard extends StatelessWidget {
       ),
     );
   }
-}
-
-class _StatusBadge extends StatelessWidget {
-  const _StatusBadge({required this.stale});
-  final bool stale;
-
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-        decoration: BoxDecoration(
-          color: C.bg,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: stale ? C.padat : C.accent),
-        ),
-        child: Text(
-          stale ? 'STALE' : 'CURRENT',
-          style: TextStyle(
-            color: stale ? C.padat : C.accent,
-            fontSize: 10,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      );
 }
 
 class _MessageCard extends StatelessWidget {

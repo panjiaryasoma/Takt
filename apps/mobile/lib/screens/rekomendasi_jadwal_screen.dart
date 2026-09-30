@@ -8,6 +8,7 @@ import '../monetization/revenuecat_contract.dart';
 import '../monetization/revenuecat_service.dart';
 import '../theme/app_theme.dart';
 import '../viewmodels/decision_report_view_model.dart';
+import '../widgets/common.dart';
 
 /// Host-injected Decision Report; no repositories, input generation or HTTP.
 class RekomendasiJadwalScreen extends StatefulWidget {
@@ -170,20 +171,62 @@ class _RekomendasiJadwalScreenState extends State<RekomendasiJadwalScreen> {
             const Text('Suggested schedule · Not added to calendar', style: TextStyle(color: C.accent)),
             const SizedBox(height: 8),
             Text('Evaluated ${_instant(view.response.evaluatedAt)}', style: const TextStyle(color: C.detailMuted)),
-            if (_vm.isStale) const _ReportCard(highlight: true, child: Text(
-              'Inputs have changed. Go back for a new evaluation before accepting a suggested schedule.',
-              key: Key('stale-notice'))),
+            if (_vm.isSessionOutdated)
+              _ReportCard(
+                highlight: true,
+                child: Column(
+                  key: const Key('stale-notice'),
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const StatusPill(
+                      label: 'SESSION OUTDATED',
+                      color: C.sibuk,
+                      icon: Icons.update_rounded,
+                      semanticLabel:
+                          'Session outdated. Current inputs no longer match this report.',
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'Inputs changed after this Decision Report was created.',
+                      key: Key('session-outdated-notice'),
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'This screen is no longer valid for Accept or Choose Alternative. Go back, review the current inputs, and run a fresh evaluation.',
+                      style: TextStyle(color: C.detailMuted),
+                    ),
+                    if (widget.onBack != null) ...[
+                      const SizedBox(height: 12),
+                      OutlinedButton.icon(
+                        key: const Key('review-inputs-from-outdated'),
+                        onPressed: widget.onBack,
+                        icon: const Icon(Icons.arrow_back_rounded),
+                        label: const Text('Review inputs'),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
             _ReportCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               const _Heading('Readiness'),
-              Text(view.readinessLabel, style: const TextStyle(fontSize: 17, color: C.accent)),
+              StatusPill(
+                label: view.readinessLabel,
+                color: _readinessColor(view.response.readiness.status),
+                icon: _readinessIcon(view.response.readiness.status),
+              ),
               _TextList(title: 'Blockers', lines: view.response.readiness.blockingReasons.map(DecisionReportViewData.explain).toList()),
               _TextList(title: 'Review items', lines: view.response.readiness.reviewItems.map(DecisionReportViewData.explain).toList()),
               _TextList(title: 'Passed checks', lines: view.response.readiness.passedChecks.map(DecisionReportViewData.explain).toList()),
             ])),
             _ReportCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               const _Heading('Feasibility'),
-              Text(view.feasibilityLabel, style: const TextStyle(fontSize: 17, color: C.accent)),
-              const SizedBox(height: 8),
+              StatusPill(
+                label: view.feasibilityLabel,
+                color: _feasibilityColor(view.response.planning?.feasibility),
+                icon: Icons.query_stats_rounded,
+              ),
+              const SizedBox(height: 10),
               Text(view.feasibilityExplanation),
               if (planning != null) ...[
                 const SizedBox(height: 8),
@@ -194,6 +237,15 @@ class _RekomendasiJadwalScreenState extends State<RekomendasiJadwalScreen> {
               ],
             ])),
             if (planning != null && payload != null) ...[
+              const SizedBox(height: 8),
+              const PresentationSectionTitle('Recommendation'),
+              const SizedBox(height: 6),
+              const Text(
+                'Advisory only. Nothing below is added to your calendar until you explicitly accept an option and persistence succeeds.',
+                key: Key('recommendation-advisory-copy'),
+                style: TextStyle(color: C.detailMuted, height: 1.4),
+              ),
+              const SizedBox(height: 8),
               const Text('Times are shown in your device time zone.', style: TextStyle(color: C.detailMuted)),
               for (var i = 0; i < planning.candidates.length; i++)
                 if (planning.candidates[i].ref.candidateId ==
@@ -240,6 +292,14 @@ class _RekomendasiJadwalScreenState extends State<RekomendasiJadwalScreen> {
             if (_vm.handoffComplete) const _ReportCard(child: Text('Your choice was handed off. Wait for persistence confirmation.', key: Key('handoff-complete'))),
             if (_vm.handoffFailed) const _ReportCard(highlight: true, child: Text('Your choice could not be handed off. Review it before trying again.', key: Key('handoff-failed'))),
             if (planning != null) ...[
+              const SizedBox(height: 8),
+              const PresentationSectionTitle('Your actions'),
+              const SizedBox(height: 4),
+              const Text(
+                'Actions shown here come from the backend evaluation. This screen may only disable them for local safety or access constraints.',
+                style: TextStyle(color: C.detailMuted, fontSize: 12, height: 1.35),
+              ),
+              const SizedBox(height: 10),
               if (planning.allowedActions.contains(RecommendationAction.accept)) ...[
                 FilledButton(key: const Key('accept-candidate'),
                     onPressed: widget.onAccept != null &&
@@ -267,7 +327,17 @@ class _RekomendasiJadwalScreenState extends State<RekomendasiJadwalScreen> {
                   } : null, child: const Text('Ignore recommendation')),
             ],
             _ReportCard(child: ExpansionTile(tilePadding: EdgeInsets.zero,
-              title: const Text('Evaluation details'), children: [
+              title: const Text('Traceability & evaluation details'), children: [
+                const Align(
+                  alignment: Alignment.centerLeft,
+                  child: Padding(
+                    padding: EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      'This view uses validated evaluation data only. Source evidence remains available in the analysis review.',
+                      style: TextStyle(color: C.detailMuted, fontSize: 12),
+                    ),
+                  ),
+                ),
                 Align(alignment: Alignment.centerLeft, child: SelectableText([
                   'Evaluation: ${view.response.evaluationId}',
                   'Competition: ${view.response.basis.report.competitionId}',
@@ -302,7 +372,42 @@ class _CandidateCard extends StatelessWidget {
         _Heading(label),
         if (selected) const Text('Your selected option', style: TextStyle(color: C.accent, fontWeight: FontWeight.w700)),
         const SizedBox(height: 8),
-        Text('Remaining buffer: ${data.bufferMinutes} min'),
+        Container(
+          key: Key('buffer-${data.candidate.ref.candidateId}'),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: C.bg,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Row(
+            children: [
+              const Icon(Icons.safety_check_outlined, color: C.accent),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'Remaining buffer',
+                      style: TextStyle(
+                        color: C.detailMuted,
+                        fontSize: 11,
+                      ),
+                    ),
+                    Text(
+                      '${data.bufferMinutes} min',
+                      style: const TextStyle(
+                        color: C.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
         const SizedBox(height: 12),
         const Text('Suggested schedule · Not added to calendar', style: TextStyle(color: C.accent)),
         if (next != null) ...[
@@ -412,6 +517,31 @@ class _WindowText extends StatelessWidget {
       child: Align(alignment: Alignment.centerLeft,
           child: Text('Task $taskId · $minutes min\n${_instant(start)}\nto ${_instant(end)}')));
 }
+
+
+Color _readinessColor(ReadinessStatus status) => switch (status) {
+  ReadinessStatus.readyToEvaluate => C.kosong,
+  ReadinessStatus.needsReview => C.sedang,
+  ReadinessStatus.eligibilityBlocked => C.padat,
+  ReadinessStatus.deadlinePassed => C.padat,
+  ReadinessStatus.insufficientInformation => C.sedang,
+};
+
+IconData _readinessIcon(ReadinessStatus status) => switch (status) {
+  ReadinessStatus.readyToEvaluate => Icons.check_circle_outline_rounded,
+  ReadinessStatus.needsReview => Icons.rate_review_outlined,
+  ReadinessStatus.eligibilityBlocked => Icons.block_outlined,
+  ReadinessStatus.deadlinePassed => Icons.event_busy_outlined,
+  ReadinessStatus.insufficientInformation => Icons.help_outline_rounded,
+};
+
+Color _feasibilityColor(FeasibilityStatus? status) => switch (status) {
+  null => C.detailMuted,
+  FeasibilityStatus.feasible => C.kosong,
+  FeasibilityStatus.feasibleWithTradeoffs => C.sedang,
+  FeasibilityStatus.tightCapacity => C.sibuk,
+  FeasibilityStatus.notFeasible => C.padat,
+};
 
 String _instant(DateTime instant) {
   final local = instant.toLocal();

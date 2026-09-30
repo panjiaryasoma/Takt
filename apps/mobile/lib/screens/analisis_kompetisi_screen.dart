@@ -163,24 +163,21 @@ class _AnalisisKompetisiScreenState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                GestureDetector(
-                  onTap: widget.onBack,
-                  child: Container(
-                    width: 36,
-                    height: 36,
-                    decoration: const BoxDecoration(
-                      color: C.card,
-                      shape: BoxShape.circle,
-                    ),
-                    alignment: Alignment.center,
-                    child: const Icon(
-                      Icons.chevron_left,
-                      color: C.accent,
-                      size: 22,
+                if (widget.onBack != null) ...[
+                  Material(
+                    color: C.card,
+                    shape: const CircleBorder(),
+                    child: IconButton(
+                      tooltip: 'Back',
+                      onPressed: widget.onBack,
+                      icon: const Icon(
+                        Icons.chevron_left,
+                        color: C.accent,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 12),
+                  const SizedBox(height: 12),
+                ],
                 Text(
                   widget.continuation
                       ? 'ADDITIONAL SOURCE'
@@ -254,27 +251,22 @@ class _AnalisisKompetisiScreenState
           const SizedBox(height: 16),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 20),
-            child: GestureDetector(
-              onTap: _canSubmit ? _submit : null,
-              child: Opacity(
-                opacity: _canSubmit ? 1 : 0.45,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  decoration: BoxDecoration(
-                    color: C.accent,
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                  alignment: Alignment.center,
-                  child: Text(
-                    widget.continuation
-                        ? 'Add & Re-analyze'
-                        : 'Submit & Start Analysis',
-                    style: const TextStyle(
-                      color: C.bg,
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
+            child: SizedBox(
+              height: 52,
+              child: FilledButton.icon(
+                key: const Key('submit-analysis'),
+                onPressed: _canSubmit ? _submit : null,
+                icon: _submitting
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.auto_awesome_rounded),
+                label: Text(
+                  widget.continuation
+                      ? 'Add & Re-analyze'
+                      : 'Submit & Start Analysis',
                 ),
               ),
             ),
@@ -299,26 +291,33 @@ class _AnalisisKompetisiScreenState
 
   Widget _segment(String label, int index) {
     final active = index == _mode;
-    return GestureDetector(
-      onTap: _submitting
-          ? null
-          : () => setState(() {
-                _mode = index;
-                _error = null;
-              }),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        decoration: BoxDecoration(
+    return Semantics(
+      button: true,
+      selected: active,
+      label: label,
+      child: ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 48),
+        child: Material(
           color: active ? C.accent : C.card,
           borderRadius: BorderRadius.circular(10),
-        ),
-        alignment: Alignment.center,
-        child: Text(
-          label,
-          style: TextStyle(
-            color: active ? C.bg : C.white,
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
+          child: InkWell(
+            onTap: _submitting
+                ? null
+                : () => setState(() {
+                      _mode = index;
+                      _error = null;
+                    }),
+            borderRadius: BorderRadius.circular(10),
+            child: Center(
+              child: Text(
+                label,
+                style: TextStyle(
+                  color: active ? C.bg : C.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
           ),
         ),
       ),
@@ -393,11 +392,12 @@ class _AnalisisKompetisiScreenState
                     ),
                   ),
                   const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
+                  Wrap(
+                    alignment: WrapAlignment.center,
+                    spacing: 10,
+                    runSpacing: 8,
                     children: [
                       _outlineButton('Replace', _pickFile),
-                      const SizedBox(width: 10),
                       _outlineButton(
                         'Remove',
                         () => setState(() => _picked = null),
@@ -490,25 +490,14 @@ class _AnalisisKompetisiScreenState
   }
 
   Widget _outlineButton(String label, VoidCallback action) {
-    return GestureDetector(
-      onTap: _submitting ? null : action,
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 18,
-          vertical: 8,
-        ),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: C.accent),
-        ),
-        child: Text(
-          label,
-          style: const TextStyle(
-            color: C.accent,
-            fontSize: 12,
-          ),
-        ),
+    return OutlinedButton(
+      onPressed: _submitting ? null : action,
+      style: OutlinedButton.styleFrom(
+        minimumSize: const Size(44, 44),
+        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+        shape: const StadiumBorder(),
       ),
+      child: Text(label, style: const TextStyle(fontSize: 12)),
     );
   }
 
