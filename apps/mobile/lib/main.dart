@@ -268,6 +268,17 @@ class _RootShellState extends State<RootShell> {
     }
   }
 
+  void _backFromPlanningSetup() {
+    final host = context.read<PlanningHostViewModel>();
+    if (host.navigationLockedByPersistence || host.canRetryPersistence) {
+      return;
+    }
+    if (host.phase == PlanningHostPhase.requesting) {
+      host.abandonRequest();
+    }
+    setState(() => _analisisStep = 2);
+  }
+
   void _closeDecision() {
     if (widget.decisionSession == null) {
       context.read<PlanningHostViewModel>().leaveDecision();
@@ -319,7 +330,7 @@ class _RootShellState extends State<RootShell> {
     final analysis = context.read<AnalisisViewModel>();
     switch (_effectiveAnalysisStepFor(host)) {
       case 4:
-        setState(() => _analisisStep = 2);
+        _backFromPlanningSetup();
         return;
       case 3:
         _closeDecision();
@@ -487,7 +498,7 @@ class _RootShellState extends State<RootShell> {
         }
         return PlanningSetupScreen(
           host: host,
-          onBack: () => setState(() => _analisisStep = 2),
+          onBack: _backFromPlanningSetup,
           onDecisionReady: () => setState(() => _analisisStep = 3),
         );
       case 3:
