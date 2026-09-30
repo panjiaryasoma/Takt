@@ -458,7 +458,6 @@ class _RootShellState extends State<RootShell> {
           return AnalisisKompetisiScreen(
             continuation: false,
             onSubmitted: () => setState(() => _analisisStep = 1),
-            onBack: () => setState(() => _navIndex = 0),
           );
         }
         return ReviewBriefScreen(
@@ -484,16 +483,14 @@ class _RootShellState extends State<RootShell> {
         return AnalisisKompetisiScreen(
           continuation: _addingSource,
           onSubmitted: () => setState(() => _analisisStep = 1),
-          onBack: () {
-            if (_addingSource && vm.response != null) {
-              setState(() {
-                _addingSource = false;
-                _analisisStep = 2;
-              });
-            } else {
-              setState(() => _navIndex = 0);
-            }
-          },
+          onBack: _addingSource && vm.response != null
+              ? () {
+                  setState(() {
+                    _addingSource = false;
+                    _analisisStep = 2;
+                  });
+                }
+              : null,
         );
     }
   }
@@ -567,7 +564,6 @@ class _RootShellState extends State<RootShell> {
                   _selectedSavedPlanId = savedPlanId;
                   _navIndex = 3;
                 }),
-                onBack: () => setState(() => _navIndex = 0),
               )
             : JadwalRingkasanScreen(
                 onSwitchTab: (index) =>
