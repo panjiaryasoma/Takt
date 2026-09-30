@@ -11,11 +11,7 @@ from fastapi import Request
 from fastapi.testclient import TestClient
 
 import apps.api.routes.plans as plans_route
-from apps.api.contracts import (
-    CompetitionAnalyzePdfMetadataV1,
-    PlanReevaluateRequestV1,
-    ReevaluationTransitionV1,
-)
+from apps.api.contracts import PlanReevaluateRequestV1, ReevaluationTransitionV1
 from apps.api.errors import PlanReevaluateContractError, unhandled_error_handler
 from apps.api.main import app
 from apps.api.services.reevaluation import ReevaluationExecutionFailure
