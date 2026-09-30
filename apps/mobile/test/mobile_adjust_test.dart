@@ -288,11 +288,15 @@ void main() {
   testWidgets('the entire From and To cards change their time values',
       (tester) async {
     final database = AppDatabase.forTesting(NativeDatabase.memory());
-    final repository = DriftScheduleRepository(database);
-    final viewModel = JadwalViewModel(repository);
-    addTearDown(repository.close);
-    await viewModel.initialize();
-    await Future<void>.delayed(Duration.zero);
+    final repository = DriftScheduleRepository(
+      database,
+      closeDatabaseOnDispose: false,
+    );
+    final viewModel = JadwalViewModel(
+      repository,
+      closeScheduleRepositoryOnDispose: false,
+    );
+    addTearDown(database.close);
 
     var calls = 0;
     Future<TimeOfDay?> picker(
@@ -338,11 +342,15 @@ void main() {
   testWidgets('calendar swipes change month without leaving Schedule',
       (tester) async {
     final database = AppDatabase.forTesting(NativeDatabase.memory());
-    final repository = DriftScheduleRepository(database);
-    final viewModel = JadwalViewModel(repository);
-    addTearDown(repository.close);
-    await viewModel.initialize();
-    await Future<void>.delayed(Duration.zero);
+    final repository = DriftScheduleRepository(
+      database,
+      closeDatabaseOnDispose: false,
+    );
+    final viewModel = JadwalViewModel(
+      repository,
+      closeScheduleRepositoryOnDispose: false,
+    );
+    addTearDown(database.close);
     viewModel.selectDate(DateTime(2026, 9, 1));
 
     await tester.pumpWidget(
@@ -431,11 +439,15 @@ void main() {
   testWidgets('weekly summary highlights device-local today only in current week',
       (tester) async {
     final database = AppDatabase.forTesting(NativeDatabase.memory());
-    final repository = DriftScheduleRepository(database);
-    final viewModel = JadwalViewModel(repository);
-    addTearDown(repository.close);
-    await viewModel.initialize();
-    await Future<void>.delayed(Duration.zero);
+    final repository = DriftScheduleRepository(
+      database,
+      closeDatabaseOnDispose: false,
+    );
+    final viewModel = JadwalViewModel(
+      repository,
+      closeScheduleRepositoryOnDispose: false,
+    );
+    addTearDown(database.close);
     viewModel.selectDate(DateTime(2026, 9, 30));
 
     Widget app(DateTime now) => ChangeNotifierProvider.value(
