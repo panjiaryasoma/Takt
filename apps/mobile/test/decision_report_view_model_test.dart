@@ -53,15 +53,15 @@ void main() {
     addTearDown(vm.dispose);
     final old = vm.beginAccept()!;
     vm.updateHost(session: session, currentInputRevision: 4);
-    expect(vm.isStale, isTrue);
+    expect(vm.isSessionOutdated, isTrue);
     expect(vm.selectedCandidateId, isNull);
     expect(vm.pendingConfirmation, isNull);
     expect(vm.confirmAccept(old), isNull);
     expect(vm.can(RecommendationAction.accept), isFalse);
     vm.updateHost(session: session, currentInputRevision: 3);
-    expect(vm.isStale, isTrue);
+    expect(vm.isSessionOutdated, isTrue);
     vm.updateHost(session: testSession(generation: 13, revision: 4), currentInputRevision: 4);
-    expect(vm.isStale, isFalse);
+    expect(vm.isSessionOutdated, isFalse);
     expect(vm.selectedCandidateId, primaryId);
   });
 
