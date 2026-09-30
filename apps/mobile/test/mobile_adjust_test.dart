@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:takt_mobile/calendar/ics_import.dart';
 import 'package:takt_mobile/data/database/app_database.dart';
 import 'package:takt_mobile/data/repositories/drift_schedule_repository.dart';
+import 'package:takt_mobile/screens/ics_import_screen.dart';
 import 'package:takt_mobile/screens/jadwal_ringkasan_screen.dart';
 import 'package:takt_mobile/screens/tambah_jadwal_screen.dart';
 import 'package:takt_mobile/theme/app_theme.dart';
@@ -112,6 +113,60 @@ void main() {
     expect(second.skippedDuplicates, 1);
     expect(viewModel.all, hasLength(1));
     expect(viewModel.all.single.source, 'ics');
+  });
+
+  testWidgets('ICS picker previews events before any schedule write',
+      (tester) async {
+    final database = AppDatabase.forTesting(NativeDatabase.memory());
+    final repository = DriftScheduleRepository(database);
+    final viewModel = JadwalViewModel(repository);
+    addTearDown(viewModel.dispose);
+    await viewModel.initialize();
+    await Future<void>.delayed(Duration.zero);
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: viewModel,
+        child: MaterialApp(
+          theme: AppTheme.dark,
+          home: IcsImportScreen(
+            pickText: () async => (
+              name: 'calendar.ics',
+              content: 'BEGIN:VCALENDAR\n'
+                  'BEGIN:VEVENT\n'
+                  'UID:preview-1@example\n'
+                  'SUMMARY:Preview only\n'
+                  'DTSTART:20260930T090000Z\n'
+                  'DTEND:20260930T100000Z\n'
+                  'END:VEVENT\n'
+                  'END:VCALENDAR\n',
+            ),
+          ),
+        ),
+      ),
+    );
+
+    await tester.tap(find.byKey(const Key('choose-ics-file')));
+    await tester.pumpAndSettle();
+
+    expect(find.text('Preview only'), findsOneWidget);
+    expect(viewModel.all, isEmpty);
+    expect(
+      tester.widget<FilledButton>(
+        find.byKey(const Key('import-selected-ics')),
+      ).onPressed,
+      isNull,
+    );
+
+    await tester.tap(find.byKey(const Key('select-supported-ics')));
+    await tester.pump();
+    expect(
+      tester.widget<FilledButton>(
+        find.byKey(const Key('import-selected-ics')),
+      ).onPressed,
+      isNotNull,
+    );
+    expect(viewModel.all, isEmpty);
   });
 
   testWidgets('the entire From and To cards open the native time picker',
