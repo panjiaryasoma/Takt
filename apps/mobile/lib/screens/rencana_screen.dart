@@ -104,14 +104,14 @@ class _PlanCard extends StatelessWidget {
                     ),
                   ),
                   StatusPill(
-                    label: item.stale ? 'SUPERSEDED' : 'CURRENT',
-                    color: item.stale ? C.padat : C.kosong,
+                    label: item.stale ? 'SUPERSEDED' : 'ACCEPTED',
+                    color: item.stale ? C.padat : C.accent,
                     icon: item.stale
                         ? Icons.history_toggle_off_rounded
                         : Icons.check_circle_outline_rounded,
                     semanticLabel: item.stale
                         ? 'Persisted evaluation stale. A newer evaluation superseded this saved plan source.'
-                        : 'Saved plan source evaluation is current.',
+                        : 'Accepted plan. This badge does not assert source-evaluation freshness.',
                   ),
                 ],
               ),
