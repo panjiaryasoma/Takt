@@ -186,7 +186,7 @@ class JadwalRingkasanScreen extends StatelessWidget {
                           width: 30,
                           child: Text(
                             _days[index],
-                            key: Key('weekly-day-' + _days[index]),
+                            key: Key('weekly-day-${_days[index]}'),
                             style: TextStyle(
                               color: isCurrentWeek &&
                                       localNow.weekday == index + 1
