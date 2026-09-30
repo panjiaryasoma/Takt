@@ -528,6 +528,124 @@ void main() {
     await _pumpBounded(tester);
   });
 
+  testWidgets('system back closes Add Schedule before the root route',
+      (tester) async {
+    final database = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(database.close);
+
+    await tester.pumpWidget(TaktApp(database: database));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Schedule'));
+    await _pumpBounded(tester);
+    await tester.tap(find.text('Add'));
+    await _pumpBounded(tester);
+    expect(find.text('Add Schedule'), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await _pumpBounded(tester);
+    expect(find.text('Add Schedule'), findsNothing);
+    expect(find.text('My Schedule'), findsOneWidget);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _pumpBounded(tester, frames: 2);
+  });
+
+  testWidgets('cancelled recurrence stays visible without blocking capacity',
+      (tester) async {
+    final database = AppDatabase.forTesting(NativeDatabase.memory());
+    final repository = DriftScheduleRepository(database);
+    final viewModel = JadwalViewModel(repository);
+    addTearDown(viewModel.dispose);
+    addTearDown(repository.close);
+
+    await viewModel.initialize();
+    await Future<void>.delayed(Duration.zero);
+    await viewModel.tambahRutin(
+      title: 'Cancelled class',
+      weekdays: {DateTime.wednesday},
+      jamMulai: 9,
+      menitMulai: 0,
+      jamSelesai: 10,
+      menitSelesai: 0,
+      mulaiDari: DateTime(2026, 9, 30),
+    );
+    await Future<void>.delayed(Duration.zero);
+    final occurrence = viewModel.itemsOn(DateTime(2026, 9, 30)).single;
+    expect(await viewModel.cancelOccurrence(occurrence), isTrue);
+    await Future<void>.delayed(Duration.zero);
+    viewModel.selectDate(DateTime(2026, 9, 30));
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: viewModel,
+        child: MaterialApp(
+          theme: AppTheme.dark,
+          home: Scaffold(body: JadwalHarianScreen(onSwitchTab: (_) {})),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.textContaining('cancelled occurrence'), findsOneWidget);
+    expect(find.textContaining('does not block planning'), findsOneWidget);
+    expect(find.byKey(const Key('schedule-empty-state')), findsNothing);
+    expect(viewModel.scheduledMinutesOn(DateTime(2026, 9, 30)), 0);
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _pumpBounded(tester, frames: 2);
+  });
+
+  testWidgets('Schedule daily and weekly remain reachable at 320px and 2x text',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final viewModel = JadwalViewModel(
+      _UnusedScheduleRepository(),
+      closeScheduleRepositoryOnDispose: false,
+    );
+    addTearDown(viewModel.dispose);
+    viewModel.selectDate(DateTime(2026, 9, 30));
+
+    Widget shell(Widget child) => ChangeNotifierProvider.value(
+          value: viewModel,
+          child: MaterialApp(
+            theme: AppTheme.dark,
+            home: Builder(
+              builder: (context) => MediaQuery(
+                data: MediaQuery.of(context).copyWith(
+                  textScaler: const TextScaler.linear(2),
+                ),
+                child: Scaffold(body: child),
+              ),
+            ),
+          ),
+        );
+
+    await tester.pumpWidget(shell(JadwalHarianScreen(onSwitchTab: (_) {})));
+    await _pumpBounded(tester);
+    expect(find.text('My Schedule'), findsOneWidget);
+    expect(find.text('Daily Schedule'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpWidget(
+      shell(JadwalRingkasanScreen(
+        onSwitchTab: (_) {},
+        now: DateTime(2026, 9, 30, 10),
+      )),
+    );
+    await _pumpBounded(tester);
+    expect(find.text('Weekly Summary'), findsWidgets);
+    expect(find.byKey(const Key('weekly-time-type-explanation')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _pumpBounded(tester, frames: 2);
+  });
+
   testWidgets('weekly summary highlights device-local today only in current week',
       (tester) async {
     final viewModel = JadwalViewModel(
