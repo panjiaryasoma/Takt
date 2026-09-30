@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 
 import '../data/repositories/saved_plan_repository.dart';
+import '../models/recovery_policy.dart';
 import '../theme/app_theme.dart';
 import '../viewmodels/saved_plan_detail_view_model.dart';
 import '../widgets/common.dart';
+import '../widgets/recovery_panel.dart';
 
 class SavedPlanDetailScreen extends StatefulWidget {
   const SavedPlanDetailScreen({
@@ -171,7 +173,20 @@ class _SavedPlanDetailScreenState extends State<SavedPlanDetailScreen> {
           const HeaderDivider(),
           Padding(
             padding: const EdgeInsets.all(20),
-            child: Text(vm.error ?? 'Saved plan is unavailable.'),
+            child: RecoveryPanel(
+              descriptor: RecoveryDescriptor(
+                title: 'Saved plan is unavailable',
+                message: vm.error ?? 'Saved plan details could not be loaded.',
+                recoveryClass: RecoveryClass.reloadContext,
+                technicalCode: 'LOCAL_CONTEXT_INVALID',
+                stage: 'persistence',
+                primaryAction: RecoveryAction.reloadContext,
+              ),
+              primaryLabel: 'Retry load',
+              onPrimary: () {
+                vm.load(widget.savedPlanId);
+              },
+            ),
           ),
         ],
       );
