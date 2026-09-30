@@ -298,6 +298,18 @@ INSERT INTO analysis_snapshots (
           'report': {
             'competition_id': 'cmp-ready',
             'report_version': 4,
+            'canonical_fields': {
+              'competition_name': {
+                'state': 'VERIFIED',
+                'value': 'Demo Hackathon',
+                'normalized_value': 'Demo Hackathon',
+              },
+              'submission_deadline': {
+                'state': 'VERIFIED',
+                'value': '2026-09-30T23:45:00Z',
+                'normalized_value': '2026-09-30T23:45:00Z',
+              },
+            },
           },
           'ref': {
             'assembly_material_fingerprint': reportHash,
