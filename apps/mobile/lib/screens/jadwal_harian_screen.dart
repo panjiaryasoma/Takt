@@ -235,17 +235,15 @@ class JadwalHarianScreen extends StatelessWidget {
           const SizedBox(height: 16),
           JadwalTabs(activeIndex: 0, onChanged: onSwitchTab),
           const SizedBox(height: 16),
-          GestureDetector(
+          HorizontalSwipeSurface(
             key: const Key('month-calendar-swipe-area'),
             behavior: HitTestBehavior.opaque,
-            onHorizontalDragEnd: (details) {
-              final velocity = details.primaryVelocity ?? 0;
-              if (velocity.abs() < 180) return;
-              final offset = velocity < 0 ? 1 : -1;
-              vm.selectDate(
-                DateTime(selected.year, selected.month + offset, 1),
-              );
-            },
+            onSwipeLeft: () => vm.selectDate(
+              DateTime(selected.year, selected.month + 1, 1),
+            ),
+            onSwipeRight: () => vm.selectDate(
+              DateTime(selected.year, selected.month - 1, 1),
+            ),
             child: Column(
               children: [
                 Container(
