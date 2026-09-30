@@ -1077,7 +1077,7 @@ void main() {
       };
       if (label != null) {
         final button = find.text(label);
-        await tester.ensureVisible(button);
+        await _showRecoveryControl(tester, button);
         expect(button.hitTestable(), findsOneWidget);
         if (repo is _ToggleReadEvaluationRepository) repo.failReads = false;
         await tester.tap(button);
@@ -1089,7 +1089,9 @@ void main() {
         expect(find.text('Re-evaluate plan'), findsNothing);
         expect(find.text('Retry request'), findsNothing);
       }
-      expect(tester.takeException(), isNull);
+      final exception = tester.takeException();
+      expect(exception, isNull,
+          reason: exception is FlutterError ? exception.toStringDeep() : null);
       await tester.pumpWidget(const SizedBox.shrink());
       host.dispose();
     });
@@ -1104,16 +1106,16 @@ void main() {
     await _pumpUi(tester);
     await tester.tap(find.text('Plans'));
     await _pumpUi(tester);
-    await tester.ensureVisible(find.text('Open plan'));
+    await _showRecoveryControl(tester, find.text('Open plan'));
     await tester.tap(find.text('Open plan'));
     await _pumpUi(tester);
-    await tester.ensureVisible(find.text('Re-evaluate'));
+    await _showRecoveryControl(tester, find.text('Re-evaluate'));
     await tester.tap(find.text('Re-evaluate'));
     await _pumpUi(tester);
     expect(find.byKey(const Key('recovery-panel')), findsOneWidget);
     expect(find.textContaining('private sqlite'), findsNothing);
     expect(analysis.reads, 1);
-    await tester.ensureVisible(find.text('Retry load context'));
+    await _showRecoveryControl(tester, find.text('Retry load context'));
     await tester.tap(find.text('Retry load context'));
     await _pumpUi(tester);
     expect(analysis.reads, 2);
@@ -1136,9 +1138,11 @@ void main() {
     repo.failDetail = true;
     await vm.updateProgress(savedPlanTaskId: vm.detail!.tasks.single.task.id, progressPercent: 65);
     await _pumpUi(tester);
+    expect(vm.errorCode, 'LOCAL_REFRESH_FAILED');
+    await _showRecoveryControl(tester, find.text('Progress saved; display needs refresh'));
     expect(find.text('Progress saved; display needs refresh'), findsOneWidget);
     repo.failDetail = false;
-    await tester.ensureVisible(find.text('Retry refresh'));
+    await _showRecoveryControl(tester, find.text('Retry refresh'));
     await tester.tap(find.text('Retry refresh'));
     await _pumpUi(tester);
     expect(vm.detail!.tasks.single.progress.progressPercent, 65);
@@ -1881,4 +1885,11 @@ final class _ThrowingAnalysisRead implements AnalysisRepository {
   Future<void> close() async {}
   @override
   dynamic noSuchMethod(Invocation invocation) => super.noSuchMethod(invocation);
+}
+
+
+Future<void> _showRecoveryControl(WidgetTester tester, Finder finder) async {
+  await tester.scrollUntilVisible(finder, 220,
+      scrollable: find.byType(Scrollable).first);
+  await tester.pump();
 }

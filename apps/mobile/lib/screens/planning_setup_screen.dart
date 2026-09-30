@@ -387,6 +387,8 @@ class _PlanningSetupScreenState extends State<PlanningSetupScreen> {
               children: [
                 _Field(controller: _age, label: 'Age (optional)', numeric: true, enabled: !inputsLocked),
                 DropdownButtonFormField<bool?>(
+                  isExpanded: true,
+                  itemHeight: null,
                   initialValue: _studentStatus,
                   decoration: const InputDecoration(labelText: 'Student status'),
                   items: const [

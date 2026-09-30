@@ -1068,16 +1068,16 @@ void main() {
         await _pumpRecoveryUi(tester);
         await tester.tap(find.text('Analysis'));
         await _pumpRecoveryUi(tester);
-        await tester.ensureVisible(find.text('Enter Link'));
+        await _showAnalysisControl(tester, find.text('Enter Link'));
         await tester.tap(find.text('Enter Link'));
         await tester.pump();
-        await tester.ensureVisible(find.byType(DropdownButton<SourceTypeWire>));
+        await _showAnalysisControl(tester, find.byType(DropdownButton<SourceTypeWire>));
         await tester.tap(find.byType(DropdownButton<SourceTypeWire>));
         await tester.pumpAndSettle();
         await tester.tap(find.text('Official rules').last);
         await tester.pumpAndSettle();
         await tester.enterText(find.byType(TextField), 'https://example.com/rules');
-        await tester.ensureVisible(find.byKey(const Key('submit-analysis')));
+        await _showAnalysisControl(tester, find.byKey(const Key('submit-analysis')));
         await tester.tap(find.byKey(const Key('submit-analysis')));
         await _pumpRecoveryUi(tester);
         final vm = Provider.of<AnalisisViewModel>(tester.element(find.byType(RootShell)), listen: false);
@@ -1086,9 +1086,14 @@ void main() {
         await tester.binding.handlePopRoute();
         await _pumpRecoveryUi(tester);
         expect(vm.operationIdentity, same(identity));
+        await tester.tap(find.text('Home'));
+        await _pumpRecoveryUi(tester);
+        await tester.binding.handlePopRoute();
+        await _pumpRecoveryUi(tester);
+        expect(vm.operationIdentity, same(identity));
         expect(find.text('Analysis result is not saved yet'), findsOneWidget);
         if (discard) {
-          await tester.ensureVisible(find.text('Discard unsaved result'));
+          await _showAnalysisControl(tester, find.text('Discard unsaved result'));
           await tester.tap(find.text('Discard unsaved result'));
           await tester.pumpAndSettle();
           await tester.tap(find.text('Keep result'));
@@ -1101,7 +1106,7 @@ void main() {
           expect(vm.phase, AnalysisPhase.idle);
         } else {
           repository.persistGate = Completer<void>();
-          await tester.ensureVisible(find.text('Retry local save'));
+          await _showAnalysisControl(tester, find.text('Retry local save'));
           await tester.tap(find.text('Retry local save'));
           await _pumpRecoveryUi(tester);
           expect(vm.phase, AnalysisPhase.persisting);
@@ -1856,4 +1861,11 @@ Future<void> _pumpRecoveryUi(WidgetTester tester) async {
   for (var i = 0; i < 20; i++) {
     await tester.pump(const Duration(milliseconds: 25));
   }
+}
+
+
+Future<void> _showAnalysisControl(WidgetTester tester, Finder finder) async {
+  await tester.scrollUntilVisible(finder, 220,
+      scrollable: find.byType(Scrollable).first);
+  await tester.pump();
 }
