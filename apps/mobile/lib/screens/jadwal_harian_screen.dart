@@ -451,7 +451,7 @@ class JadwalHarianScreen extends StatelessWidget {
               _ActivityCard(
                 item: item,
                 dot: _dotFor(item.commitment),
-                time: _hhmm(item.startAt),
+                time: JadwalHarianScreen._hhmm(item.startAt),
                 duration: _duration(item.durationMinutes),
                 onEdit: () => onEdit?.call(item.commitment),
                 onDelete: () => _delete(context, vm, item),
@@ -511,7 +511,7 @@ class _CancelledOccurrenceCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final duration = _duration(item.durationMinutes);
+    final duration = JadwalHarianScreen._duration(item.durationMinutes);
     return Semantics(
       label:
           '${item.commitment.title}, cancelled occurrence, does not block planning',
