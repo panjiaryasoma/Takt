@@ -2,39 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../theme/app_theme.dart';
 
-/// Status bar mock (390x44) — meniru frame Figma.
-class StatusBarMock extends StatelessWidget {
-  const StatusBarMock({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return const SizedBox(
-      height: 44,
-      child: Padding(
-        padding: EdgeInsets.symmetric(horizontal: 22),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              '9:41',
-              style: TextStyle(color: C.white, fontSize: 14),
-            ),
-            Row(
-              children: [
-                Icon(Icons.signal_cellular_alt, color: C.white, size: 16),
-                SizedBox(width: 6),
-                Icon(Icons.wifi, color: C.white, size: 16),
-                SizedBox(width: 6),
-                Icon(Icons.battery_full, color: C.white, size: 16),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
 /// Header dengan logo "Tk" + judul + trailing opsional (mis. tombol Tambah).
 class AppHeader extends StatelessWidget {
   const AppHeader({super.key, required this.title, this.trailing, this.onBack});
