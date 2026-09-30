@@ -15,6 +15,15 @@ import 'package:takt_mobile/screens/tambah_jadwal_screen.dart';
 import 'package:takt_mobile/theme/app_theme.dart';
 import 'package:takt_mobile/viewmodels/jadwal_view_model.dart';
 
+Future<void> _pumpBounded(
+  WidgetTester tester, {
+  int frames = 12,
+}) async {
+  for (var index = 0; index < frames; index++) {
+    await tester.pump(const Duration(milliseconds: 25));
+  }
+}
+
 void main() {
   test('Android launcher and native splash use the canonical Takt logo', () {
     expect(File('assets/branding/logo.jpg').existsSync(), isTrue);
@@ -291,7 +300,7 @@ void main() {
     );
 
     await tester.tap(find.byKey(const Key('choose-ics-file')));
-    await tester.pumpAndSettle();
+    await _pumpBounded(tester);
 
     expect(find.text('Preview only'), findsOneWidget);
     expect(viewModel.all, isEmpty);
@@ -345,7 +354,7 @@ void main() {
     );
 
     await tester.tap(find.byKey(const Key('choose-ics-file')));
-    await tester.pumpAndSettle();
+    await _pumpBounded(tester);
 
     expect(
       find.text('30/09/2026 · 09:00–10:00 · America/New_York'),
@@ -384,18 +393,18 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await _pumpBounded(tester);
 
     final from = find.byKey(const Key('from-time-card'));
     await tester.ensureVisible(from);
     await tester.tapAt(tester.getTopLeft(from) + const Offset(8, 8));
-    await tester.pumpAndSettle();
+    await _pumpBounded(tester);
     expect(find.text('14:30'), findsOneWidget);
 
     final to = find.byKey(const Key('to-time-card'));
     await tester.ensureVisible(to);
     await tester.tapAt(tester.getBottomRight(to) - const Offset(8, 8));
-    await tester.pumpAndSettle();
+    await _pumpBounded(tester);
     expect(find.text('17:45'), findsOneWidget);
     expect(calls, 2);
   });
@@ -428,7 +437,7 @@ void main() {
       find.byKey(const Key('month-calendar-swipe-area')),
       const Offset(-320, 0),
     );
-    await tester.pumpAndSettle();
+    await _pumpBounded(tester);
 
     expect(viewModel.selectedDate, DateTime(2026, 10, 1));
     expect(find.text('October 2026'), findsOneWidget);
@@ -437,7 +446,7 @@ void main() {
       find.byKey(const Key('month-calendar-swipe-area')),
       const Offset(320, 0),
     );
-    await tester.pumpAndSettle();
+    await _pumpBounded(tester);
 
     expect(viewModel.selectedDate, DateTime(2026, 9, 1));
     expect(find.text('September 2026'), findsOneWidget);
@@ -449,7 +458,7 @@ void main() {
     addTearDown(database.close);
 
     await tester.pumpWidget(TaktApp(database: database));
-    await tester.pumpAndSettle();
+    await _pumpBounded(tester);
 
     expect(find.text('This week at a glance'), findsOneWidget);
 
@@ -457,7 +466,7 @@ void main() {
       find.byKey(const Key('root-tab-swipe-area')),
       const Offset(-420, 0),
     );
-    await tester.pumpAndSettle();
+    await _pumpBounded(tester);
     expect(find.text('My Schedule'), findsOneWidget);
 
     final scheduleContext =
@@ -473,7 +482,7 @@ void main() {
       find.byKey(const Key('month-calendar-swipe-area')),
       const Offset(-320, 0),
     );
-    await tester.pumpAndSettle();
+    await _pumpBounded(tester);
 
     expect(find.text('My Schedule'), findsOneWidget);
     expect(find.text('October 2026'), findsOneWidget);
@@ -482,7 +491,7 @@ void main() {
       find.byKey(const Key('bottom-nav-swipe-area')),
       const Offset(-420, 0),
     );
-    await tester.pumpAndSettle();
+    await _pumpBounded(tester);
     expect(find.text('Analyze Competition'), findsOneWidget);
   });
 
