@@ -533,16 +533,9 @@ class _ExpandableEvidenceTextState
         ),
         if (canExpand) ...[
           const SizedBox(height: 6),
-          GestureDetector(
-            onTap: () => setState(() => _expanded = !_expanded),
-            child: Text(
-              _expanded ? 'Close' : 'Show more',
-              style: const TextStyle(
-                color: C.accent,
-                fontSize: 10,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
+          TextButton(
+            onPressed: () => setState(() => _expanded = !_expanded),
+            child: Text(_expanded ? 'Close' : 'Show more'),
           ),
         ],
       ],
@@ -629,14 +622,15 @@ class _StateBadge extends StatelessWidget {
         vertical: 5,
       ),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.16),
+        color: C.bg,
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color, width: 1.5),
       ),
       child: Text(
         label,
-        style: TextStyle(
-          color: color,
-          fontSize: 10,
+        style: const TextStyle(
+          color: C.white,
+          fontSize: 11,
           fontWeight: FontWeight.w700,
         ),
       ),
