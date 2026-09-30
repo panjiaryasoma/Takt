@@ -226,3 +226,68 @@ class _DashedBorderPainter extends CustomPainter {
   @override
   bool shouldRepaint(covariant _DashedBorderPainter oldDelegate) => false;
 }
+
+class HorizontalSwipeSurface extends StatefulWidget {
+  const HorizontalSwipeSurface({
+    super.key,
+    required this.child,
+    this.onSwipeLeft,
+    this.onSwipeRight,
+    this.behavior = HitTestBehavior.translucent,
+    this.distanceThreshold = 48,
+    this.velocityThreshold = 500,
+  });
+
+  final Widget child;
+  final VoidCallback? onSwipeLeft;
+  final VoidCallback? onSwipeRight;
+  final HitTestBehavior behavior;
+  final double distanceThreshold;
+  final double velocityThreshold;
+
+  @override
+  State<HorizontalSwipeSurface> createState() =>
+      _HorizontalSwipeSurfaceState();
+}
+
+class _HorizontalSwipeSurfaceState extends State<HorizontalSwipeSurface> {
+  double _dragDx = 0;
+
+  void _reset() {
+    _dragDx = 0;
+  }
+
+  void _finish(DragEndDetails details) {
+    final velocity = details.primaryVelocity ?? 0;
+    final distance = _dragDx;
+    _reset();
+
+    if (distance.abs() < widget.distanceThreshold &&
+        velocity.abs() < widget.velocityThreshold) {
+      return;
+    }
+
+    final direction = distance.abs() >= widget.distanceThreshold
+        ? distance
+        : velocity;
+    if (direction < 0) {
+      widget.onSwipeLeft?.call();
+    } else if (direction > 0) {
+      widget.onSwipeRight?.call();
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      behavior: widget.behavior,
+      onHorizontalDragStart: (_) => _reset(),
+      onHorizontalDragUpdate: (details) {
+        _dragDx += details.primaryDelta ?? 0;
+      },
+      onHorizontalDragEnd: _finish,
+      onHorizontalDragCancel: _reset,
+      child: widget.child,
+    );
+  }
+}
