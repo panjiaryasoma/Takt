@@ -292,15 +292,15 @@ class _StepRow extends StatelessWidget {
                     ),
                   ),
                 ],
+                const SizedBox(height: 4),
+                Text(
+                  badge,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 11,
+                  ),
+                ),
               ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Text(
-            badge,
-            style: TextStyle(
-              color: color,
-              fontSize: 11,
             ),
           ),
         ],
