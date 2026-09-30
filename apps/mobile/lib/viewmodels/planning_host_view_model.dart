@@ -693,6 +693,7 @@ final class PlanningHostViewModel extends ChangeNotifier {
     _failure = null;
     _message = null;
     _pendingPersistence = null;
+    _lastRequest = null;
     notifyListeners();
   }
 
@@ -862,7 +863,7 @@ final class PlanningHostViewModel extends ChangeNotifier {
   }
 
   void createFreshEvaluationBaseline() {
-    if (!canCreateFreshBaseline) return;
+    if (!canCreateFreshBaseline || _pendingAcceptance != null) return;
     _forceFreshBaseline = true;
     _phase = PlanningHostPhase.setup;
     _failure = null;
@@ -872,9 +873,9 @@ final class PlanningHostViewModel extends ChangeNotifier {
   }
 
   void _mutateDraft(PlanningDraft next) {
-    if (_pendingPersistence != null) {
+    if (_pendingPersistence != null || _pendingAcceptance != null) {
       throw StateError(
-        'Resolve or abandon pending persistence before editing constraints.',
+        'Resolve pending persistence before editing constraints.',
       );
     }
     _draft = next;
@@ -1058,6 +1059,63 @@ final class SavedPlanIntegrityExceptionProxy implements Exception {
 
   @override
   String toString() => message;
+}
+
+final class AcceptancePersistenceExceptionProxy implements Exception {
+  const AcceptancePersistenceExceptionProxy(this.message);
+  final String message;
+
+  @override
+  String toString() => message;
+}
+
+sealed class _PlanRequestContext {
+  const _PlanRequestContext({
+    required this.generation,
+    required this.revision,
+    required this.snapshot,
+    required this.assembly,
+  });
+
+  final int generation;
+  final int revision;
+  final AnalysisSnapshot snapshot;
+  final PlanningAssembly assembly;
+}
+
+final class _FreshPlanRequest extends _PlanRequestContext {
+  const _FreshPlanRequest({
+    required super.generation,
+    required super.revision,
+    required super.snapshot,
+    required super.assembly,
+  });
+}
+
+final class _ReevaluationPlanRequest extends _PlanRequestContext {
+  const _ReevaluationPlanRequest({
+    required super.generation,
+    required super.revision,
+    required super.snapshot,
+    required super.assembly,
+    required this.prior,
+  });
+
+  final Evaluation prior;
+}
+
+final class _PendingAcceptance {
+  const _PendingAcceptance({
+    required this.session,
+    required this.intent,
+    required this.generation,
+    required this.revision,
+  });
+
+  final EvaluationSession session;
+  final AcceptCandidateIntent intent;
+  final int generation;
+  final int revision;
 }
 
 sealed class _PendingPersistence {
