@@ -4,9 +4,11 @@ import 'package:provider/provider.dart';
 import '../models/active_accepted_block.dart';
 import '../models/enums.dart';
 import '../models/schedule_occurrence.dart';
+import '../models/recovery_policy.dart';
 import '../theme/app_theme.dart';
 import '../viewmodels/jadwal_view_model.dart';
 import '../widgets/common.dart';
+import '../widgets/recovery_panel.dart';
 import 'jadwal_harian_screen.dart' show JadwalTabs;
 
 class _Task {
@@ -127,6 +129,24 @@ class JadwalRingkasanScreen extends StatelessWidget {
           if (vm.isLoading) const LinearProgressIndicator(minHeight: 2),
           const SizedBox(height: 16),
           JadwalTabs(activeIndex: 1, onChanged: onSwitchTab),
+          if (vm.errorMessage != null) ...[
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: RecoveryPanel(
+                descriptor: RecoveryDescriptor(
+                  title: 'Local schedule needs attention',
+                  message: vm.errorMessage!,
+                  recoveryClass: RecoveryClass.reloadContext,
+                  technicalCode: 'LOCAL_CONTEXT_INVALID',
+                  stage: 'persistence',
+                  primaryAction: RecoveryAction.reloadContext,
+                ),
+                primaryLabel: 'Retry local load',
+                onPrimary: vm.retry,
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           Container(
             margin: const EdgeInsets.symmetric(horizontal: 20),
