@@ -436,6 +436,71 @@ void main() {
     host.dispose();
   });
 
+  test('SUPERSEDED success persistence is correctness-bearing and non-discardable',
+      () async {
+    final prior = await _persistAndAcceptPrior(
+      evaluations,
+      savedPlans,
+      snapshot,
+    );
+    final failOnce = _FailOnceReevaluationRepository(evaluations);
+    final api = _ReevaluationPlanApi(
+      mode: _ReevaluationMode.superseded,
+      priorEvaluationId: prior.id,
+      priorBasisFingerprint: prior.evaluationBasisFingerprint,
+    );
+    final host = PlanningHostViewModel(
+      apiClient: api,
+      scheduleRepository: schedule,
+      evaluationRepository: failOnce,
+      savedPlanRepository: savedPlans,
+    );
+
+    await host.startPlanning(snapshot);
+    await host.evaluate();
+
+    expect(host.phase, PlanningHostPhase.persistenceError);
+    expect(host.hasKnownUnpersistedStaleWitness, isTrue);
+    expect(host.canDiscardPendingResult, isFalse);
+    expect(api.reevaluateCalls, 1);
+    expect(await evaluations.isStale(prior.id), isFalse);
+
+    await host.retryPersistence();
+
+    expect(api.reevaluateCalls, 1);
+    expect(await evaluations.isStale(prior.id), isTrue);
+    expect(host.phase, PlanningHostPhase.decision);
+    expect(host.activeSession, isNotNull);
+    host.dispose();
+  });
+
+  test('abandoned planning request ignores its late response', () async {
+    final api = _ControlledPlanApi(delayed: true);
+    final host = PlanningHostViewModel(
+      apiClient: api,
+      scheduleRepository: schedule,
+      evaluationRepository: evaluations,
+      savedPlanRepository: savedPlans,
+    );
+
+    await host.startPlanning(snapshot);
+    host.addTask(_task());
+    final evaluation = host.evaluate();
+    await Future<void>.delayed(Duration.zero);
+
+    expect(host.phase, PlanningHostPhase.requesting);
+    expect(host.abandonRequest(), isTrue);
+    expect(host.phase, PlanningHostPhase.setup);
+
+    api.completeEvaluate();
+    await evaluation;
+
+    expect(host.phase, PlanningHostPhase.setup);
+    expect(host.activeSession, isNull);
+    expect(await evaluations.evaluationById(evaluationId), isNull);
+    host.dispose();
+  });
+
   test('planning request retry reuses the exact assembled request', () async {
     final api = _FailOncePlanApi();
     final host = PlanningHostViewModel(
