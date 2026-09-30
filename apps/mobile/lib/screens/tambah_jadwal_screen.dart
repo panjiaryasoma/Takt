@@ -10,12 +10,25 @@ import '../viewmodels/jadwal_view_model.dart';
 
 enum _PolaJadwal { rutin, sekali }
 
+typedef ScheduleTimePicker = Future<TimeOfDay?> Function(
+  BuildContext context,
+  TimeOfDay initialTime,
+);
+
 class TambahJadwalScreen extends StatefulWidget {
-  const TambahJadwalScreen({super.key, this.onBack, this.onSave, this.commitment, this.recurrenceRule});
+  const TambahJadwalScreen({
+    super.key,
+    this.onBack,
+    this.onSave,
+    this.commitment,
+    this.recurrenceRule,
+    this.pickTime,
+  });
   final VoidCallback? onBack;
   final VoidCallback? onSave;
   final Commitment? commitment;
   final RecurrenceRule? recurrenceRule;
+  final ScheduleTimePicker? pickTime;
   bool get isEditing => commitment != null;
   @override
   State<TambahJadwalScreen> createState() => _TambahJadwalScreenState();
@@ -75,7 +88,11 @@ class _TambahJadwalScreenState extends State<TambahJadwalScreen> {
     if (picked != null) setState(() => _tanggal = picked);
   }
   Future<void> _pilihWaktu({required bool mulai}) async {
-    final picked = await showTimePicker(context: context, initialTime: mulai ? _mulai : _selesai);
+    final initialTime = mulai ? _mulai : _selesai;
+    final picker = widget.pickTime;
+    final picked = picker == null
+        ? await showTimePicker(context: context, initialTime: initialTime)
+        : await picker(context, initialTime);
     if (!mounted || picked == null) return;
     setState(() {
       if (mulai) {
