@@ -59,3 +59,30 @@ def load_recovery_policy(path=POLICY_PATH):
 def recovery_for(scenario_id):
     # Unknown scenarios fail closed; no optimistic automatic-retry default.
     return load_recovery_policy()[scenario_id]["recovery_class"]
+
+
+def public_recovery_cases():
+    """Join the two authorities at test time; never maintain a copied catalog."""
+    policy = load_recovery_policy()
+    by_contract = {
+        (endpoint, scenario["contract_key"]): scenario["recovery_class"]
+        for scenario in policy.values()
+        if scenario["contract_key"] is not None
+        for endpoint in scenario["endpoints"]
+    }
+    return [
+        {
+            "endpoint": row.endpoint,
+            "contract_key": row.failure_class,
+            "code": row.code,
+            "stage": row.stage,
+            "status_code": row.http_status,
+            "recovery_class": by_contract[row.endpoint, row.failure_class],
+        }
+        for row in PUBLIC_ERROR_MATRIX
+    ]
+
+
+if __name__ == "__main__":
+    # Stdlib-only bridge for Flutter's parity test, run from the repository root.
+    print(json.dumps(public_recovery_cases()))

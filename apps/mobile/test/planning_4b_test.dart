@@ -222,6 +222,68 @@ INSERT INTO analysis_snapshots (
       );
     });
 
+    test('accepted persistence leaves no foreign-key violations', () async {
+      final evaluation = await evaluations.persistEvaluation(
+        analysisSnapshot: snapshot,
+        evaluationRequestJson: _evaluationRequest(),
+        evaluationResponseJson: jsonEncode(decisionFixture()),
+        planningWindowPolicyJson: _windowPolicyJson(),
+      );
+
+      await savedPlans.acceptEvaluation(
+        evaluationId: evaluation.id,
+        candidateId: primaryId,
+        selectionSource: SelectionSource.primary,
+      );
+
+      final violations =
+          await db.customSelect('PRAGMA foreign_key_check').get();
+      expect(violations, isEmpty);
+    });
+
+    test('Accept transaction rolls back every child when block insert fails',
+        () async {
+      final evaluation = await evaluations.persistEvaluation(
+        analysisSnapshot: snapshot,
+        evaluationRequestJson: _evaluationRequest(),
+        evaluationResponseJson: jsonEncode(decisionFixture()),
+        planningWindowPolicyJson: _windowPolicyJson(),
+      );
+      await db.customStatement(
+        '''
+CREATE TRIGGER fail_6b_accepted_commitment
+BEFORE INSERT ON accepted_commitments
+BEGIN
+  SELECT RAISE(ABORT, 'simulated 6B accepted block failure');
+END
+''',
+      );
+
+      await expectLater(
+        savedPlans.acceptEvaluation(
+          evaluationId: evaluation.id,
+          candidateId: primaryId,
+          selectionSource: SelectionSource.primary,
+        ),
+        throwsA(anything),
+      );
+
+      for (final table in [
+        'saved_plans',
+        'saved_plan_revisions',
+        'saved_plan_tasks',
+        'task_progress',
+        'accepted_commitments',
+      ]) {
+        final row =
+            await db.customSelect('SELECT COUNT(*) AS count FROM $table').getSingle();
+        expect(row.data['count'], 0, reason: '$table must roll back atomically');
+      }
+      final violations =
+          await db.customSelect('PRAGMA foreign_key_check').get();
+      expect(violations, isEmpty);
+    });
+
     test('5A acceptance lineage consumes the shared backend/mobile golden',
         () async {
       final goldenResponseJson =
@@ -489,6 +551,101 @@ INSERT INTO analysis_snapshots (
         variables: [Variable<String>(evaluation.id)],
       ).get();
       expect(rows, hasLength(1));
+    });
+
+    test('failed Accept transaction stays rolled back after database restart',
+        () async {
+      final dir =
+          await Directory.systemTemp.createTemp('takt_6b_failed_accept_restart_');
+      final file = File('${dir.path}/takt.sqlite3');
+      addTearDown(() async {
+        if (await dir.exists()) await dir.delete(recursive: true);
+      });
+
+      final firstDb = AppDatabase.forTesting(NativeDatabase(file));
+      await firstDb.initialize();
+      final firstSnapshot = _analysisSnapshot();
+      await firstDb.customStatement(
+        '''
+INSERT INTO competitions (
+  id, created_at_epoch_ms, updated_at_epoch_ms
+) VALUES (?, ?, ?)
+''',
+        [firstSnapshot.competitionId, 1, 1],
+      );
+      await firstDb.customStatement(
+        '''
+INSERT INTO analysis_snapshots (
+  id, competition_id, report_version, assembly_material_fingerprint,
+  source_set_fingerprint, wire_fingerprint, report_changed,
+  response_json, cached_at_epoch_ms
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+''',
+        [
+          firstSnapshot.id,
+          firstSnapshot.competitionId,
+          firstSnapshot.reportVersion,
+          firstSnapshot.assemblyMaterialFingerprint,
+          null,
+          firstSnapshot.wireFingerprint,
+          1,
+          firstSnapshot.responseJson,
+          firstSnapshot.cachedAtEpochMs,
+        ],
+      );
+      final firstEvaluations = DriftEvaluationRepository(firstDb);
+      final firstPlans = DriftSavedPlanRepository(firstDb);
+      final evaluation = await firstEvaluations.persistEvaluation(
+        analysisSnapshot: firstSnapshot,
+        evaluationRequestJson: _evaluationRequest(),
+        evaluationResponseJson: jsonEncode(decisionFixture()),
+        planningWindowPolicyJson: _windowPolicyJson(),
+      );
+      await firstDb.customStatement(
+        '''
+CREATE TRIGGER fail_6b_restart_accepted_commitment
+BEFORE INSERT ON accepted_commitments
+BEGIN
+  SELECT RAISE(ABORT, 'simulated restart-safe failure');
+END
+''',
+      );
+
+      await expectLater(
+        firstPlans.acceptEvaluation(
+          evaluationId: evaluation.id,
+          candidateId: primaryId,
+          selectionSource: SelectionSource.primary,
+        ),
+        throwsA(anything),
+      );
+      await firstDb.close();
+
+      final secondDb = AppDatabase.forTesting(NativeDatabase(file));
+      addTearDown(secondDb.close);
+      await secondDb.initialize();
+
+      for (final table in [
+        'saved_plans',
+        'saved_plan_revisions',
+        'saved_plan_tasks',
+        'task_progress',
+        'accepted_commitments',
+      ]) {
+        final row = await secondDb
+            .customSelect('SELECT COUNT(*) AS count FROM $table')
+            .getSingle();
+        expect(
+          row.data['count'],
+          0,
+          reason: '$table must remain rolled back after restart',
+        );
+      }
+      final evaluationsAfterRestart = await secondDb
+          .customSelect('SELECT COUNT(*) AS count FROM evaluations')
+          .getSingle();
+      expect(evaluationsAfterRestart.data['count'], 1);
+      expect(await secondDb.customSelect('PRAGMA foreign_key_check').get(), isEmpty);
     });
 
     test('accepted plan, task progress, and blocks survive database restart',

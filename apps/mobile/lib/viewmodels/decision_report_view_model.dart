@@ -140,6 +140,13 @@ class DecisionReportViewModel extends ChangeNotifier {
     );
   }
 
+  void resetFailedHandoff() {
+    if (!_handoffFailed || _handoff != null) return;
+    _handoffFailed = false;
+    _handoffComplete = false;
+    notifyListeners();
+  }
+
   /// Ignore completions from a replaced/invalidated session. A failed handoff
   /// permits a new explicit confirmation; it is never retried automatically.
   void finishHandoff(AcceptConfirmation token, {bool failed = false}) {

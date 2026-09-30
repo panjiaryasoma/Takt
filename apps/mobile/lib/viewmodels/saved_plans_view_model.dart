@@ -60,6 +60,20 @@ final class SavedPlansViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
+  Future<void> refreshForHandoff() async {
+    try {
+      _items = await _repository.listSummaries();
+      _loading = false;
+      _error = null;
+      notifyListeners();
+    } on Object {
+      _loading = false;
+      _error = 'Saved plans could not be refreshed.';
+      notifyListeners();
+      rethrow;
+    }
+  }
+
   @override
   void dispose() {
     _subscription?.cancel();

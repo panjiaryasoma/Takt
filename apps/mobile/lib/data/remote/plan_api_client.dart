@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 
 import '../../models/plan_evaluation_wire.dart';
+import '../../models/recovery_policy.dart';
 import '../../models/reevaluation_wire.dart';
 import '../../utils/deterministic_json.dart';
 
@@ -12,23 +13,36 @@ final class PlanApiFailure implements Exception {
     required this.code,
     required this.stage,
     required this.message,
-    required this.retryable,
     this.statusCode,
+    this.origin = FailureOrigin.backend,
     this.transportRequestJson,
     this.transportResponseJson,
     this.transition,
     this.errorJson,
+    bool? retryable,
   });
 
   final String code;
   final String stage;
   final String message;
-  final bool retryable;
   final int? statusCode;
+  final FailureOrigin origin;
   final String? transportRequestJson;
   final String? transportResponseJson;
   final ReevaluationTransitionWire? transition;
   final String? errorJson;
+
+  FailureIdentity get identity => FailureIdentity(
+        code: code,
+        stage: stage,
+        statusCode: statusCode,
+        origin: origin,
+      );
+
+  RecoveryClass get recoveryClass => RecoveryPolicy.classify(identity);
+
+  /// Compatibility projection only. RecoveryClass is the authority.
+  bool get retryable => recoveryClass == RecoveryClass.retrySameInput;
 
   @override
   String toString() => '$code: $message';
@@ -106,7 +120,7 @@ final class HttpPlanApiClient implements PlanApiClient {
         code: 'RESPONSE_CONTRACT_INVALID',
         stage: 'response',
         message: error.message,
-        retryable: false,
+        origin: FailureOrigin.local,
         transportResponseJson: response,
       );
     }
@@ -126,7 +140,7 @@ final class HttpPlanApiClient implements PlanApiClient {
         code: 'LOCAL_CONTEXT_INVALID',
         stage: 'reevaluation',
         message: 'Prior persisted evaluation has no valid basis.',
-        retryable: false,
+        origin: FailureOrigin.local,
       );
     }
     final current =
@@ -151,8 +165,8 @@ final class HttpPlanApiClient implements PlanApiClient {
         code: error.code,
         stage: error.stage,
         message: error.message,
-        retryable: error.retryable,
         statusCode: error.statusCode,
+        origin: error.origin,
         transportRequestJson: transportRequestJson,
         transportResponseJson: error.transportResponseJson,
         transition: error.transition,
@@ -171,7 +185,7 @@ final class HttpPlanApiClient implements PlanApiClient {
         code: 'RESPONSE_CONTRACT_INVALID',
         stage: 'reevaluation',
         message: error.message,
-        retryable: false,
+        origin: FailureOrigin.local,
         transportResponseJson: response,
       );
     }
@@ -202,17 +216,17 @@ final class HttpPlanApiClient implements PlanApiClient {
       rethrow;
     } on TimeoutException catch (error) {
       throw PlanApiFailure(
-        code: 'TIMEOUT',
-        stage: 'network',
+        code: 'CLIENT_TIMEOUT',
+        stage: 'transport',
         message: error.toString(),
-        retryable: true,
+        origin: FailureOrigin.clientTransport,
       );
     } on http.ClientException catch (error) {
       throw PlanApiFailure(
-        code: 'NETWORK',
-        stage: 'network',
+        code: 'CLIENT_CONNECTION_FAILED',
+        stage: 'transport',
         message: error.toString(),
-        retryable: true,
+        origin: FailureOrigin.clientTransport,
       );
     }
   }
@@ -229,8 +243,8 @@ final class HttpPlanApiClient implements PlanApiClient {
           code: parsed.code,
           stage: parsed.stage,
           message: parsed.message,
-          retryable: _retryable(parsed.code, statusCode),
           statusCode: statusCode,
+          origin: FailureOrigin.backend,
           transportResponseJson: body,
           transition: parsed.transition,
           errorJson: parsed.errorJson,
@@ -240,8 +254,8 @@ final class HttpPlanApiClient implements PlanApiClient {
           code: 'UNKNOWN_BACKEND_ERROR',
           stage: 'unknown',
           message: 'Backend returned an unrecognized re-evaluation error.',
-          retryable: false,
           statusCode: statusCode,
+          origin: FailureOrigin.backend,
           transportResponseJson: body,
         );
       }
@@ -268,8 +282,8 @@ final class HttpPlanApiClient implements PlanApiClient {
         code: code,
         stage: stage,
         message: message,
-        retryable: _retryable(code, statusCode),
         statusCode: statusCode,
+        origin: FailureOrigin.backend,
         transportResponseJson: body,
         errorJson: deterministicJsonEncode(error),
       );
@@ -278,23 +292,11 @@ final class HttpPlanApiClient implements PlanApiClient {
         code: 'UNKNOWN_BACKEND_ERROR',
         stage: 'unknown',
         message: 'Backend returned an unrecognized planning error.',
-        retryable: false,
         statusCode: statusCode,
+        origin: FailureOrigin.backend,
         transportResponseJson: body,
       );
     }
-  }
-
-  static bool _retryable(String code, int statusCode) {
-    if (code == 'VALIDATION_ERROR' ||
-        code == 'PLANNING_INPUT_INVALID' ||
-        code == 'REPORT_BUNDLE_INVALID' ||
-        code == 'UNSUPPORTED_REPORT_CONTRACT' ||
-        code == 'REEVALUATION_CONTEXT_INVALID' ||
-        code == 'UNSUPPORTED_REEVALUATION_CONTRACT') {
-      return false;
-    }
-    return statusCode >= 500;
   }
 
   static Map<String, dynamic> _requireJsonObject(
@@ -312,7 +314,7 @@ final class HttpPlanApiClient implements PlanApiClient {
         code: 'LOCAL_CONTEXT_INVALID',
         stage: 'local',
         message: '$field is not valid JSON.',
-        retryable: false,
+        origin: FailureOrigin.local,
       );
     }
   }

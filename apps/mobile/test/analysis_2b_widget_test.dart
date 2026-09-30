@@ -13,19 +13,32 @@ import 'package:takt_mobile/screens/review_brief_screen.dart';
 import 'package:takt_mobile/theme/app_theme.dart';
 import 'package:takt_mobile/viewmodels/analisis_view_model.dart';
 
-void main() {
-  testWidgets('2B input exposes only PDF or URL and no fake analysis goal',
-      (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.dark,
-        home: const Scaffold(
-          body: AnalisisKompetisiScreen(
-            continuation: false,
+Widget _analysisInputHarness({double scale = 1}) {
+  return ChangeNotifierProvider(
+    create: (_) => AnalisisViewModel(
+      apiClient: _NoopApiClient(),
+      repository: _NoopAnalysisRepository(),
+    ),
+    child: MaterialApp(
+      theme: AppTheme.dark,
+      home: Builder(
+        builder: (context) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            textScaler: TextScaler.linear(scale),
+          ),
+          child: const Scaffold(
+            body: AnalisisKompetisiScreen(continuation: false),
           ),
         ),
       ),
-    );
+    ),
+  );
+}
+
+void main() {
+  testWidgets('2B input exposes only PDF or URL and no fake analysis goal',
+      (tester) async {
+    await tester.pumpWidget(_analysisInputHarness());
 
     expect(find.text('Upload PDF'), findsOneWidget);
     expect(find.text('Enter Link'), findsOneWidget);
@@ -43,21 +56,7 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.dark,
-        home: Builder(
-          builder: (context) => MediaQuery(
-            data: MediaQuery.of(context).copyWith(
-              textScaler: const TextScaler.linear(2),
-            ),
-            child: const Scaffold(
-              body: AnalisisKompetisiScreen(continuation: false),
-            ),
-          ),
-        ),
-      ),
-    );
+    await tester.pumpWidget(_analysisInputHarness(scale: 2));
     await tester.pumpAndSettle();
 
     expect(find.text('Upload PDF'), findsOneWidget);
@@ -70,16 +69,7 @@ void main() {
 
   testWidgets('submit stays disabled until the selected source is valid',
       (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.dark,
-        home: const Scaffold(
-          body: AnalisisKompetisiScreen(
-            continuation: false,
-          ),
-        ),
-      ),
-    );
+    await tester.pumpWidget(_analysisInputHarness());
 
     FilledButton submitButton() => tester.widget<FilledButton>(
           find.byKey(const Key('submit-analysis')),
