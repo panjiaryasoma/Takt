@@ -180,8 +180,8 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('Review Sources'), findsOneWidget);
-    final plan = find.text('Continue to Planning');
+    expect(find.text('SOURCE REVIEW'), findsOneWidget);
+    final plan = find.text('Plan this competition');
     await tester.scrollUntilVisible(
       plan,
       500,
