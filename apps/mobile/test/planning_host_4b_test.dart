@@ -97,7 +97,7 @@ void main() {
       (tester) async {
     final api = _ControlledPlanApi();
     await tester.pumpWidget(TaktApp(database: db, planApiClient: api));
-    await tester.pumpAndSettle();
+    await _pumpUi(tester);
 
     final rootContext = tester.element(find.byType(RootShell));
     final host = Provider.of<PlanningHostViewModel>(
@@ -107,28 +107,28 @@ void main() {
     await host.startPlanning(snapshot);
     host.addTask(_task());
     await host.evaluate();
-    await tester.pumpAndSettle();
+    await _pumpUi(tester);
 
     await tester.tap(find.text('Analysis'));
-    await tester.pumpAndSettle();
+    await _pumpUi(tester);
     expect(find.text('Decision Report'), findsOneWidget);
 
     await tester.tap(find.byTooltip('Back'));
-    await tester.pumpAndSettle();
+    await _pumpUi(tester);
 
     expect(find.text('Decision Report'), findsNothing);
     expect(host.phase, PlanningHostPhase.setup);
     expect(host.activeSession, isNull);
 
     await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pumpAndSettle();
+    await _pumpUi(tester);
   });
 
   testWidgets('production Decision Report system back exits to analysis parent',
       (tester) async {
     final api = _ControlledPlanApi();
     await tester.pumpWidget(TaktApp(database: db, planApiClient: api));
-    await tester.pumpAndSettle();
+    await _pumpUi(tester);
 
     final rootContext = tester.element(find.byType(RootShell));
     final host = Provider.of<PlanningHostViewModel>(
@@ -138,21 +138,21 @@ void main() {
     await host.startPlanning(snapshot);
     host.addTask(_task());
     await host.evaluate();
-    await tester.pumpAndSettle();
+    await _pumpUi(tester);
 
     await tester.tap(find.text('Analysis'));
-    await tester.pumpAndSettle();
+    await _pumpUi(tester);
     expect(find.text('Decision Report'), findsOneWidget);
 
     await tester.binding.handlePopRoute();
-    await tester.pumpAndSettle();
+    await _pumpUi(tester);
 
     expect(find.text('Decision Report'), findsNothing);
     expect(host.phase, PlanningHostPhase.setup);
     expect(host.activeSession, isNull);
 
     await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pumpAndSettle();
+    await _pumpUi(tester);
   });
 
   testWidgets('Saved Plans uses neutral accepted state and system back returns to list',
@@ -163,19 +163,11 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    await tester.pumpWidget(
-      MediaQuery(
-        data: const MediaQueryData(
-          size: Size(320, 720),
-          textScaler: TextScaler.linear(2),
-        ),
-        child: TaktApp(database: db),
-      ),
-    );
-    await tester.pumpAndSettle();
+    await tester.pumpWidget(TaktApp(database: db));
+    await _pumpUi(tester);
 
     await tester.tap(find.text('Plans'));
-    await tester.pumpAndSettle();
+    await _pumpUi(tester);
     expect(find.text('Saved Plans'), findsOneWidget);
     expect(find.text('ACCEPTED'), findsOneWidget);
     expect(find.text('CURRENT'), findsNothing);
@@ -183,18 +175,18 @@ void main() {
 
     await tester.ensureVisible(find.text('Open plan'));
     await tester.tap(find.text('Open plan'));
-    await tester.pumpAndSettle();
+    await _pumpUi(tester);
     expect(find.text('Saved Plan'), findsOneWidget);
     expect(find.text('ACCEPTED'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
     await tester.binding.handlePopRoute();
-    await tester.pumpAndSettle();
+    await _pumpUi(tester);
     expect(find.text('Saved Plans'), findsOneWidget);
     expect(find.text('Saved Plan'), findsNothing);
 
     await tester.pumpWidget(const SizedBox.shrink());
-    await tester.pumpAndSettle();
+    await _pumpUi(tester);
   });
 
   test('late HTTP response is dropped after input revision changes', () async {
@@ -958,6 +950,15 @@ String _decisionResponse({
       .replaceAll(evaluationId, evaluationIdValue)
       .replaceAll(List.filled(64, 'b').join(), basisFingerprint);
   return raw;
+}
+
+Future<void> _pumpUi(
+  WidgetTester tester, {
+  int frames = 20,
+}) async {
+  for (var index = 0; index < frames; index++) {
+    await tester.pump(const Duration(milliseconds: 25));
+  }
 }
 
 Future<void> _waitFor(bool Function() condition) async {
