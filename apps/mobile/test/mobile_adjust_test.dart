@@ -528,6 +528,44 @@ void main() {
     await _pumpBounded(tester);
   });
 
+  testWidgets('root navigation remains reachable at 320px and 2x text',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final viewModel = JadwalViewModel(
+      _UnusedScheduleRepository(),
+      closeScheduleRepositoryOnDispose: false,
+    );
+    addTearDown(viewModel.dispose);
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: viewModel,
+        child: MaterialApp(
+          theme: AppTheme.dark,
+          home: Builder(
+            builder: (context) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                textScaler: const TextScaler.linear(2),
+              ),
+              child: const RootShell(),
+            ),
+          ),
+        ),
+      ),
+    );
+    await _pumpBounded(tester);
+
+    expect(find.text('Home'), findsOneWidget);
+    expect(find.text('Schedule'), findsOneWidget);
+    expect(find.text('Analysis'), findsOneWidget);
+    expect(find.text('Plans'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('system back closes Add Schedule before the root route',
       (tester) async {
     final database = AppDatabase.forTesting(NativeDatabase.memory());
@@ -554,7 +592,10 @@ void main() {
       (tester) async {
     final database = AppDatabase.forTesting(NativeDatabase.memory());
     final repository = DriftScheduleRepository(database);
-    final viewModel = JadwalViewModel(repository);
+    final viewModel = JadwalViewModel(
+      repository,
+      closeScheduleRepositoryOnDispose: false,
+    );
     addTearDown(viewModel.dispose);
     addTearDown(repository.close);
 
