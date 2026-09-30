@@ -13,6 +13,23 @@ import '../models/recurrence_exception.dart';
 import '../models/recurrence_rule.dart';
 import '../models/schedule_occurrence.dart';
 
+final class CancelledScheduleOccurrence {
+  const CancelledScheduleOccurrence({
+    required this.commitment,
+    required this.recurrenceRuleId,
+    required this.originalStartAtEpochMs,
+  });
+
+  final Commitment commitment;
+  final String recurrenceRuleId;
+  final int originalStartAtEpochMs;
+
+  DateTime get startAt =>
+      DateTime.fromMillisecondsSinceEpoch(originalStartAtEpochMs);
+  int get durationMinutes =>
+      (commitment.endAtEpochMs - commitment.startAtEpochMs) ~/ 60000;
+}
+
 final class IcsImportSaveResult {
   const IcsImportSaveResult({
     required this.success,
@@ -150,6 +167,58 @@ class JadwalViewModel extends ChangeNotifier {
 
   List<ScheduleOccurrence> get itemsForSelectedDate => itemsOn(_selectedDate);
 
+  List<CancelledScheduleOccurrence> get cancelledItemsForSelectedDate =>
+      cancelledItemsOn(_selectedDate);
+
+  List<CancelledScheduleOccurrence> cancelledItemsOn(DateTime day) {
+    final start = _dateOnly(day);
+    final end = start.add(const Duration(days: 1));
+    return cancelledOccurrencesBetween(start, end);
+  }
+
+  List<CancelledScheduleOccurrence> cancelledOccurrencesBetween(
+    DateTime startInclusive,
+    DateTime endExclusive,
+  ) {
+    final rulesById = <String, RecurrenceRule>{
+      for (final rule in _state.recurrenceRules) rule.id: rule,
+    };
+    final commitmentsById = <String, Commitment>{
+      for (final commitment in _state.commitments) commitment.id: commitment,
+    };
+    final output = <CancelledScheduleOccurrence>[];
+
+    for (final exception in _state.recurrenceExceptions) {
+      if (exception.action != ExceptionAction.cancelled) continue;
+      final originalStart = DateTime.fromMillisecondsSinceEpoch(
+        exception.originalStartAtEpochMs,
+      );
+      if (originalStart.isBefore(startInclusive) ||
+          !originalStart.isBefore(endExclusive)) {
+        continue;
+      }
+      final rule = rulesById[exception.recurrenceRuleId];
+      if (rule == null) continue;
+      final commitment = commitmentsById[rule.commitmentId];
+      if (commitment == null) continue;
+      output.add(
+        CancelledScheduleOccurrence(
+          commitment: commitment,
+          recurrenceRuleId: rule.id,
+          originalStartAtEpochMs: exception.originalStartAtEpochMs,
+        ),
+      );
+    }
+
+    output.sort((a, b) {
+      final byStart =
+          a.originalStartAtEpochMs.compareTo(b.originalStartAtEpochMs);
+      if (byStart != 0) return byStart;
+      return a.commitment.id.compareTo(b.commitment.id);
+    });
+    return output;
+  }
+
   List<ActiveAcceptedBlock> get acceptedItemsForSelectedDate =>
       acceptedItemsOn(_selectedDate);
 
@@ -276,6 +345,9 @@ class JadwalViewModel extends ChangeNotifier {
     final end = DateTime(month.year, month.month + 1, 1);
     final days =
         occurrencesBetween(start, end).map((item) => item.startAt.day).toSet();
+    days.addAll(
+      cancelledOccurrencesBetween(start, end).map((item) => item.startAt.day),
+    );
     days.addAll(
       _acceptedBlocks
           .where((block) =>
