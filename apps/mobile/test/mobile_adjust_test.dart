@@ -36,6 +36,12 @@ Future<void> _pumpBounded(
 }
 
 void main() {
+  test('in-app branding uses the transparent Takt mark', () {
+    expect(File('assets/branding/logo_in_app.png').existsSync(), isTrue);
+    expect(C.logoAsset, 'assets/branding/logo_in_app.png');
+    expect(C.logoAsset, isNot('assets/branding/logo.png'));
+  });
+
   test('Android launcher and native splash use the canonical Takt logo', () {
     expect(File('assets/branding/logo.png').existsSync(), isTrue);
     expect(File('assets/branding/logo.jpg').existsSync(), isFalse);
