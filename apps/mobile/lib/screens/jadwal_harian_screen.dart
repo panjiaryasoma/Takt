@@ -465,7 +465,7 @@ class JadwalHarianScreen extends StatelessWidget {
               const SizedBox(height: 16),
             ],
             for (final cancelled in cancelledItems) ...[
-              _CancelledOccurrenceCard(item: cancelled),
+              CancelledOccurrenceCard(item: cancelled),
               const SizedBox(height: 16),
             ],
             for (final block in acceptedItems) ...[
@@ -504,8 +504,8 @@ class JadwalHarianScreen extends StatelessWidget {
   }
 }
 
-class _CancelledOccurrenceCard extends StatelessWidget {
-  const _CancelledOccurrenceCard({required this.item});
+class CancelledOccurrenceCard extends StatelessWidget {
+  const CancelledOccurrenceCard({super.key, required this.item});
 
   final CancelledScheduleOccurrence item;
 
