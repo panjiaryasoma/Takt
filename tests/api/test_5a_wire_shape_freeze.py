@@ -1,6 +1,6 @@
 """Freeze every Issue-4A public API wrapper field for parallel 5A/5B work."""
 
-from __future__ import annotations
+from typing import get_args
 
 from apps.api import contracts as wire
 
@@ -202,6 +202,80 @@ PUBLIC_WIRE_FIELDS = {
         "report_changed",
     ),
 }
+
+
+PUBLIC_WIRE_DEFAULTED_FIELDS = {
+    wire.CanonicalReportRefV1: {
+        "domain_schema_version",
+        "reconciliation_policy_version",
+        "assembly_policy_version",
+        "source_set_fingerprint_version",
+        "source_set_fingerprint",
+        "wire_fingerprint_version",
+    },
+    wire.ReadinessUserContextV1: {"age", "student_status", "country"},
+    wire.ReadinessContextV1: {"selected_scope", "require_technology_information"},
+    wire.ReadinessBasisV1: {"basis_version", "projection_version"},
+    wire.PlanningBasisV1: {"basis_version", "policy_version", "solver_backend"},
+    wire.EvaluationBasisV1: {"version", "domain_schema_version", "planning"},
+    wire.RecommendationAssumptionV1: {"task_id"},
+    wire.RecommendationV1: {"alternatives"},
+    wire.PublicCandidateV1: {"assumptions"},
+    wire.RecommendationTraceV1: {"planning_policy_version"},
+    wire.RecommendationSetV1: {"alternative_candidates"},
+    wire.PlanningDecisionV1: {
+        "reason_codes",
+        "tradeoff_codes",
+        "sensitivity_codes",
+    },
+    wire.PriorEvaluationBasisSnapshotV1: {"planning"},
+    wire.ReevaluationTransitionV1: {"change_reasons"},
+    wire.ApiErrorBodyV1: {"details"},
+    wire.CompetitionAnalyzeUrlRequestV1: {
+        "previous_report_bundle",
+        "prior_source_artifacts",
+    },
+    wire.CompetitionAnalyzePdfMetadataV1: {
+        "previous_report_bundle",
+        "prior_source_artifacts",
+    },
+}
+
+PUBLIC_WIRE_NULLABLE_FIELDS = {
+    wire.CanonicalReportRefV1: {"source_set_fingerprint"},
+    wire.ReadinessUserContextV1: {"age", "student_status", "country"},
+    wire.ReadinessContextV1: {"selected_scope"},
+    wire.EvaluationBasisV1: {"planning"},
+    wire.RecommendationAlternativeV1: {"recommended_next_work"},
+    wire.RecommendationAssumptionV1: {"task_id"},
+    wire.RecommendationV1: {"recommended_next_work"},
+    wire.PlanningDecisionV1: {"recommendation"},
+    wire.PriorEvaluationBasisSnapshotV1: {"planning"},
+    wire.ReevaluationTransitionV1: {"current_basis_fingerprint"},
+    wire.PlanReevaluateResponseV1: {"evaluation"},
+    wire.PlanReevaluateErrorResponseV1: {"transition"},
+    wire.CompetitionAnalyzeUrlRequestV1: {"previous_report_bundle"},
+    wire.CompetitionAnalyzePdfMetadataV1: {"previous_report_bundle"},
+}
+
+
+def _allows_none(annotation) -> bool:
+    return type(None) in get_args(annotation)
+
+
+def test_public_wire_requiredness_and_nullability_are_frozen() -> None:
+    for model, expected_fields in PUBLIC_WIRE_FIELDS.items():
+        defaulted = {
+            name for name, field in model.model_fields.items() if not field.is_required()
+        }
+        assert defaulted == PUBLIC_WIRE_DEFAULTED_FIELDS.get(model, set())
+
+        nullable = {
+            name
+            for name, field in model.model_fields.items()
+            if _allows_none(field.annotation)
+        }
+        assert nullable == PUBLIC_WIRE_NULLABLE_FIELDS.get(model, set())
 
 
 def test_all_public_api_wrapper_field_sets_are_frozen() -> None:
