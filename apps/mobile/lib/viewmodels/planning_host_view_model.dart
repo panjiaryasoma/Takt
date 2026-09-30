@@ -630,6 +630,19 @@ final class PlanningHostViewModel extends ChangeNotifier {
     }
   }
 
+  /// Leave the current Decision Report without recording a user decision.
+  ///
+  /// This is a presentation/host lifecycle transition only. It intentionally
+  /// does not persist Ignore, Accept, or Edit Constraints semantics.
+  void leaveDecision() {
+    if (_phase != PlanningHostPhase.decision || _activeSession == null) return;
+    _activeSession = null;
+    _phase = PlanningHostPhase.setup;
+    _failure = null;
+    _message = null;
+    notifyListeners();
+  }
+
   void beginEditConstraints(EditConstraintsIntent intent) {
     final session = _activeSession;
     if (session == null ||
