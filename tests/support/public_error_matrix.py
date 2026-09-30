@@ -31,6 +31,16 @@ ANALYSIS_ENDPOINTS = (
     "POST /api/v1/competitions/analyze/pdf",
 )
 
+_ANALYSIS_VALIDATION_FAILURES = (
+    ("RequestValidationError", 422, "VALIDATION_ERROR", "validation"),
+    (
+        "RequestValidationError[source]",
+        422,
+        "SOURCE_METADATA_INVALID",
+        "ingestion",
+    ),
+)
+
 _ANALYSIS_FAILURES = (
     ("AnalysisInputError", 422, "SOURCE_METADATA_INVALID", "ingestion"),
     ("AnalysisContinuationError", 422, "ANALYSIS_CONTEXT_INVALID", "analysis"),
@@ -70,7 +80,45 @@ PUBLIC_ERROR_MATRIX = (
     *(
         PublicErrorCase(endpoint, failure, status, code, stage)
         for endpoint in ANALYSIS_ENDPOINTS
-        for failure, status, code, stage in _ANALYSIS_FAILURES
+        for failure, status, code, stage in (
+            *_ANALYSIS_VALIDATION_FAILURES,
+            *_ANALYSIS_FAILURES,
+        )
+    ),
+    PublicErrorCase(
+        "POST /api/v1/competitions/analyze/pdf",
+        "PdfFormValidation",
+        422,
+        "VALIDATION_ERROR",
+        "validation",
+    ),
+    PublicErrorCase(
+        "POST /api/v1/competitions/analyze/pdf",
+        "PdfUploadUnsupportedMediaType",
+        415,
+        "UNSUPPORTED_MEDIA_TYPE",
+        "ingestion",
+    ),
+    PublicErrorCase(
+        "POST /api/v1/plans/evaluate",
+        "RequestValidationError",
+        422,
+        "VALIDATION_ERROR",
+        "validation",
+    ),
+    PublicErrorCase(
+        "POST /api/v1/plans/evaluate",
+        "UnsupportedReportContractValidation",
+        422,
+        "UNSUPPORTED_REPORT_CONTRACT",
+        "report",
+    ),
+    PublicErrorCase(
+        "POST /api/v1/plans/evaluate",
+        "ReportBundleInvalidValidation",
+        422,
+        "REPORT_BUNDLE_INVALID",
+        "report",
     ),
     *(
         PublicErrorCase("POST /api/v1/plans/evaluate", failure, status, code, stage)
@@ -118,6 +166,22 @@ PUBLIC_ERROR_MATRIX = (
         422,
         "UNSUPPORTED_REEVALUATION_CONTRACT",
         "reevaluation",
+        transition=TRANSITION_NULL,
+    ),
+    PublicErrorCase(
+        "POST /api/v1/plans/re-evaluate",
+        "UnsupportedReportContractValidation",
+        422,
+        "UNSUPPORTED_REPORT_CONTRACT",
+        "report",
+        transition=TRANSITION_NULL,
+    ),
+    PublicErrorCase(
+        "POST /api/v1/plans/re-evaluate",
+        "ReportBundleInvalidValidation",
+        422,
+        "REPORT_BUNDLE_INVALID",
+        "report",
         transition=TRANSITION_NULL,
     ),
 )
