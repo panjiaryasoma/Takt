@@ -4,17 +4,31 @@ import '../models/decision_intent.dart';
 import '../models/decision_report_view_data.dart';
 import '../models/enums.dart';
 import '../models/evaluation_session.dart';
+import '../models/recovery_policy.dart';
 import '../monetization/revenuecat_contract.dart';
 import '../monetization/revenuecat_service.dart';
 import '../theme/app_theme.dart';
 import '../viewmodels/decision_report_view_model.dart';
 import '../widgets/common.dart';
+import '../widgets/recovery_panel.dart';
 
 /// Host-injected Decision Report; no repositories, input generation or HTTP.
 class RekomendasiJadwalScreen extends StatefulWidget {
-  const RekomendasiJadwalScreen({super.key, required this.session,
-    required this.currentInputRevision, this.revenueCatService, this.onOpenPro,
-    this.onAccept, this.onEditConstraints, this.onIgnore, this.onBack});
+  const RekomendasiJadwalScreen({
+    super.key,
+    required this.session,
+    required this.currentInputRevision,
+    this.revenueCatService,
+    this.onOpenPro,
+    this.onAccept,
+    this.onEditConstraints,
+    this.onIgnore,
+    this.onBack,
+    this.acceptancePersistencePending = false,
+    this.acceptancePersistenceMessage,
+    this.onRetryAcceptanceSave,
+    this.onCancelPendingAcceptance,
+  });
   final EvaluationSession? session;
   final int currentInputRevision;
   final RevenueCatService? revenueCatService;
@@ -23,6 +37,10 @@ class RekomendasiJadwalScreen extends StatefulWidget {
   final ValueChanged<EditConstraintsIntent>? onEditConstraints;
   final ValueChanged<IgnoreRecommendationIntent>? onIgnore;
   final VoidCallback? onBack;
+  final bool acceptancePersistencePending;
+  final String? acceptancePersistenceMessage;
+  final Future<void> Function()? onRetryAcceptanceSave;
+  final VoidCallback? onCancelPendingAcceptance;
   @override
   State<RekomendasiJadwalScreen> createState() => _RekomendasiJadwalScreenState();
 }
@@ -75,12 +93,54 @@ class _RekomendasiJadwalScreenState extends State<RekomendasiJadwalScreen> {
       widget.revenueCatService?.canAccess(PremiumFeature.alternativeCandidates) ?? false;
 
   bool _prepareAccessibleSelection() {
+    if (widget.acceptancePersistencePending) return false;
     if (_canAccessAlternatives) return true;
     final primary = _vm.systemPrimaryCandidateId;
     if (primary == null) return false;
     if (_vm.selectedCandidateId == primary) return true;
     if (_vm.handoffPending) return false;
     return _vm.chooseCandidate(primary);
+  }
+
+  Future<void> _retryAcceptanceSave() async {
+    final handler = widget.onRetryAcceptanceSave;
+    if (handler == null || !widget.acceptancePersistencePending) return;
+    try {
+      await handler();
+    } on Object {
+      // Host owns the durable failure state. The panel remains visible.
+    }
+  }
+
+  Future<void> _cancelPendingAcceptance() async {
+    final handler = widget.onCancelPendingAcceptance;
+    if (handler == null || !widget.acceptancePersistencePending) return;
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            backgroundColor: C.card,
+            title: const Text('Cancel pending acceptance?'),
+            content: const Text(
+              'Your choice was confirmed, but the local save did not commit. '
+              'Cancelling clears only this pending acceptance intent. It does '
+              'not ignore the recommendation or delete an existing accepted plan.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Keep pending'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Cancel pending acceptance'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed || !mounted) return;
+    handler();
+    _vm.resetFailedHandoff();
   }
 
   Future<void> _accept() async {
@@ -157,7 +217,9 @@ class _RekomendasiJadwalScreenState extends State<RekomendasiJadwalScreen> {
           Align(alignment: Alignment.centerLeft, child: Container(
             decoration: BoxDecoration(color: C.card, shape: BoxShape.circle,
                 border: Border.all(color: C.accent.withValues(alpha: 0.6))),
-            child: IconButton(tooltip: 'Back', onPressed: widget.onBack,
+            child: IconButton(
+                tooltip: 'Back',
+                onPressed: widget.acceptancePersistencePending ? null : widget.onBack,
                 icon: const Icon(Icons.chevron_left, color: C.accent)),
           )),
           const SizedBox(height: 14),
@@ -269,6 +331,7 @@ class _RekomendasiJadwalScreenState extends State<RekomendasiJadwalScreen> {
                           RecommendationAction.chooseAlternative,
                         ),
                     onChoose: _canAccessAlternatives &&
+                            !widget.acceptancePersistencePending &&
                             _vm.can(RecommendationAction.chooseAlternative)
                         ? () => _vm.chooseCandidate(
                               planning.candidates[i].ref.candidateId,
@@ -288,9 +351,49 @@ class _RekomendasiJadwalScreenState extends State<RekomendasiJadwalScreen> {
                     item.taskId == null ? item.description : '${item.description} (Task ${item.taskId})').toList()),
               ])),
             ],
-            if (_vm.handoffPending) const _ReportCard(child: Text('Sending your choice…', key: Key('handoff-pending'))),
-            if (_vm.handoffComplete) const _ReportCard(child: Text('Your choice was handed off. Wait for persistence confirmation.', key: Key('handoff-complete'))),
-            if (_vm.handoffFailed) const _ReportCard(highlight: true, child: Text('Your choice could not be handed off. Review it before trying again.', key: Key('handoff-failed'))),
+            if (_vm.handoffPending)
+              const _ReportCard(
+                child: Text(
+                  'Saving your confirmed choice…',
+                  key: Key('handoff-pending'),
+                ),
+              ),
+            if (_vm.handoffComplete)
+              const _ReportCard(
+                child: Text(
+                  'Your choice was handed off. Wait for persistence confirmation.',
+                  key: Key('handoff-complete'),
+                ),
+              ),
+            if (widget.acceptancePersistencePending)
+              RecoveryPanel(
+                descriptor: RecoveryDescriptor(
+                  title: 'Acceptance is confirmed but not saved',
+                  message: widget.acceptancePersistenceMessage ??
+                      'The local acceptance transaction did not commit.',
+                  recoveryClass: RecoveryClass.noAutomaticRecovery,
+                  technicalCode: 'LOCAL_ACCEPT_PERSISTENCE_FAILED',
+                  stage: 'persistence',
+                  primaryAction: RecoveryAction.retryAcceptanceSave,
+                  secondaryAction: RecoveryAction.cancelPendingAcceptance,
+                ),
+                primaryLabel: 'Retry acceptance save',
+                onPrimary: widget.onRetryAcceptanceSave == null
+                    ? null
+                    : _retryAcceptanceSave,
+                secondaryLabel: 'Cancel pending acceptance',
+                onSecondary: widget.onCancelPendingAcceptance == null
+                    ? null
+                    : _cancelPendingAcceptance,
+              )
+            else if (_vm.handoffFailed)
+              const _ReportCard(
+                highlight: true,
+                child: Text(
+                  'Your choice could not be handed off. Review it before trying again.',
+                  key: Key('handoff-failed'),
+                ),
+              ),
             if (planning != null) ...[
               const SizedBox(height: 8),
               const PresentationSectionTitle('Your actions'),
@@ -303,6 +406,7 @@ class _RekomendasiJadwalScreenState extends State<RekomendasiJadwalScreen> {
               if (planning.allowedActions.contains(RecommendationAction.accept)) ...[
                 FilledButton(key: const Key('accept-candidate'),
                     onPressed: widget.onAccept != null &&
+                            !widget.acceptancePersistencePending &&
                             _vm.can(RecommendationAction.accept) &&
                             (_canAccessAlternatives ||
                                 _vm.systemPrimaryCandidateId != null)
@@ -313,14 +417,17 @@ class _RekomendasiJadwalScreenState extends State<RekomendasiJadwalScreen> {
               ],
               if (planning.allowedActions.contains(RecommendationAction.editConstraints)) ...[
                 OutlinedButton(key: const Key('edit-constraints'),
-                  onPressed: widget.onEditConstraints != null && _vm.can(RecommendationAction.editConstraints)
+                  onPressed: widget.onEditConstraints != null &&
+                          !widget.acceptancePersistencePending &&
+                          _vm.can(RecommendationAction.editConstraints)
                       ? () { final intent = _vm.editConstraints(); if (intent != null) widget.onEditConstraints!(intent); }
                       : null, child: const Text('Edit constraints')),
                 if (widget.onEditConstraints == null) const Text('Constraint editing is not available yet.', style: TextStyle(color: C.detailMuted)),
               ],
               if (planning.allowedActions.contains(RecommendationAction.ignore))
                 TextButton(key: const Key('ignore-recommendation'),
-                  onPressed: _vm.can(RecommendationAction.ignore) ? () {
+                  onPressed: !widget.acceptancePersistencePending &&
+                          _vm.can(RecommendationAction.ignore) ? () {
                     final intent = _vm.ignore();
                     if (intent == null) return;
                     if (widget.onIgnore != null) { widget.onIgnore!(intent); } else { widget.onBack?.call(); }
