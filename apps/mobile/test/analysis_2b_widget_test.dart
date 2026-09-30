@@ -49,22 +49,15 @@ void main() {
       ),
     );
 
-    GestureDetector submitGesture() {
-      return tester.widget<GestureDetector>(
-        find
-            .ancestor(
-              of: find.text('Submit & Start Analysis'),
-              matching: find.byType(GestureDetector),
-            )
-            .first,
-      );
-    }
+    FilledButton submitButton() => tester.widget<FilledButton>(
+          find.byKey(const Key('submit-analysis')),
+        );
 
-    expect(submitGesture().onTap, isNull);
+    expect(submitButton().onPressed, isNull);
 
     await tester.tap(find.text('Enter Link'));
     await tester.pump();
-    expect(submitGesture().onTap, isNull);
+    expect(submitButton().onPressed, isNull);
 
     await tester.tap(find.byType(DropdownButton<SourceTypeWire>));
     await tester.pumpAndSettle();
@@ -76,14 +69,14 @@ void main() {
       'not-a-url',
     );
     await tester.pump();
-    expect(submitGesture().onTap, isNull);
+    expect(submitButton().onPressed, isNull);
 
     await tester.enterText(
       find.byType(TextField),
       'https://example.com/rules',
     );
     await tester.pump();
-    expect(submitGesture().onTap, isNotNull);
+    expect(submitButton().onPressed, isNotNull);
     expect(tester.takeException(), isNull);
   });
 
