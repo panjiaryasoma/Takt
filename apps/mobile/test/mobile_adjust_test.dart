@@ -7,6 +7,7 @@ import 'package:provider/provider.dart';
 import 'package:takt_mobile/calendar/ics_import.dart';
 import 'package:takt_mobile/data/database/app_database.dart';
 import 'package:takt_mobile/data/repositories/drift_schedule_repository.dart';
+import 'package:takt_mobile/data/repositories/schedule_repository.dart';
 import 'package:takt_mobile/main.dart';
 import 'package:takt_mobile/screens/ics_import_screen.dart';
 import 'package:takt_mobile/screens/jadwal_harian_screen.dart';
@@ -14,6 +15,16 @@ import 'package:takt_mobile/screens/jadwal_ringkasan_screen.dart';
 import 'package:takt_mobile/screens/tambah_jadwal_screen.dart';
 import 'package:takt_mobile/theme/app_theme.dart';
 import 'package:takt_mobile/viewmodels/jadwal_view_model.dart';
+
+final class _UnusedScheduleRepository implements ScheduleRepository {
+  @override
+  dynamic noSuchMethod(Invocation invocation) {
+    throw StateError(
+      'UI-only test unexpectedly touched ScheduleRepository: '
+      '${invocation.memberName}',
+    );
+  }
+}
 
 Future<void> _pumpBounded(
   WidgetTester tester, {
@@ -287,16 +298,11 @@ void main() {
 
   testWidgets('the entire From and To cards change their time values',
       (tester) async {
-    final database = AppDatabase.forTesting(NativeDatabase.memory());
-    final repository = DriftScheduleRepository(
-      database,
-      closeDatabaseOnDispose: false,
-    );
     final viewModel = JadwalViewModel(
-      repository,
+      _UnusedScheduleRepository(),
       closeScheduleRepositoryOnDispose: false,
     );
-    addTearDown(database.close);
+    addTearDown(viewModel.dispose);
 
     var calls = 0;
     Future<TimeOfDay?> picker(
@@ -341,16 +347,11 @@ void main() {
 
   testWidgets('calendar swipes change month without leaving Schedule',
       (tester) async {
-    final database = AppDatabase.forTesting(NativeDatabase.memory());
-    final repository = DriftScheduleRepository(
-      database,
-      closeDatabaseOnDispose: false,
-    );
     final viewModel = JadwalViewModel(
-      repository,
+      _UnusedScheduleRepository(),
       closeScheduleRepositoryOnDispose: false,
     );
-    addTearDown(database.close);
+    addTearDown(viewModel.dispose);
     viewModel.selectDate(DateTime(2026, 9, 1));
 
     await tester.pumpWidget(
@@ -438,16 +439,11 @@ void main() {
 
   testWidgets('weekly summary highlights device-local today only in current week',
       (tester) async {
-    final database = AppDatabase.forTesting(NativeDatabase.memory());
-    final repository = DriftScheduleRepository(
-      database,
-      closeDatabaseOnDispose: false,
-    );
     final viewModel = JadwalViewModel(
-      repository,
+      _UnusedScheduleRepository(),
       closeScheduleRepositoryOnDispose: false,
     );
-    addTearDown(database.close);
+    addTearDown(viewModel.dispose);
     viewModel.selectDate(DateTime(2026, 9, 30));
 
     Widget app(DateTime now) => ChangeNotifierProvider.value(
