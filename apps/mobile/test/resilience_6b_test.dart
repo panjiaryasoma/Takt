@@ -55,8 +55,14 @@ void main() {
     expect(find.text('Edit source'), findsOneWidget);
     expect(tester.takeException(), isNull);
 
-    await tester.tap(find.text('Retry request'));
-    await tester.tap(find.text('Edit source'));
+    final retry = find.text('Retry request');
+    final edit = find.text('Edit source');
+    await tester.ensureVisible(retry);
+    await tester.tap(retry);
+    await tester.pump();
+    await tester.ensureVisible(edit);
+    await tester.tap(edit);
+    await tester.pump();
     expect(retried, isTrue);
     expect(secondary, isTrue);
   });
