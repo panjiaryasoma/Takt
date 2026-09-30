@@ -262,6 +262,52 @@ def test_validation_error_envelopes_keep_detail_shape_and_transition_rule() -> N
     assert reevaluation_body["transition"] is None
 
 
+def test_pdf_form_shape_matches_frozen_error_matrix() -> None:
+    case = _matrix_case(
+        "POST /api/v1/competitions/analyze/pdf",
+        "PdfFormValidation",
+    )
+    response = TestClient(app).post(
+        "/api/v1/competitions/analyze/pdf",
+        files={"file": ("brief.pdf", b"%PDF-1.4", "application/pdf")},
+    )
+
+    assert response.status_code == case.http_status
+    body = response.json()
+    _assert_error_body(body, reevaluation=False)
+    assert body["error"]["code"] == case.code
+    assert body["error"]["stage"] == case.stage
+
+
+def test_pdf_upload_media_type_matches_frozen_error_matrix() -> None:
+    case = _matrix_case(
+        "POST /api/v1/competitions/analyze/pdf",
+        "PdfUploadUnsupportedMediaType",
+    )
+    metadata = {
+        "competition_id": "cmp-5a-error-matrix",
+        "document_id": "doc-1",
+        "source": {
+            "source_id": "source-1",
+            "source_type": "official_rules",
+            "authority_rank": 1,
+            "scope": {},
+            "freshness_metadata": {},
+        },
+    }
+    response = TestClient(app).post(
+        "/api/v1/competitions/analyze/pdf",
+        data={"metadata": json.dumps(metadata)},
+        files={"file": ("brief.txt", b"not a pdf", "text/plain")},
+    )
+
+    assert response.status_code == case.http_status
+    body = response.json()
+    _assert_error_body(body, reevaluation=False)
+    assert body["error"]["code"] == case.code
+    assert body["error"]["stage"] == case.stage
+
+
 def test_unsupported_reevaluation_contract_is_422_with_null_transition() -> None:
     client = TestClient(app)
     response = client.post(
