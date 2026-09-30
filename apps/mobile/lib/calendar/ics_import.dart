@@ -34,8 +34,7 @@ final class IcsImportEvent {
   bool get isRecurring => rrule != null;
 
   String get commitmentId {
-    final material = '$uid|$startAtEpochMs|$endAtEpochMs|${rrule ?? ''}';
-    final digest = sha256.convert(utf8.encode(material)).toString();
+    final digest = sha256.convert(utf8.encode(uid)).toString();
     return 'ics_${digest.substring(0, 24)}';
   }
 }
