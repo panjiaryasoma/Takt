@@ -163,19 +163,21 @@ class _AnalisisKompetisiScreenState
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Material(
-                  color: C.card,
-                  shape: const CircleBorder(),
-                  child: IconButton(
-                    tooltip: 'Back',
-                    onPressed: widget.onBack,
-                    icon: const Icon(
-                      Icons.chevron_left,
-                      color: C.accent,
+                if (widget.onBack != null) ...[
+                  Material(
+                    color: C.card,
+                    shape: const CircleBorder(),
+                    child: IconButton(
+                      tooltip: 'Back',
+                      onPressed: widget.onBack,
+                      icon: const Icon(
+                        Icons.chevron_left,
+                        color: C.accent,
+                      ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 12),
+                  const SizedBox(height: 12),
+                ],
                 Text(
                   widget.continuation
                       ? 'ADDITIONAL SOURCE'
