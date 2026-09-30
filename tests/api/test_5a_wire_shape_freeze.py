@@ -249,6 +249,7 @@ PUBLIC_WIRE_NULLABLE_FIELDS = {
     apps.api.contracts.RecommendationAssumptionV1: {"task_id"},
     apps.api.contracts.RecommendationV1: {"recommended_next_work"},
     apps.api.contracts.PlanningDecisionV1: {"recommendation"},
+    apps.api.contracts.PlanEvaluateResponseV1: {"planning"},
     apps.api.contracts.PriorEvaluationBasisSnapshotV1: {"planning"},
     apps.api.contracts.ReevaluationTransitionV1: {"current_basis_fingerprint"},
     apps.api.contracts.PlanReevaluateResponseV1: {"evaluation"},
