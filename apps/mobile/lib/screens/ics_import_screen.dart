@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:timezone/timezone.dart' as tz;
 
 import '../calendar/ics_import.dart';
 import '../theme/app_theme.dart';
@@ -25,6 +27,8 @@ class IcsImportScreen extends StatefulWidget {
 }
 
 class _IcsImportScreenState extends State<IcsImportScreen> {
+  static const int _maxIcsBytes = 2 * 1024 * 1024;
+
   final _parser = IcsCalendarParser();
   List<IcsImportEvent> _events = const [];
   final Set<String> _selected = {};
@@ -37,22 +41,52 @@ class _IcsImportScreenState extends State<IcsImportScreen> {
     final result = await FilePicker.platform.pickFiles(
       type: FileType.custom,
       allowedExtensions: const ['ics'],
-      withData: true,
+      withData: false,
+      withReadStream: true,
       allowMultiple: false,
     );
     if (result == null || result.files.isEmpty) return null;
     final file = result.files.single;
-    var bytes = file.bytes;
-    final path = file.path;
-    if (bytes == null && path != null) {
-      bytes = await File(path).readAsBytes();
-    }
-    if (bytes == null) {
+    if (file.size > _maxIcsBytes) {
       throw const FormatException(
-        'The selected calendar file could not be read.',
+        'Calendar file is too large to import safely.',
       );
     }
-    return (name: file.name, content: utf8.decode(bytes));
+
+    final bytes = BytesBuilder(copy: false);
+    final path = file.path;
+    if (path != null) {
+      final source = File(path);
+      final length = await source.length();
+      if (length > _maxIcsBytes) {
+        throw const FormatException(
+          'Calendar file is too large to import safely.',
+        );
+      }
+      bytes.add(await source.readAsBytes());
+    } else {
+      final stream = file.readStream;
+      if (stream == null) {
+        throw const FormatException(
+          'The selected calendar file could not be read.',
+        );
+      }
+      var total = 0;
+      await for (final chunk in stream) {
+        total += chunk.length;
+        if (total > _maxIcsBytes) {
+          throw const FormatException(
+            'Calendar file is too large to import safely.',
+          );
+        }
+        bytes.add(chunk);
+      }
+    }
+
+    return (
+      name: file.name,
+      content: utf8.decode(bytes.takeBytes()),
+    );
   }
 
   Future<void> _pick() async {
@@ -125,8 +159,21 @@ class _IcsImportScreenState extends State<IcsImportScreen> {
   }
 
   String _when(IcsImportEvent event) {
-    final start = DateTime.fromMillisecondsSinceEpoch(event.startAtEpochMs);
-    final end = DateTime.fromMillisecondsSinceEpoch(event.endAtEpochMs);
+    final location = tz.getLocation(event.timezone);
+    final start = tz.TZDateTime.from(
+      DateTime.fromMillisecondsSinceEpoch(
+        event.startAtEpochMs,
+        isUtc: true,
+      ),
+      location,
+    );
+    final end = tz.TZDateTime.from(
+      DateTime.fromMillisecondsSinceEpoch(
+        event.endAtEpochMs,
+        isUtc: true,
+      ),
+      location,
+    );
     String two(int value) => value.toString().padLeft(2, '0');
     final date = '${two(start.day)}/${two(start.month)}/${start.year}';
     final time =

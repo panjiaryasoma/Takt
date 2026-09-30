@@ -64,3 +64,27 @@ jobs:
 
       - name: Flutter Android debug build
         run: flutter build apk --debug
+
+  ios:
+    runs-on: macos-latest
+    defaults:
+      run:
+        working-directory: apps/mobile
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Resolve Flutter dependencies
+        run: flutter pub get
+
+      - name: Verify Flutter lockfile is committed
+        run: git diff --exit-code -- pubspec.lock
+
+      - name: Flutter iOS debug build
+        run: flutter build ios --debug --no-codesign

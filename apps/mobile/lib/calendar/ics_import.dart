@@ -50,6 +50,9 @@ final class IcsParseResult {
 }
 
 final class IcsCalendarParser {
+  static const int maxSourceCharacters = 2 * 1024 * 1024;
+  static const int maxEvents = 500;
+
   IcsCalendarParser({this.defaultTimezone = 'Asia/Jakarta'}) {
     _ensureTimezones();
   }
@@ -64,15 +67,28 @@ final class IcsCalendarParser {
   }
 
   IcsParseResult parse(String source) {
+    if (source.length > maxSourceCharacters) {
+      throw const FormatException(
+        'Calendar file is too large to import safely.',
+      );
+    }
+
     final lines = _unfold(source);
     final events = <IcsImportEvent>[];
     var skippedCancelled = 0;
+    var seenEvents = 0;
     List<_IcsProperty>? block;
 
     for (final line in lines) {
       if (line == 'BEGIN:VEVENT') {
         if (block != null) {
           throw const FormatException('Nested VEVENT is not supported.');
+        }
+        seenEvents++;
+        if (seenEvents > maxEvents) {
+          throw const FormatException(
+            'Calendar contains too many events to import safely.',
+          );
         }
         block = <_IcsProperty>[];
         continue;
@@ -224,8 +240,19 @@ final class IcsCalendarParser {
           unsupportedReason: 'Malformed RRULE.',
         );
       }
-      parts[fragment.substring(0, separator).toUpperCase()] =
-          fragment.substring(separator + 1);
+      final key = fragment.substring(0, separator).trim().toUpperCase();
+      final value = fragment.substring(separator + 1).trim().toUpperCase();
+      if (key.isEmpty || value.isEmpty) {
+        return const _Recurrence(
+          unsupportedReason: 'Malformed RRULE.',
+        );
+      }
+      if (parts.containsKey(key)) {
+        return _Recurrence(
+          unsupportedReason: 'Duplicate RRULE key: $key.',
+        );
+      }
+      parts[key] = value;
     }
 
     const supportedKeys = {'FREQ', 'INTERVAL', 'BYDAY', 'UNTIL', 'WKST'};
@@ -236,10 +263,17 @@ final class IcsCalendarParser {
       );
     }
 
-    if (parts['FREQ']?.toUpperCase() != 'WEEKLY') {
+    if (parts['FREQ'] != 'WEEKLY') {
       return const _Recurrence(
         unsupportedReason:
             'Only weekly recurring events can be imported automatically.',
+      );
+    }
+    final weekStart = parts['WKST'];
+    if (weekStart != null && weekStart != 'MO') {
+      return const _Recurrence(
+        unsupportedReason:
+            'Only Monday-based weekly recurrence is supported.',
       );
     }
     final interval = int.tryParse(parts['INTERVAL'] ?? '1');
@@ -249,12 +283,6 @@ final class IcsCalendarParser {
             'Recurring intervals other than every week are not supported.',
       );
     }
-    if (parts.containsKey('COUNT')) {
-      return const _Recurrence(
-        unsupportedReason: 'COUNT-based recurrence is not supported yet.',
-      );
-    }
-
     final byDay = (parts['BYDAY'] ?? '')
         .split(',')
         .where((value) => value.isNotEmpty)
@@ -263,6 +291,11 @@ final class IcsCalendarParser {
     if (byDay.isEmpty || byDay.any((value) => !allowedDays.contains(value))) {
       return const _Recurrence(
         unsupportedReason: 'Weekly recurrence requires plain BYDAY values.',
+      );
+    }
+    if (byDay.toSet().length != byDay.length) {
+      return const _Recurrence(
+        unsupportedReason: 'Weekly BYDAY values must not contain duplicates.',
       );
     }
 
@@ -324,7 +357,7 @@ final class IcsCalendarParser {
     if (match == null) {
       throw FormatException('Unsupported iCalendar date "$raw".');
     }
-    return _DateParts(
+    final parts = _DateParts(
       year: int.parse(match.group(1)!),
       month: int.parse(match.group(2)!),
       day: int.parse(match.group(3)!),
@@ -334,6 +367,23 @@ final class IcsCalendarParser {
           ? int.parse(match.group(6)!)
           : 0,
     );
+    final normalized = DateTime.utc(
+      parts.year,
+      parts.month,
+      parts.day,
+      parts.hour,
+      parts.minute,
+      parts.second,
+    );
+    if (normalized.year != parts.year ||
+        normalized.month != parts.month ||
+        normalized.day != parts.day ||
+        normalized.hour != parts.hour ||
+        normalized.minute != parts.minute ||
+        normalized.second != parts.second) {
+      throw FormatException('Invalid iCalendar date "$raw".');
+    }
+    return parts;
   }
 
   static bool _has(List<_IcsProperty> properties, String name) =>
