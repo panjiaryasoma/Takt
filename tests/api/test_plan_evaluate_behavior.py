@@ -61,6 +61,7 @@ from packages.contracts import (
     WorkloadInput,
 )
 from packages.contracts.source import CORE_CANONICAL_FIELDS
+from tests.support.semantic_projection import semantic_projection
 
 
 def _candidate_field(
@@ -257,30 +258,23 @@ def test_identical_semantic_inputs_are_deterministic_except_execution_identity()
     )
 
     assert first.evaluation_id != second.evaluation_id
-    assert first.basis == second.basis
-    assert first.readiness == second.readiness
-    assert first.planning is not None and second.planning is not None
-    assert first.planning.feasibility == second.planning.feasibility
+    assert semantic_projection(first) == semantic_projection(second)
 
-    first_set = first.planning.recommendation
-    second_set = second.planning.recommendation
-    assert first_set is not None and second_set is not None
-    assert (
-        first_set.primary_candidate.candidate_id
-        == second_set.primary_candidate.candidate_id
+    projected = semantic_projection(first)
+    assert projected["evaluated_at"] == _clock().isoformat()
+    assert projected["basis"]["report"]["competition_id"] == (
+        request.report_bundle.ref.competition_id
     )
-    assert first_set.recommendation == second_set.recommendation
-    assert (
-        first_set.recommendation.recommended_candidate_id
-        == first_set.primary_candidate.candidate_id
+    assert projected["basis"]["report"]["report_version"] == (
+        request.report_bundle.ref.report_version
     )
-    assert tuple(
-        item.candidate_id for item in first_set.recommendation.alternatives
-    ) == tuple(
-        item.candidate_id for item in first_set.alternative_candidates
+    planning = projected["planning"]
+    assert planning is not None
+    candidate_ids = [item["ref"]["candidate_id"] for item in planning["candidates"]]
+    assert candidate_ids
+    assert planning["recommendation"]["primary_candidate"]["candidate_id"] == (
+        candidate_ids[0]
     )
-    assert first.basis.report.competition_id == request.report_bundle.ref.competition_id
-    assert first.basis.report.report_version == request.report_bundle.ref.report_version
 
 
 def test_aware_datetime_inside_any_survives_report_wire_round_trip() -> None:
