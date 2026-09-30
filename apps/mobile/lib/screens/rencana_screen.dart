@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../data/repositories/saved_plan_repository.dart';
+import '../models/recovery_policy.dart';
 import '../theme/app_theme.dart';
 import '../viewmodels/saved_plans_view_model.dart';
 import '../widgets/common.dart';
+import '../widgets/recovery_panel.dart';
 
 class RencanaScreen extends StatelessWidget {
   const RencanaScreen({
@@ -32,11 +34,19 @@ class RencanaScreen extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(20, 0, 20, 24),
               children: [
                 if (vm.error != null)
-                  _MessageCard(
-                    icon: Icons.error_outline,
-                    text: vm.error!,
+                  RecoveryPanel(
+                    descriptor: RecoveryDescriptor(
+                      title: 'Saved plans are unavailable',
+                      message: vm.error!,
+                      recoveryClass: RecoveryClass.reloadContext,
+                      technicalCode: 'LOCAL_CONTEXT_INVALID',
+                      stage: 'persistence',
+                      primaryAction: RecoveryAction.reloadContext,
+                    ),
+                    primaryLabel: 'Retry load',
+                    onPrimary: vm.refresh,
                   ),
-                if (!vm.loading && vm.items.isEmpty)
+                if (!vm.loading && vm.error == null && vm.items.isEmpty)
                   const _MessageCard(
                     icon: Icons.inventory_2_outlined,
                     text:
