@@ -233,6 +233,29 @@ class _RekomendasiJadwalScreenState extends State<RekomendasiJadwalScreen> {
             const Text('Suggested schedule · Not added to calendar', style: TextStyle(color: C.accent)),
             const SizedBox(height: 8),
             Text('Evaluated ${_instant(view.response.evaluatedAt)}', style: const TextStyle(color: C.detailMuted)),
+            if (widget.acceptancePersistencePending) ...[
+              const SizedBox(height: 12),
+              RecoveryPanel(
+                descriptor: RecoveryDescriptor(
+                  title: 'Acceptance is confirmed but not saved',
+                  message: widget.acceptancePersistenceMessage ??
+                      'The local acceptance transaction did not commit.',
+                  recoveryClass: RecoveryClass.noAutomaticRecovery,
+                  technicalCode: 'LOCAL_ACCEPT_PERSISTENCE_FAILED',
+                  stage: 'persistence',
+                  primaryAction: RecoveryAction.retryAcceptanceSave,
+                  secondaryAction: RecoveryAction.cancelPendingAcceptance,
+                ),
+                primaryLabel: 'Retry acceptance save',
+                onPrimary: widget.onRetryAcceptanceSave == null
+                    ? null
+                    : _retryAcceptanceSave,
+                secondaryLabel: 'Cancel pending acceptance',
+                onSecondary: widget.onCancelPendingAcceptance == null
+                    ? null
+                    : _cancelPendingAcceptance,
+              ),
+            ],
             if (_vm.isSessionOutdated)
               _ReportCard(
                 highlight: true,
@@ -365,28 +388,7 @@ class _RekomendasiJadwalScreenState extends State<RekomendasiJadwalScreen> {
                   key: Key('handoff-complete'),
                 ),
               ),
-            if (widget.acceptancePersistencePending)
-              RecoveryPanel(
-                descriptor: RecoveryDescriptor(
-                  title: 'Acceptance is confirmed but not saved',
-                  message: widget.acceptancePersistenceMessage ??
-                      'The local acceptance transaction did not commit.',
-                  recoveryClass: RecoveryClass.noAutomaticRecovery,
-                  technicalCode: 'LOCAL_ACCEPT_PERSISTENCE_FAILED',
-                  stage: 'persistence',
-                  primaryAction: RecoveryAction.retryAcceptanceSave,
-                  secondaryAction: RecoveryAction.cancelPendingAcceptance,
-                ),
-                primaryLabel: 'Retry acceptance save',
-                onPrimary: widget.onRetryAcceptanceSave == null
-                    ? null
-                    : _retryAcceptanceSave,
-                secondaryLabel: 'Cancel pending acceptance',
-                onSecondary: widget.onCancelPendingAcceptance == null
-                    ? null
-                    : _cancelPendingAcceptance,
-              )
-            else if (_vm.handoffFailed)
+            if (!widget.acceptancePersistencePending && _vm.handoffFailed)
               const _ReportCard(
                 highlight: true,
                 child: Text(
