@@ -529,13 +529,6 @@ class _RootShellState extends State<RootShell> {
     });
   }
 
-  void _handleRootSwipe(DragEndDetails details) {
-    final velocity = details.primaryVelocity ?? 0;
-    if (velocity.abs() < 500) return;
-    final target = velocity < 0 ? _navIndex + 1 : _navIndex - 1;
-    _selectRootTab(target);
-  }
-
   Widget _body() {
     switch (_navIndex) {
       case 1:
@@ -603,10 +596,10 @@ class _RootShellState extends State<RootShell> {
       backgroundColor: C.bg,
       body: SafeArea(
         bottom: false,
-        child: GestureDetector(
+        child: HorizontalSwipeSurface(
           key: const Key('root-tab-swipe-area'),
-          behavior: HitTestBehavior.translucent,
-          onHorizontalDragEnd: _handleRootSwipe,
+          onSwipeLeft: () => _selectRootTab(_navIndex + 1),
+          onSwipeRight: () => _selectRootTab(_navIndex - 1),
           child: _body(),
         ),
       ),
@@ -636,16 +629,16 @@ class _BottomNav extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    return HorizontalSwipeSurface(
       key: const Key('bottom-nav-swipe-area'),
       behavior: HitTestBehavior.opaque,
-      onHorizontalDragEnd: (details) {
-        final velocity = details.primaryVelocity ?? 0;
-        if (velocity.abs() < 500) return;
-        final target = velocity < 0 ? activeIndex + 1 : activeIndex - 1;
-        if (target >= 0 && target < _items.length) {
-          onTap(target);
-        }
+      onSwipeLeft: () {
+        final target = activeIndex + 1;
+        if (target < _items.length) onTap(target);
+      },
+      onSwipeRight: () {
+        final target = activeIndex - 1;
+        if (target >= 0) onTap(target);
       },
       child: Container(
         color: C.card,
