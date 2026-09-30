@@ -5,9 +5,11 @@ import '../models/active_accepted_block.dart';
 import '../models/commitment.dart';
 import '../models/enums.dart';
 import '../models/schedule_occurrence.dart';
+import '../models/recovery_policy.dart';
 import '../theme/app_theme.dart';
 import '../viewmodels/jadwal_view_model.dart';
 import '../widgets/common.dart';
+import '../widgets/recovery_panel.dart';
 
 class JadwalTabs extends StatelessWidget {
   const JadwalTabs({
@@ -243,6 +245,24 @@ class JadwalHarianScreen extends StatelessWidget {
           if (vm.isLoading) const LinearProgressIndicator(minHeight: 2),
           const SizedBox(height: 16),
           JadwalTabs(activeIndex: 0, onChanged: onSwitchTab),
+          if (vm.errorMessage != null) ...[
+            const SizedBox(height: 12),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: RecoveryPanel(
+                descriptor: RecoveryDescriptor(
+                  title: 'Local schedule needs attention',
+                  message: vm.errorMessage!,
+                  recoveryClass: RecoveryClass.reloadContext,
+                  technicalCode: 'LOCAL_CONTEXT_INVALID',
+                  stage: 'persistence',
+                  primaryAction: RecoveryAction.reloadContext,
+                ),
+                primaryLabel: 'Retry local load',
+                onPrimary: vm.retry,
+              ),
+            ),
+          ],
           const SizedBox(height: 16),
           HorizontalSwipeSurface(
             key: const Key('month-calendar-swipe-area'),
