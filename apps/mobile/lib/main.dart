@@ -39,7 +39,6 @@ import 'viewmodels/jadwal_view_model.dart';
 import 'viewmodels/planning_host_view_model.dart';
 import 'viewmodels/saved_plan_detail_view_model.dart';
 import 'viewmodels/saved_plans_view_model.dart';
-import 'widgets/common.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
