@@ -158,6 +158,38 @@ void main() {
     expect(find.textContaining('Save Schedule'), findsNothing);
     expect(tester.takeException(), isNull);
   });
+  testWidgets('Source Review remains reachable at 320px and 2x text',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.dark,
+        home: Builder(
+          builder: (context) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              textScaler: const TextScaler.linear(2),
+            ),
+            child: Scaffold(body: ReviewBriefScreen(response: _reviewResponse())),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Review Sources'), findsOneWidget);
+    final plan = find.text('Continue to Planning');
+    await tester.scrollUntilVisible(
+      plan,
+      500,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(plan, findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
 }
 
 CompetitionAnalyzeResponseWire _reviewResponse() {
