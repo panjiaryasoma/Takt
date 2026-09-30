@@ -76,7 +76,7 @@ class _TambahJadwalScreenState extends State<TambahJadwalScreen> {
   }
   Future<void> _pilihWaktu({required bool mulai}) async {
     final picked = await showTimePicker(context: context, initialTime: mulai ? _mulai : _selesai);
-    if (picked == null) return;
+    if (!mounted || picked == null) return;
     setState(() {
       if (mulai) {
         _mulai = picked;
