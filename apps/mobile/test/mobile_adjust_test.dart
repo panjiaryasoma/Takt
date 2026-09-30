@@ -9,6 +9,8 @@ import 'package:takt_mobile/data/database/app_database.dart';
 import 'package:takt_mobile/data/repositories/drift_schedule_repository.dart';
 import 'package:takt_mobile/data/repositories/schedule_repository.dart';
 import 'package:takt_mobile/main.dart';
+import 'package:takt_mobile/models/commitment.dart';
+import 'package:takt_mobile/models/enums.dart';
 import 'package:takt_mobile/screens/ics_import_screen.dart';
 import 'package:takt_mobile/screens/jadwal_harian_screen.dart';
 import 'package:takt_mobile/screens/jadwal_ringkasan_screen.dart';
@@ -588,55 +590,39 @@ void main() {
     await _pumpBounded(tester, frames: 2);
   });
 
-  testWidgets('cancelled recurrence stays visible without blocking capacity',
+  testWidgets('cancelled recurrence presentation is explicit and read-only',
       (tester) async {
-    final database = AppDatabase.forTesting(NativeDatabase.memory());
-    final repository = DriftScheduleRepository(database);
-    final viewModel = JadwalViewModel(
-      repository,
-      closeScheduleRepositoryOnDispose: false,
-    );
-    addTearDown(() async {
-      viewModel.dispose();
-      await repository.close();
-    });
-
-    await viewModel.initialize();
-    await Future<void>.delayed(Duration.zero);
-    await viewModel.tambahRutin(
+    final start = DateTime(2026, 9, 30, 9);
+    final commitment = Commitment(
+      id: 'cancelled-class',
       title: 'Cancelled class',
-      weekdays: {DateTime.wednesday},
-      jamMulai: 9,
-      menitMulai: 0,
-      jamSelesai: 10,
-      menitSelesai: 0,
-      mulaiDari: DateTime(2026, 9, 30),
+      type: CommitmentType.fixed,
+      startAtEpochMs: start.millisecondsSinceEpoch,
+      endAtEpochMs: start.add(const Duration(hours: 1)).millisecondsSinceEpoch,
+      timezone: 'Asia/Jakarta',
+      source: 'manual',
+      createdAtEpochMs: start.millisecondsSinceEpoch,
+      updatedAtEpochMs: start.millisecondsSinceEpoch,
     );
-    await Future<void>.delayed(Duration.zero);
-    final occurrence = viewModel.itemsOn(DateTime(2026, 9, 30)).single;
-    expect(await viewModel.cancelOccurrence(occurrence), isTrue);
-    await Future<void>.delayed(Duration.zero);
-    viewModel.selectDate(DateTime(2026, 9, 30));
+    final item = CancelledScheduleOccurrence(
+      commitment: commitment,
+      recurrenceRuleId: 'rule-cancelled-class',
+      originalStartAtEpochMs: start.millisecondsSinceEpoch,
+    );
 
     await tester.pumpWidget(
-      ChangeNotifierProvider.value(
-        value: viewModel,
-        child: MaterialApp(
-          theme: AppTheme.dark,
-          home: Scaffold(body: JadwalHarianScreen(onSwitchTab: (_) {})),
-        ),
+      MaterialApp(
+        theme: AppTheme.dark,
+        home: Scaffold(body: CancelledOccurrenceCard(item: item)),
       ),
     );
-    await _pumpBounded(tester);
+    await tester.pump();
 
+    expect(find.text('Cancelled class'), findsOneWidget);
     expect(find.textContaining('cancelled occurrence'), findsOneWidget);
     expect(find.textContaining('does not block planning'), findsOneWidget);
-    expect(find.byKey(const Key('schedule-empty-state')), findsNothing);
-    expect(viewModel.scheduledMinutesOn(DateTime(2026, 9, 30)), 0);
+    expect(find.byIcon(Icons.event_busy_outlined), findsOneWidget);
     expect(tester.takeException(), isNull);
-
-    await tester.pumpWidget(const SizedBox.shrink());
-    await _pumpBounded(tester, frames: 2);
   });
 
   testWidgets('Schedule daily and weekly remain reachable at 320px and 2x text',
