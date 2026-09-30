@@ -356,7 +356,7 @@ class _RootShellState extends State<RootShell> {
     final schedule = context.read<JadwalViewModel>();
     var failed = false;
     try {
-      await savedPlans.refresh();
+      await savedPlans.refreshForHandoff();
     } on Object {
       failed = true;
     }
