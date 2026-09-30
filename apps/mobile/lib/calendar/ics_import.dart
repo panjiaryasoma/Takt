@@ -377,7 +377,7 @@ final class IcsCalendarParser {
       .replaceAll(r'\N', '\n')
       .replaceAll(r'\,', ',')
       .replaceAll(r'\;', ';')
-      .replaceAll(r'\\', r'\');
+      .replaceAll('\\\\', '\\');
 
   static int _floorToMinute(int epochMs) => (epochMs ~/ 60000) * 60000;
 }
