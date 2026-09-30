@@ -460,6 +460,9 @@ class _FailOnceScheduleRepository implements ScheduleRepository {
   }) async {}
 
   @override
+  Future<void> createCommitmentsBatch(List<ScheduleImportEntry> entries) async {}
+
+  @override
   Future<void> deleteCommitment(String commitmentId) async {}
 
   @override
