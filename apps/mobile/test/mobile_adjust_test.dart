@@ -7,7 +7,9 @@ import 'package:provider/provider.dart';
 import 'package:takt_mobile/calendar/ics_import.dart';
 import 'package:takt_mobile/data/database/app_database.dart';
 import 'package:takt_mobile/data/repositories/drift_schedule_repository.dart';
+import 'package:takt_mobile/main.dart';
 import 'package:takt_mobile/screens/ics_import_screen.dart';
+import 'package:takt_mobile/screens/jadwal_harian_screen.dart';
 import 'package:takt_mobile/screens/jadwal_ringkasan_screen.dart';
 import 'package:takt_mobile/screens/tambah_jadwal_screen.dart';
 import 'package:takt_mobile/theme/app_theme.dart';
@@ -33,6 +35,41 @@ void main() {
     expect(splash, contains('@color/takt_bg'));
     expect(android12, contains('android:windowSplashScreenAnimatedIcon'));
     expect(android12, contains('@drawable/takt_logo'));
+  });
+
+  test('iOS launch and AppIcon generation use the canonical Takt logo', () {
+    final launchScreen =
+        File('ios/Runner/Base.lproj/LaunchScreen.storyboard')
+            .readAsStringSync();
+    final imageSet = File(
+      'ios/Runner/Assets.xcassets/TaktLogo.imageset/Contents.json',
+    ).readAsStringSync();
+    final project =
+        File('ios/Runner.xcodeproj/project.pbxproj').readAsStringSync();
+    final generator =
+        File('ios/scripts/generate_takt_branding.sh').readAsStringSync();
+    final ignore = File('ios/.gitignore').readAsStringSync();
+
+    expect(
+      File(
+        'ios/Runner/Assets.xcassets/TaktLogo.imageset/takt_logo.jpg',
+      ).existsSync(),
+      isTrue,
+    );
+    expect(launchScreen, contains('image="TaktLogo"'));
+    expect(launchScreen, contains('red="0.1764705882"'));
+    expect(imageSet, contains('"filename" : "takt_logo.jpg"'));
+    expect(project, contains('Generate Takt Branding'));
+    expect(
+      project.indexOf('Generate Takt Branding'),
+      lessThan(project.indexOf('/* Resources */')),
+    );
+    expect(generator, contains('/usr/bin/sips'));
+    expect(generator, contains('Icon-App-1024x1024@1x.png'));
+    expect(
+      ignore,
+      contains('Runner/Assets.xcassets/AppIcon.appiconset/*.png'),
+    );
   });
 
   test('Google-style ICS parses timed events and fails closed on all-day data', () {
@@ -225,6 +262,92 @@ void main() {
     await tester.pumpAndSettle();
     expect(find.text('17:45'), findsOneWidget);
     expect(calls, 2);
+  });
+
+  testWidgets('calendar swipes change month without leaving Schedule',
+      (tester) async {
+    final database = AppDatabase.forTesting(NativeDatabase.memory());
+    final repository = DriftScheduleRepository(database);
+    final viewModel = JadwalViewModel(repository);
+    addTearDown(viewModel.dispose);
+    await viewModel.initialize();
+    await Future<void>.delayed(Duration.zero);
+    viewModel.selectDate(DateTime(2026, 9, 1));
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: viewModel,
+        child: MaterialApp(
+          theme: AppTheme.dark,
+          home: Scaffold(
+            body: JadwalHarianScreen(onSwitchTab: (_) {}),
+          ),
+        ),
+      ),
+    );
+    await tester.pump();
+
+    expect(find.text('September 2026'), findsOneWidget);
+    await tester.drag(
+      find.byKey(const Key('month-calendar-swipe-area')),
+      const Offset(-320, 0),
+    );
+    await tester.pumpAndSettle();
+
+    expect(viewModel.selectedDate, DateTime(2026, 10, 1));
+    expect(find.text('October 2026'), findsOneWidget);
+
+    await tester.drag(
+      find.byKey(const Key('month-calendar-swipe-area')),
+      const Offset(320, 0),
+    );
+    await tester.pumpAndSettle();
+
+    expect(viewModel.selectedDate, DateTime(2026, 9, 1));
+    expect(find.text('September 2026'), findsOneWidget);
+  });
+
+  testWidgets('root body and bottom bar swipe through navigation tabs',
+      (tester) async {
+    final database = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(database.close);
+
+    await tester.pumpWidget(TaktApp(database: database));
+    await tester.pumpAndSettle();
+
+    expect(find.text('This week at a glance'), findsOneWidget);
+
+    await tester.drag(
+      find.byKey(const Key('root-tab-swipe-area')),
+      const Offset(-420, 0),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('My Schedule'), findsOneWidget);
+
+    final scheduleContext =
+        tester.element(find.byType(JadwalHarianScreen));
+    final schedule = Provider.of<JadwalViewModel>(
+      scheduleContext,
+      listen: false,
+    );
+    schedule.selectDate(DateTime(2026, 9, 1));
+    await tester.pump();
+
+    await tester.drag(
+      find.byKey(const Key('month-calendar-swipe-area')),
+      const Offset(-320, 0),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('My Schedule'), findsOneWidget);
+    expect(find.text('October 2026'), findsOneWidget);
+
+    await tester.drag(
+      find.byKey(const Key('bottom-nav-swipe-area')),
+      const Offset(-420, 0),
+    );
+    await tester.pumpAndSettle();
+    expect(find.text('Analyze a competition'), findsWidgets);
   });
 
   testWidgets('weekly summary highlights device-local today only in current week',
