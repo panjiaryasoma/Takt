@@ -712,13 +712,82 @@ final class PlanningHostViewModel extends ChangeNotifier {
         'The decision session changed before persistence.',
       );
     }
+    if (_pendingAcceptance != null || _acceptanceSaving) {
+      throw const AcceptancePersistenceExceptionProxy(
+        'A confirmed acceptance is already waiting for local persistence.',
+      );
+    }
 
-    await _savedPlanRepository.acceptEvaluation(
-      evaluationId: intent.evaluationId,
-      candidateId: intent.candidateId,
-      selectionSource: intent.selectionSource,
+    final pending = _PendingAcceptance(
+      session: session,
+      intent: intent,
+      generation: _generation,
+      revision: _inputRevision,
     );
+    _pendingAcceptance = pending;
+    await _persistAcceptance(pending);
+  }
 
+  Future<void> retryAcceptancePersistence() async {
+    final pending = _pendingAcceptance;
+    if (pending == null ||
+        _acceptanceSaving ||
+        !_isCurrent(pending.generation, pending.revision) ||
+        !identical(_activeSession, pending.session)) {
+      return;
+    }
+    await _persistAcceptance(pending);
+  }
+
+  void cancelPendingAcceptance() {
+    if (!canCancelPendingAcceptance) return;
+    _pendingAcceptance = null;
+    _failure = null;
+    _message =
+        'Pending acceptance save cancelled. No accepted plan was deleted or ignored.';
+    notifyListeners();
+  }
+
+  Future<void> _persistAcceptance(_PendingAcceptance pending) async {
+    _acceptanceSaving = true;
+    _failure = null;
+    _message = null;
+    notifyListeners();
+
+    try {
+      await _savedPlanRepository.acceptEvaluation(
+        evaluationId: pending.intent.evaluationId,
+        candidateId: pending.intent.candidateId,
+        selectionSource: pending.intent.selectionSource,
+      );
+    } on Object catch (error) {
+      if (!_isCurrent(pending.generation, pending.revision) ||
+          !identical(_activeSession, pending.session)) {
+        _acceptanceSaving = false;
+        notifyListeners();
+        return;
+      }
+      _acceptanceSaving = false;
+      _failure = PlanningHostFailure(
+        code: 'LOCAL_ACCEPT_PERSISTENCE_FAILED',
+        message:
+            'Your acceptance is confirmed, but the local transaction did not commit. Retry the acceptance save or explicitly cancel the pending acceptance.',
+        recoveryClass: RecoveryClass.noAutomaticRecovery,
+        stage: 'persistence',
+      );
+      notifyListeners();
+      throw AcceptancePersistenceExceptionProxy(error.toString());
+    }
+
+    if (!_isCurrent(pending.generation, pending.revision) ||
+        !identical(_activeSession, pending.session)) {
+      _acceptanceSaving = false;
+      notifyListeners();
+      return;
+    }
+
+    _acceptanceSaving = false;
+    _pendingAcceptance = null;
     _activeSession = null;
     _phase = PlanningHostPhase.accepted;
     _message = 'Plan accepted and saved locally.';
@@ -738,7 +807,7 @@ final class PlanningHostViewModel extends ChangeNotifier {
     }
     try {
       _priorEvaluation =
-          await _evaluationRepository.evaluationById(intent.evaluationId);
+          await _evaluationRepository.evaluationById(pending.intent.evaluationId);
     } on Object {
       // Re-evaluation can reload this persisted row on the next lifecycle.
     }
@@ -749,7 +818,11 @@ final class PlanningHostViewModel extends ChangeNotifier {
   /// This is a presentation/host lifecycle transition only. It intentionally
   /// does not persist Ignore, Accept, or Edit Constraints semantics.
   void leaveDecision() {
-    if (_phase != PlanningHostPhase.decision || _activeSession == null) return;
+    if (_phase != PlanningHostPhase.decision ||
+        _activeSession == null ||
+        _pendingAcceptance != null) {
+      return;
+    }
     _activeSession = null;
     _phase = PlanningHostPhase.setup;
     _failure = null;
@@ -758,6 +831,7 @@ final class PlanningHostViewModel extends ChangeNotifier {
   }
 
   void beginEditConstraints(EditConstraintsIntent intent) {
+    if (_pendingAcceptance != null) return;
     final session = _activeSession;
     if (session == null ||
         intent.sessionId != session.sessionId ||
@@ -772,6 +846,7 @@ final class PlanningHostViewModel extends ChangeNotifier {
   }
 
   void ignore(IgnoreRecommendationIntent intent) {
+    if (_pendingAcceptance != null) return;
     final session = _activeSession;
     if (session == null ||
         intent.sessionId != session.sessionId ||
