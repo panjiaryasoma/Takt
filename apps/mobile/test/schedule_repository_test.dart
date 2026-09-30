@@ -296,6 +296,12 @@ ORDER BY name
     await Future<void>.delayed(Duration.zero);
 
     expect(vm.itemsOn(DateTime(2026, 9, 30)), isEmpty);
+    final cancelledItems = vm.cancelledItemsOn(DateTime(2026, 9, 30));
+    expect(cancelledItems, hasLength(1));
+    expect(cancelledItems.single.commitment.title, 'Kelas rutin');
+    expect(cancelledItems.single.startAt.hour, 9);
+    expect(vm.scheduledMinutesOn(DateTime(2026, 9, 30)), 0,
+        reason: 'cancelled presentation must not restore blocked capacity');
     expect(vm.itemsOn(DateTime(2026, 10, 5)), hasLength(1));
   });
 
