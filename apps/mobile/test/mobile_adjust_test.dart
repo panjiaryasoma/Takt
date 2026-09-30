@@ -296,6 +296,91 @@ void main() {
     await _pumpBounded(tester, frames: 2);
   });
 
+  testWidgets('FIXED and FLEXIBLE copy matches planning semantics',
+      (tester) async {
+    final viewModel = JadwalViewModel(
+      _UnusedScheduleRepository(),
+      closeScheduleRepositoryOnDispose: false,
+    );
+    addTearDown(viewModel.dispose);
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: viewModel,
+        child: MaterialApp(
+          theme: AppTheme.dark,
+          home: const Scaffold(body: TambahJadwalScreen()),
+        ),
+      ),
+    );
+    await _pumpBounded(tester);
+
+    expect(
+      find.text('Scheduled time is treated as unavailable during planning.'),
+      findsOneWidget,
+    );
+
+    await tester.tap(find.text('FLEXIBLE'));
+    await tester.pump();
+
+    expect(
+      find.textContaining(
+        'its currently scheduled time is still treated as unavailable during planning',
+      ),
+      findsOneWidget,
+    );
+    expect(
+      find.textContaining('Takt does not move it automatically'),
+      findsOneWidget,
+    );
+    expect(find.textContaining('Takt can move'), findsNothing);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _pumpBounded(tester, frames: 2);
+  });
+
+  testWidgets('Add Schedule keeps critical controls reachable at 320px and 2x text',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    final viewModel = JadwalViewModel(
+      _UnusedScheduleRepository(),
+      closeScheduleRepositoryOnDispose: false,
+    );
+    addTearDown(viewModel.dispose);
+
+    await tester.pumpWidget(
+      ChangeNotifierProvider.value(
+        value: viewModel,
+        child: MaterialApp(
+          theme: AppTheme.dark,
+          home: Builder(
+            builder: (context) => MediaQuery(
+              data: MediaQuery.of(context).copyWith(
+                textScaler: const TextScaler.linear(2),
+              ),
+              child: const Scaffold(body: TambahJadwalScreen()),
+            ),
+          ),
+        ),
+      ),
+    );
+    await _pumpBounded(tester);
+
+    final save = find.byKey(const Key('save-schedule'));
+    await tester.ensureVisible(save);
+    await _pumpBounded(tester, frames: 2);
+    expect(save, findsOneWidget);
+    expect(find.byKey(const Key('commitment-type-explanation')), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _pumpBounded(tester, frames: 2);
+  });
+
   testWidgets('the entire From and To cards change their time values',
       (tester) async {
     final viewModel = JadwalViewModel(
