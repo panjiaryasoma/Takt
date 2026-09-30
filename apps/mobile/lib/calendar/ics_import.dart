@@ -229,6 +229,14 @@ final class IcsCalendarParser {
           fragment.substring(separator + 1);
     }
 
+    const supportedKeys = {'FREQ', 'INTERVAL', 'BYDAY', 'UNTIL', 'WKST'};
+    if (parts.keys.any((key) => !supportedKeys.contains(key))) {
+      return const _Recurrence(
+        unsupportedReason:
+            'This weekly recurrence uses unsupported iCalendar modifiers.',
+      );
+    }
+
     if (parts['FREQ']?.toUpperCase() != 'WEEKLY') {
       return const _Recurrence(
         unsupportedReason:
