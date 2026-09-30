@@ -115,13 +115,11 @@ final class PlanningHostViewModel extends ChangeNotifier {
       };
   bool get canDiscardPendingResult =>
       persistenceExitKind == PersistenceExitKind.discardableResult;
-  bool get hasKnownUnpersistedStaleWitness =>
-      _pendingPersistence case _PendingReevaluationFailure(
-        failure: final failure,
-      ) when failure.transition?.kind.name == 'superseded' =>
-        true,
-      _ => false,
-      };
+  bool get hasKnownUnpersistedStaleWitness {
+    final pending = _pendingPersistence;
+    return pending is _PendingReevaluationFailure &&
+        pending.failure.transition?.priorEvaluationFreshness == 'STALE';
+  }
   bool get acceptanceSaving => _acceptanceSaving;
   bool get canRetryAcceptancePersistence =>
       _pendingAcceptance != null && !_acceptanceSaving;
@@ -139,6 +137,25 @@ final class PlanningHostViewModel extends ChangeNotifier {
       _savedPlan != null;
 
   Future<void> startPlanning(AnalysisSnapshot snapshot) async {
+    if (persistenceExitKind == PersistenceExitKind.correctnessBearing) {
+      _setPersistenceFailure(
+        const StateError(
+          'A trusted re-evaluation transition still requires local persistence.',
+        ),
+      );
+      return;
+    }
+    if (_pendingAcceptance != null) {
+      _failure = const PlanningHostFailure(
+        code: 'LOCAL_ACCEPT_PERSISTENCE_FAILED',
+        message:
+            'Resolve or cancel the pending acceptance save before opening another planning context.',
+        recoveryClass: RecoveryClass.noAutomaticRecovery,
+      );
+      notifyListeners();
+      return;
+    }
+
     final contextGeneration = ++_generation;
     _phase = PlanningHostPhase.loading;
     _analysisSnapshot = null;
@@ -147,6 +164,9 @@ final class PlanningHostViewModel extends ChangeNotifier {
     _priorEvaluation = null;
     _activeSession = null;
     _pendingPersistence = null;
+    _lastRequest = null;
+    _pendingAcceptance = null;
+    _acceptanceSaving = false;
     _failure = null;
     _message = null;
     _inputRevision = 0;
