@@ -1,7 +1,7 @@
 name: takt_mobile
 description: Calendar-aware competition decision support mobile client.
 publish_to: "none"
-version: 0.1.0+1
+version: 0.1.0+5
 
 environment:
   sdk: ">=3.11.0 <4.0.0"
