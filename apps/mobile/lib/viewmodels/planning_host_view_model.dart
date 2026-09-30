@@ -769,7 +769,7 @@ final class PlanningHostViewModel extends ChangeNotifier {
         return;
       }
       _acceptanceSaving = false;
-      _failure = PlanningHostFailure(
+      _failure = const PlanningHostFailure(
         code: 'LOCAL_ACCEPT_PERSISTENCE_FAILED',
         message:
             'Your acceptance is confirmed, but the local transaction did not commit. Retry the acceptance save or explicitly cancel the pending acceptance.',
