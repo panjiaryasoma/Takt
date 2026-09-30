@@ -363,6 +363,12 @@ final class PlanningHostViewModel extends ChangeNotifier {
     if (!_isCurrent(capturedGeneration, capturedRevision)) return;
 
     if (_savedPlan == null || _forceFreshBaseline) {
+      _lastRequest = _FreshPlanRequest(
+        generation: capturedGeneration,
+        revision: capturedRevision,
+        snapshot: snapshot,
+        assembly: assembly,
+      );
       await _evaluateFresh(
         snapshot: snapshot,
         assembly: assembly,
@@ -380,6 +386,13 @@ final class PlanningHostViewModel extends ChangeNotifier {
       );
       return;
     }
+    _lastRequest = _ReevaluationPlanRequest(
+      generation: capturedGeneration,
+      revision: capturedRevision,
+      snapshot: snapshot,
+      prior: prior,
+      assembly: assembly,
+    );
     await _reevaluate(
       snapshot: snapshot,
       prior: prior,
@@ -387,6 +400,36 @@ final class PlanningHostViewModel extends ChangeNotifier {
       generation: capturedGeneration,
       revision: capturedRevision,
     );
+  }
+
+  Future<void> retryRequest() async {
+    final request = _lastRequest;
+    if (!canRetryRequest || request == null ||
+        !_isCurrent(request.generation, request.revision)) {
+      return;
+    }
+    _phase = PlanningHostPhase.requesting;
+    _failure = null;
+    _message = null;
+    notifyListeners();
+
+    switch (request) {
+      case _FreshPlanRequest():
+        await _evaluateFresh(
+          snapshot: request.snapshot,
+          assembly: request.assembly,
+          generation: request.generation,
+          revision: request.revision,
+        );
+      case _ReevaluationPlanRequest():
+        await _reevaluate(
+          snapshot: request.snapshot,
+          prior: request.prior,
+          assembly: request.assembly,
+          generation: request.generation,
+          revision: request.revision,
+        );
+    }
   }
 
   Future<void> _evaluateFresh({
@@ -401,6 +444,7 @@ final class PlanningHostViewModel extends ChangeNotifier {
       );
       if (!_isCurrent(generation, revision)) return;
 
+      _lastRequest = null;
       _phase = PlanningHostPhase.persisting;
       notifyListeners();
       try {
@@ -444,6 +488,7 @@ final class PlanningHostViewModel extends ChangeNotifier {
       );
       if (!_isCurrent(generation, revision)) return;
 
+      _lastRequest = null;
       _phase = PlanningHostPhase.persisting;
       notifyListeners();
       try {
@@ -489,6 +534,7 @@ final class PlanningHostViewModel extends ChangeNotifier {
           request != null &&
           response != null &&
           errorJson != null) {
+        _lastRequest = null;
         try {
           await _evaluationRepository.persistReevaluation(
             priorEvaluationId: prior.id,
