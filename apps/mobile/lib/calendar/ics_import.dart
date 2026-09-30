@@ -34,11 +34,9 @@ final class IcsImportEvent {
   bool get isRecurring => rrule != null;
 
   String get commitmentId {
-    final material =
-        uid + '|' + startAtEpochMs.toString() + '|' +
-        endAtEpochMs.toString() + '|' + (rrule ?? '');
+    final material = '$uid|$startAtEpochMs|$endAtEpochMs|${rrule ?? ''}';
     final digest = sha256.convert(utf8.encode(material)).toString();
-    return 'ics_' + digest.substring(0, 24);
+    return 'ics_${digest.substring(0, 24)}';
   }
 }
 
@@ -207,7 +205,7 @@ final class IcsCalendarParser {
         allDay: false,
       );
     } on Object {
-      throw FormatException('Unsupported TZID "' + timezone + '".');
+      throw FormatException('Unsupported TZID "$timezone".');
     }
   }
 
@@ -289,7 +287,7 @@ final class IcsCalendarParser {
     final sortedDays = [...byDay]
       ..sort((a, b) => allowedDays.indexOf(a).compareTo(allowedDays.indexOf(b)));
     return _Recurrence(
-      rrule: 'FREQ=WEEKLY;BYDAY=' + sortedDays.join(','),
+      rrule: 'FREQ=WEEKLY;BYDAY=${sortedDays.join(',')}',
       activeUntilEpochMs: activeUntilEpochMs,
     );
   }
@@ -317,7 +315,7 @@ final class IcsCalendarParser {
           : r'^(\d{4})(\d{2})(\d{2})$',
     ).firstMatch(value);
     if (match == null) {
-      throw FormatException('Unsupported iCalendar date "' + raw + '".');
+      throw FormatException('Unsupported iCalendar date "$raw".');
     }
     return _DateParts(
       year: int.parse(match.group(1)!),
@@ -341,7 +339,7 @@ final class IcsCalendarParser {
     for (final property in properties) {
       if (property.name == name) return property;
     }
-    throw FormatException('VEVENT is missing ' + name + '.');
+    throw FormatException('VEVENT is missing $name.');
   }
 
   static String _requiredValue(
@@ -350,7 +348,7 @@ final class IcsCalendarParser {
   ) {
     final value = _value(properties, name);
     if (value == null || value.trim().isEmpty) {
-      throw FormatException('VEVENT is missing ' + name + '.');
+      throw FormatException('VEVENT is missing $name.');
     }
     return value.trim();
   }
@@ -392,7 +390,7 @@ final class _IcsProperty {
   factory _IcsProperty.parse(String line) {
     final separator = line.indexOf(':');
     if (separator <= 0) {
-      throw FormatException('Malformed iCalendar property "' + line + '".');
+      throw FormatException('Malformed iCalendar property "$line".');
     }
     final header = line.substring(0, separator);
     final value = line.substring(separator + 1);
