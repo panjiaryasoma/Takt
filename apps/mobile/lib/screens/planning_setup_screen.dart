@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../models/planning_input_draft.dart';
 import '../models/planning_preferences.dart';
+import '../models/recovery_policy.dart';
 import '../theme/app_theme.dart';
 import '../viewmodels/planning_host_view_model.dart';
 import '../widgets/common.dart';
+import '../widgets/recovery_panel.dart';
 
 class PlanningSetupScreen extends StatefulWidget {
   const PlanningSetupScreen({
@@ -144,6 +146,62 @@ class _PlanningSetupScreenState extends State<PlanningSetupScreen> {
     } else {
       setState(() {});
     }
+  }
+
+  Future<void> _retryRequest() async {
+    await widget.host.retryRequest();
+    if (!mounted) return;
+    if (widget.host.phase == PlanningHostPhase.decision) {
+      widget.onDecisionReady?.call();
+    } else {
+      setState(() {});
+    }
+  }
+
+  Future<void> _discardPendingResult() async {
+    if (!widget.host.canDiscardPendingResult) return;
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            backgroundColor: C.card,
+            title: const Text('Discard unsaved evaluation?'),
+            content: const Text(
+              'This evaluation was not saved. Discarding it returns to the '
+              'previous durable planning state and does not change an existing '
+              'accepted plan.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Keep result'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Discard unsaved result'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed || !mounted) return;
+    widget.host.discardPendingResult();
+    setState(() {});
+  }
+
+  RecoveryDescriptor _failureDescriptor(PlanningHostFailure failure) {
+    return RecoveryDescriptor(
+      title: switch (failure.recoveryClass) {
+        RecoveryClass.retrySameInput => 'Planning request can be retried',
+        RecoveryClass.editConstraints => 'Planning inputs need attention',
+        RecoveryClass.reloadContext => 'Planning context needs to be reloaded',
+        RecoveryClass.reevaluate => 'A fresh evaluation baseline is required',
+        _ => 'Planning could not complete safely',
+      },
+      message: failure.message,
+      recoveryClass: failure.recoveryClass,
+      technicalCode: failure.code,
+      stage: failure.stage,
+    );
   }
 
   Future<void> _addTask() async {
@@ -474,10 +532,37 @@ class _PlanningSetupScreenState extends State<PlanningSetupScreen> {
           ),
           if (_localError != null)
             _ErrorBox(text: _localError!),
-          if (host.failure != null)
-            _ErrorBox(
-              text: '[${host.failure!.code}] ${host.failure!.message}',
+          if (host.failure != null) ...[
+            RecoveryPanel(
+              descriptor: host.canRetryPersistence
+                  ? RecoveryDescriptor(
+                      title: host.hasKnownUnpersistedStaleWitness
+                          ? 'Trusted stale state still needs saving'
+                          : 'Evaluation result is not saved yet',
+                      message: host.failure!.message,
+                      recoveryClass: RecoveryClass.noAutomaticRecovery,
+                      technicalCode: host.failure!.code,
+                      stage: host.failure!.stage,
+                    )
+                  : _failureDescriptor(host.failure!),
+              primaryLabel: host.canRetryPersistence
+                  ? 'Retry local save'
+                  : host.canRetryRequest
+                      ? 'Retry request'
+                      : null,
+              onPrimary: host.canRetryPersistence
+                  ? _retryPersistence
+                  : host.canRetryRequest
+                      ? _retryRequest
+                      : null,
+              secondaryLabel: host.canDiscardPendingResult
+                  ? 'Discard unsaved result'
+                  : null,
+              onSecondary:
+                  host.canDiscardPendingResult ? _discardPendingResult : null,
             ),
+            const SizedBox(height: 12),
+          ],
           if (host.message != null)
             Padding(
               padding: const EdgeInsets.only(bottom: 12),
@@ -486,12 +571,7 @@ class _PlanningSetupScreenState extends State<PlanningSetupScreen> {
                 style: const TextStyle(color: C.accent),
               ),
             ),
-          if (host.canRetryPersistence)
-            FilledButton(
-              onPressed: busy ? null : _retryPersistence,
-              child: const Text('Retry local save'),
-            )
-          else
+          if (!host.canRetryPersistence && !host.canRetryRequest)
             FilledButton(
               onPressed: busy ? null : _evaluate,
               child: Text(
