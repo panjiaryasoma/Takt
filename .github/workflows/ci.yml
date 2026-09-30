@@ -60,7 +60,8 @@ jobs:
         run: flutter analyze
 
       - name: Flutter test
-        run: flutter test
+        timeout-minutes: 5
+        run: flutter test --reporter expanded
 
       - name: Flutter Android debug build
         run: flutter build apk --debug
