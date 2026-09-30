@@ -222,6 +222,61 @@ INSERT INTO analysis_snapshots (
       );
     });
 
+    test('5A acceptance lineage stays compatible with 4B persisted trace',
+        () async {
+      final response = decisionFixture();
+      final planning = response['planning'] as Map<String, dynamic>;
+      final candidates = planning['candidates'] as List<dynamic>;
+      final primary = candidates
+          .cast<Map<String, dynamic>>()
+          .singleWhere(
+            (candidate) =>
+                (candidate['ref'] as Map<String, dynamic>)['candidate_id'] ==
+                primaryId,
+          );
+      final sourceBlock =
+          (primary['work_blocks'] as List<dynamic>).single
+              as Map<String, dynamic>;
+
+      final evaluation = await evaluations.persistEvaluation(
+        analysisSnapshot: snapshot,
+        evaluationRequestJson: _evaluationRequest(),
+        evaluationResponseJson: jsonEncode(response),
+        planningWindowPolicyJson: _windowPolicyJson(),
+      );
+      final revision = await savedPlans.acceptEvaluation(
+        evaluationId: evaluation.id,
+        candidateId: primaryId,
+        selectionSource: SelectionSource.primary,
+      );
+      final detail = await savedPlans.loadDetail(revision.savedPlanId);
+
+      expect(detail, isNotNull);
+      expect(revision.evaluationId, evaluation.id);
+      expect(detail!.summary.currentRevision.evaluationId, evaluation.id);
+
+      final persistedTask = detail.tasks.singleWhere(
+        (state) => state.task.domainTaskId == sourceBlock['task_id'],
+      );
+      final accepted = detail.acceptedCommitments.single;
+      expect(accepted.savedPlanRevisionId, revision.id);
+      expect(accepted.savedPlanTaskId, persistedTask.task.id);
+
+      final persistedSourceBlock =
+          jsonDecode(accepted.sourceBlockJson) as Map<String, dynamic>;
+      expect(persistedSourceBlock['task_id'], sourceBlock['task_id']);
+      expect(persistedSourceBlock['start'], sourceBlock['start']);
+      expect(persistedSourceBlock['end'], sourceBlock['end']);
+      expect(
+        persistedSourceBlock['allocated_minutes'],
+        sourceBlock['allocated_minutes'],
+      );
+      expect(
+        accepted.originalAvailabilitySource,
+        sourceBlock['availability_source'],
+      );
+    });
+
     test('fresh accepted evaluation creates a linear revision and resets progress',
         () async {
       final firstEvaluation = await evaluations.persistEvaluation(
