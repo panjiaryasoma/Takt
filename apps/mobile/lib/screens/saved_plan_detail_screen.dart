@@ -224,7 +224,7 @@ class _SavedPlanDetailScreenState extends State<SavedPlanDetailScreen> {
                     ),
                     if (summary.stale) ...[
                       const SizedBox(height: 12),
-                      PresentationCard(
+                      const PresentationCard(
                         highlightColor: C.padat,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
