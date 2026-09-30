@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import '../data/remote/competition_api_client.dart';
+import '../models/analysis_source_draft.dart';
 import '../models/competition_analysis_wire.dart';
 import '../theme/app_theme.dart';
 import '../viewmodels/analisis_view_model.dart';
@@ -35,6 +36,40 @@ class _AnalisisKompetisiScreenState
   SourceTypeWire? _sourceType;
   String? _error;
   bool _submitting = false;
+
+  @override
+  void initState() {
+    super.initState();
+    final vm = context.read<AnalisisViewModel>();
+    vm.ensureSourceDraft(continuation: widget.continuation);
+    final draft = vm.sourceDraft!;
+    _mode = draft.mode == AnalysisSourceMode.pdf ? 0 : 1;
+    _urlController.text = draft.url;
+    _sourceType = draft.sourceType;
+    final bytes = draft.bytes;
+    final filename = draft.filename;
+    if (bytes != null && filename != null) {
+      _picked = PlatformFile(
+        name: filename,
+        size: bytes.length,
+        bytes: Uint8List.fromList(bytes),
+      );
+    }
+  }
+
+  void _syncDraft() {
+    final bytes = _picked?.bytes;
+    context.read<AnalisisViewModel>().updateSourceDraft(
+          AnalysisSourceDraft(
+            mode: _mode == 0 ? AnalysisSourceMode.pdf : AnalysisSourceMode.url,
+            continuation: widget.continuation,
+            url: _urlController.text,
+            filename: _picked?.name,
+            bytes: bytes == null ? null : Uint8List.fromList(bytes),
+            sourceType: _sourceType,
+          ),
+        );
+  }
 
   @override
   void dispose() {
@@ -83,6 +118,7 @@ class _AnalisisKompetisiScreenState
       _picked = file;
       _error = null;
     });
+    _syncDraft();
   }
 
   Future<void> _submit() async {
@@ -94,6 +130,7 @@ class _AnalisisKompetisiScreenState
     }
 
     final vm = context.read<AnalisisViewModel>();
+    _syncDraft();
     Future<void> request;
 
     if (_mode == 0) {
@@ -303,10 +340,13 @@ class _AnalisisKompetisiScreenState
           child: InkWell(
             onTap: _submitting
                 ? null
-                : () => setState(() {
+                : () {
+                    setState(() {
                       _mode = index;
                       _error = null;
-                    }),
+                    });
+                    _syncDraft();
+                  },
             borderRadius: BorderRadius.circular(10),
             child: Center(
               child: Text(
@@ -400,7 +440,10 @@ class _AnalisisKompetisiScreenState
                       _outlineButton('Replace', _pickFile),
                       _outlineButton(
                         'Remove',
-                        () => setState(() => _picked = null),
+                        () {
+                          setState(() => _picked = null);
+                          _syncDraft();
+                        },
                       ),
                     ],
                   ),
@@ -423,9 +466,12 @@ class _AnalisisKompetisiScreenState
         enabled: !_submitting,
         keyboardType: TextInputType.url,
         autocorrect: false,
-        onChanged: (_) => setState(() {
-          _error = null;
-        }),
+        onChanged: (_) {
+          setState(() {
+            _error = null;
+          });
+          _syncDraft();
+        },
         style: const TextStyle(
           color: C.white,
           fontSize: 13,
