@@ -75,6 +75,50 @@ void main() {
     );
   });
 
+  test('source and extraction failures map without inventing domain MISSING', () {
+    const sourceUnavailable = FailureIdentity(
+      code: 'SOURCE_FETCH_FAILED',
+      stage: 'ingestion',
+      statusCode: 502,
+      origin: FailureOrigin.backend,
+    );
+    const invalidSource = FailureIdentity(
+      code: 'INVALID_SOURCE',
+      stage: 'ingestion',
+      statusCode: 400,
+      origin: FailureOrigin.backend,
+    );
+    const corruptPdf = FailureIdentity(
+      code: 'NATIVE_EXTRACTION_FAILED',
+      stage: 'extraction',
+      statusCode: 422,
+      origin: FailureOrigin.backend,
+    );
+    const ocrTimeout = FailureIdentity(
+      code: 'OCR_TIMEOUT',
+      stage: 'extraction',
+      statusCode: 504,
+      origin: FailureOrigin.backend,
+    );
+
+    expect(
+      RecoveryPolicy.classify(sourceUnavailable),
+      RecoveryClass.retrySameInput,
+    );
+    expect(
+      RecoveryPolicy.classify(invalidSource),
+      RecoveryClass.fixInput,
+    );
+    expect(
+      RecoveryPolicy.classify(corruptPdf),
+      RecoveryClass.reuploadSource,
+    );
+    expect(
+      RecoveryPolicy.classify(ocrTimeout),
+      RecoveryClass.retrySameInput,
+    );
+  });
+
   test('client transport timeout is retryable without becoming backend code', () {
     const failure = FailureIdentity(
       code: 'CLIENT_TIMEOUT',
