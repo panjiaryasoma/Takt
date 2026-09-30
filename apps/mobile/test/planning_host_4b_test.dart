@@ -124,6 +124,37 @@ void main() {
     await tester.pumpAndSettle();
   });
 
+  testWidgets('production Decision Report system back exits to analysis parent',
+      (tester) async {
+    final api = _ControlledPlanApi();
+    await tester.pumpWidget(TaktApp(database: db, planApiClient: api));
+    await tester.pumpAndSettle();
+
+    final rootContext = tester.element(find.byType(RootShell));
+    final host = Provider.of<PlanningHostViewModel>(
+      rootContext,
+      listen: false,
+    );
+    await host.startPlanning(snapshot);
+    host.addTask(_task());
+    await host.evaluate();
+    await tester.pumpAndSettle();
+
+    await tester.tap(find.text('Analysis'));
+    await tester.pumpAndSettle();
+    expect(find.text('Decision Report'), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await tester.pumpAndSettle();
+
+    expect(find.text('Decision Report'), findsNothing);
+    expect(host.phase, PlanningHostPhase.setup);
+    expect(host.activeSession, isNull);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await tester.pumpAndSettle();
+  });
+
   testWidgets('Saved Plans uses neutral accepted state and system back returns to list',
       (tester) async {
     await _persistAndAcceptPrior(evaluations, savedPlans, snapshot);
