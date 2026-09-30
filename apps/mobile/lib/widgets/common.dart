@@ -62,14 +62,22 @@ class AppHeader extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 24),
-          Text(
-            title,
-            style: const TextStyle(color: C.white, fontSize: 20),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: C.white,
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
           if (trailing != null) ...[
-            const Spacer(),
-            trailing!,
+            const SizedBox(width: 12),
+            Flexible(child: trailing!),
           ],
         ],
       ),
@@ -225,6 +233,99 @@ class _DashedBorderPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _DashedBorderPainter oldDelegate) => false;
+}
+
+
+class StatusPill extends StatelessWidget {
+  const StatusPill({
+    super.key,
+    required this.label,
+    required this.color,
+    this.icon,
+    this.semanticLabel,
+  });
+
+  final String label;
+  final Color color;
+  final IconData? icon;
+  final String? semanticLabel;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+        label: semanticLabel ?? label,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: color.withValues(alpha: 0.14),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: color.withValues(alpha: 0.75)),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 14, color: color),
+                const SizedBox(width: 5),
+              ],
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+}
+
+class PresentationCard extends StatelessWidget {
+  const PresentationCard({
+    super.key,
+    required this.child,
+    this.highlightColor,
+    this.padding = const EdgeInsets.all(16),
+  });
+
+  final Widget child;
+  final Color? highlightColor;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        padding: padding,
+        decoration: BoxDecoration(
+          color: C.card,
+          borderRadius: BorderRadius.circular(14),
+          border: highlightColor == null
+              ? null
+              : Border.all(color: highlightColor!),
+        ),
+        child: child,
+      );
+}
+
+class PresentationSectionTitle extends StatelessWidget {
+  const PresentationSectionTitle(this.text, {super.key});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Text(
+        text,
+        style: const TextStyle(
+          color: C.white,
+          fontSize: 17,
+          fontWeight: FontWeight.w700,
+        ),
+      );
 }
 
 class HorizontalSwipeSurface extends StatefulWidget {
