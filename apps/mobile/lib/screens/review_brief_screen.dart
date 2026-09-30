@@ -216,6 +216,7 @@ class _CanonicalFieldCard extends StatelessWidget {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Expanded(
+                      flex: 3,
                       child: Text(
                         label,
                         style: const TextStyle(
@@ -225,9 +226,16 @@ class _CanonicalFieldCard extends StatelessWidget {
                         ),
                       ),
                     ),
-                    _StateBadge(
-                      label: _stateLabel(field.state),
-                      color: color,
+                    const SizedBox(width: 8),
+                    Flexible(
+                      flex: 2,
+                      child: Align(
+                        alignment: Alignment.topRight,
+                        child: _StateBadge(
+                          label: _stateLabel(field.state),
+                          color: color,
+                        ),
+                      ),
                     ),
                   ],
                 ),
@@ -628,6 +636,8 @@ class _StateBadge extends StatelessWidget {
       ),
       child: Text(
         label,
+        textAlign: TextAlign.center,
+        softWrap: true,
         style: const TextStyle(
           color: C.white,
           fontSize: 11,
