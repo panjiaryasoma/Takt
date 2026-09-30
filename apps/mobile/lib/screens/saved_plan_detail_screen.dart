@@ -193,10 +193,25 @@ class _SavedPlanDetailScreenState extends State<SavedPlanDetailScreen> {
                             ),
                           ),
                         ),
-                        _Badge(stale: summary.stale),
+                        StatusPill(
+                          label: summary.stale ? 'SUPERSEDED' : 'CURRENT',
+                          color: summary.stale ? C.padat : C.kosong,
+                          icon: summary.stale
+                              ? Icons.history_toggle_off_rounded
+                              : Icons.check_circle_outline_rounded,
+                        ),
                       ],
                     ),
                     const SizedBox(height: 8),
+                    const Text(
+                      'Accepted plan · persisted user decision',
+                      key: Key('accepted-plan-label'),
+                      style: TextStyle(
+                        color: C.accent,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
                     Text(
                       'Revision ${summary.currentRevision.revisionNumber} · '
                       '${summary.currentRevision.selectedCandidateId}',
@@ -207,6 +222,27 @@ class _SavedPlanDetailScreenState extends State<SavedPlanDetailScreen> {
                       'Accepted ${_instant(summary.currentRevision.acceptedAt)}',
                       style: const TextStyle(color: C.detailMuted),
                     ),
+                    if (summary.stale) ...[
+                      const SizedBox(height: 12),
+                      PresentationCard(
+                        highlightColor: C.padat,
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Persisted evaluation stale',
+                              key: Key('persisted-evaluation-stale'),
+                              style: TextStyle(fontWeight: FontWeight.w700),
+                            ),
+                            SizedBox(height: 6),
+                            Text(
+                              'A trusted SUPERSEDED transition established that the source evaluation is no longer current. This accepted revision remains in history and is not rewritten.',
+                              style: TextStyle(color: C.detailMuted, height: 1.4),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 14),
                     FilledButton(
                       onPressed: () => widget.onReevaluate?.call(summary),
@@ -323,28 +359,6 @@ class _SectionTitle extends StatelessWidget {
           text,
           style: const TextStyle(
             fontSize: 16,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      );
-}
-
-class _Badge extends StatelessWidget {
-  const _Badge({required this.stale});
-  final bool stale;
-
-  @override
-  Widget build(BuildContext context) => Container(
-        padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(color: stale ? C.padat : C.accent),
-        ),
-        child: Text(
-          stale ? 'STALE' : 'CURRENT',
-          style: TextStyle(
-            color: stale ? C.padat : C.accent,
-            fontSize: 10,
             fontWeight: FontWeight.w700,
           ),
         ),
