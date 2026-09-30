@@ -4,7 +4,6 @@ from typing import get_args
 
 import apps.api.contracts
 
-
 PUBLIC_WIRE_FIELDS = {
     apps.api.contracts.CanonicalReportRefV1: (
         "domain_schema_version",
