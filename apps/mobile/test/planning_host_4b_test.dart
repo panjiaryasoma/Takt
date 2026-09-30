@@ -12,6 +12,7 @@ import 'package:takt_mobile/data/repositories/drift_evaluation_repository.dart';
 import 'package:takt_mobile/data/repositories/drift_saved_plan_repository.dart';
 import 'package:takt_mobile/data/repositories/drift_schedule_repository.dart';
 import 'package:takt_mobile/data/repositories/evaluation_repository.dart';
+import 'package:takt_mobile/models/active_accepted_block.dart';
 import 'package:takt_mobile/models/analysis_snapshot.dart';
 import 'package:takt_mobile/models/decision_intent.dart';
 import 'package:takt_mobile/models/enums.dart';
@@ -19,6 +20,8 @@ import 'package:takt_mobile/models/evaluation.dart';
 import 'package:takt_mobile/models/plan_evaluation_wire.dart';
 import 'package:takt_mobile/models/planning_input_draft.dart';
 import 'package:takt_mobile/models/reevaluation_wire.dart';
+import 'package:takt_mobile/models/saved_plan.dart';
+import 'package:takt_mobile/models/saved_plan_revision.dart';
 import 'package:takt_mobile/screens/planning_setup_screen.dart';
 import 'package:takt_mobile/viewmodels/planning_host_view_model.dart';
 
@@ -355,6 +358,194 @@ void main() {
     expect(
       await evaluations.evaluationById(evaluationId),
       isNotNull,
+    );
+    host.dispose();
+  });
+
+  test('discardable evaluation persistence can be abandoned without HTTP retry',
+      () async {
+    final api = _ControlledPlanApi();
+    final failOnce = _FailOnceEvaluationRepository(evaluations);
+    final host = PlanningHostViewModel(
+      apiClient: api,
+      scheduleRepository: schedule,
+      evaluationRepository: failOnce,
+      savedPlanRepository: savedPlans,
+    );
+
+    await host.startPlanning(snapshot);
+    host.addTask(_task());
+    await host.evaluate();
+
+    expect(host.phase, PlanningHostPhase.persistenceError);
+    expect(host.canDiscardPendingResult, isTrue);
+    expect(api.evaluateCalls, 1);
+
+    host.discardPendingResult();
+
+    expect(host.phase, PlanningHostPhase.setup);
+    expect(host.canRetryPersistence, isFalse);
+    expect(api.evaluateCalls, 1);
+    expect(await evaluations.evaluationById(evaluationId), isNull);
+    host.dispose();
+  });
+
+  test('trusted SUPERSEDED witness cannot be discarded before local save',
+      () async {
+    final prior = await _persistAndAcceptPrior(
+      evaluations,
+      savedPlans,
+      snapshot,
+    );
+    final failOnce = _FailOnceReevaluationRepository(evaluations);
+    final api = _ReevaluationPlanApi(
+      mode: _ReevaluationMode.failure,
+      priorEvaluationId: prior.id,
+      priorBasisFingerprint: prior.evaluationBasisFingerprint,
+    );
+    final host = PlanningHostViewModel(
+      apiClient: api,
+      scheduleRepository: schedule,
+      evaluationRepository: failOnce,
+      savedPlanRepository: savedPlans,
+    );
+
+    await host.startPlanning(snapshot);
+    await host.evaluate();
+
+    expect(host.phase, PlanningHostPhase.persistenceError);
+    expect(host.hasKnownUnpersistedStaleWitness, isTrue);
+    expect(host.canDiscardPendingResult, isFalse);
+    expect(api.reevaluateCalls, 1);
+    expect(await evaluations.isStale(prior.id), isFalse);
+
+    host.discardPendingResult();
+    expect(host.phase, PlanningHostPhase.persistenceError);
+    expect(host.hasKnownUnpersistedStaleWitness, isTrue);
+
+    await host.retryPersistence();
+
+    expect(api.reevaluateCalls, 1);
+    expect(await evaluations.isStale(prior.id), isTrue);
+    expect(host.phase, PlanningHostPhase.error);
+    final plan = await savedPlans.planForCompetition(snapshot.competitionId);
+    final detail = await savedPlans.loadDetail(plan!.id);
+    expect(detail!.summary.stale, isTrue);
+    expect(detail.revisions, hasLength(1));
+    host.dispose();
+  });
+
+  test('planning request retry reuses the exact assembled request', () async {
+    final api = _FailOncePlanApi();
+    final host = PlanningHostViewModel(
+      apiClient: api,
+      scheduleRepository: schedule,
+      evaluationRepository: evaluations,
+      savedPlanRepository: savedPlans,
+    );
+
+    await host.startPlanning(snapshot);
+    host.addTask(_task());
+    await host.evaluate();
+
+    expect(host.phase, PlanningHostPhase.error);
+    expect(host.canRetryRequest, isTrue);
+    expect(api.evaluateCalls, 1);
+    final firstRequest = api.requests.single;
+
+    await host.retryRequest();
+
+    expect(api.evaluateCalls, 2);
+    expect(api.requests, [firstRequest, firstRequest]);
+    expect(host.phase, PlanningHostPhase.decision);
+    host.dispose();
+  });
+
+  test('failed acceptance save can retry without a second backend evaluation',
+      () async {
+    final api = _ControlledPlanApi();
+    final failAccept = _FailOnceSavedPlanRepository(savedPlans);
+    final host = PlanningHostViewModel(
+      apiClient: api,
+      scheduleRepository: schedule,
+      evaluationRepository: evaluations,
+      savedPlanRepository: failAccept,
+    );
+
+    await host.startPlanning(snapshot);
+    host.addTask(_task());
+    await host.evaluate();
+    final session = host.activeSession!;
+    final intent = AcceptCandidateIntent(
+      sessionId: session.sessionId,
+      evaluationId: session.parsedResponse.evaluationId,
+      candidateId: primaryId,
+      selectionSource: SelectionSource.primary,
+    );
+
+    await expectLater(
+      host.accept(session, intent),
+      throwsA(isA<AcceptancePersistenceExceptionProxy>()),
+    );
+
+    expect(host.phase, PlanningHostPhase.decision);
+    expect(host.hasPendingAcceptance, isTrue);
+    expect(host.canRetryAcceptancePersistence, isTrue);
+    expect(api.evaluateCalls, 1);
+    expect(
+      await savedPlans.planForCompetition(snapshot.competitionId),
+      isNull,
+    );
+
+    await host.retryAcceptancePersistence();
+
+    expect(api.evaluateCalls, 1);
+    expect(host.phase, PlanningHostPhase.accepted);
+    expect(host.hasPendingAcceptance, isFalse);
+    final plan = await savedPlans.planForCompetition(snapshot.competitionId);
+    final detail = await savedPlans.loadDetail(plan!.id);
+    expect(detail!.revisions, hasLength(1));
+    expect(detail.acceptedCommitments, hasLength(1));
+    host.dispose();
+  });
+
+  test('cancelling pending acceptance clears intent without Ignore or deletion',
+      () async {
+    final api = _ControlledPlanApi();
+    final failAccept = _FailOnceSavedPlanRepository(savedPlans);
+    final host = PlanningHostViewModel(
+      apiClient: api,
+      scheduleRepository: schedule,
+      evaluationRepository: evaluations,
+      savedPlanRepository: failAccept,
+    );
+
+    await host.startPlanning(snapshot);
+    host.addTask(_task());
+    await host.evaluate();
+    final session = host.activeSession!;
+    final intent = AcceptCandidateIntent(
+      sessionId: session.sessionId,
+      evaluationId: session.parsedResponse.evaluationId,
+      candidateId: primaryId,
+      selectionSource: SelectionSource.primary,
+    );
+
+    await expectLater(
+      host.accept(session, intent),
+      throwsA(isA<AcceptancePersistenceExceptionProxy>()),
+    );
+    expect(host.hasPendingAcceptance, isTrue);
+
+    host.cancelPendingAcceptance();
+
+    expect(host.phase, PlanningHostPhase.decision);
+    expect(host.hasPendingAcceptance, isFalse);
+    expect(host.activeSession, same(session));
+    expect(api.evaluateCalls, 1);
+    expect(
+      await savedPlans.planForCompetition(snapshot.competitionId),
+      isNull,
     );
     host.dispose();
   });
@@ -790,6 +981,177 @@ final class _ControlledPlanApi implements PlanApiClient {
 
   @override
   void close() {}
+}
+
+final class _FailOncePlanApi implements PlanApiClient {
+  int evaluateCalls = 0;
+  final List<String> requests = [];
+
+  @override
+  Future<PlanEvaluateTransportResult> evaluate({
+    required String evaluationRequestJson,
+  }) async {
+    evaluateCalls++;
+    requests.add(evaluationRequestJson);
+    if (evaluateCalls == 1) {
+      throw const PlanApiFailure(
+        code: 'PLANNING_EXECUTION_FAILED',
+        stage: 'planning',
+        message: 'simulated transient execution failure',
+        statusCode: 500,
+      );
+    }
+    final raw = jsonEncode(decisionFixture());
+    return PlanEvaluateTransportResult(
+      evaluationRequestJson: evaluationRequestJson,
+      evaluationResponseJson: raw,
+      response: PlanEvaluateResponseV1.parse(raw),
+    );
+  }
+
+  @override
+  Future<PlanReevaluateTransportResult> reevaluate({
+    required String priorEvaluationId,
+    required String priorEvaluationResponseJson,
+    required String currentEvaluationRequestJson,
+  }) {
+    throw UnimplementedError();
+  }
+
+  @override
+  void close() {}
+}
+
+final class _FailOnceReevaluationRepository implements EvaluationRepository {
+  _FailOnceReevaluationRepository(this.delegate);
+
+  final EvaluationRepository delegate;
+  bool failed = false;
+
+  @override
+  Future<void> initialize() => delegate.initialize();
+
+  @override
+  Future<Evaluation?> evaluationById(String evaluationId) =>
+      delegate.evaluationById(evaluationId);
+
+  @override
+  Future<Evaluation> persistEvaluation({
+    required AnalysisSnapshot analysisSnapshot,
+    required String evaluationRequestJson,
+    required String evaluationResponseJson,
+    required String planningWindowPolicyJson,
+  }) =>
+      delegate.persistEvaluation(
+        analysisSnapshot: analysisSnapshot,
+        evaluationRequestJson: evaluationRequestJson,
+        evaluationResponseJson: evaluationResponseJson,
+        planningWindowPolicyJson: planningWindowPolicyJson,
+      );
+
+  @override
+  Future<ReevaluationPersistenceResult> persistReevaluation({
+    required String priorEvaluationId,
+    required ReevaluationTransitionWire transition,
+    required String transportRequestJson,
+    required String transportResponseJson,
+    required String? errorJson,
+    AnalysisSnapshot? currentAnalysisSnapshot,
+    String? currentEvaluationRequestJson,
+    String? currentEvaluationResponseJson,
+    String? planningWindowPolicyJson,
+  }) {
+    if (!failed) {
+      failed = true;
+      throw StateError('simulated trusted-transition persistence failure');
+    }
+    return delegate.persistReevaluation(
+      priorEvaluationId: priorEvaluationId,
+      transition: transition,
+      transportRequestJson: transportRequestJson,
+      transportResponseJson: transportResponseJson,
+      errorJson: errorJson,
+      currentAnalysisSnapshot: currentAnalysisSnapshot,
+      currentEvaluationRequestJson: currentEvaluationRequestJson,
+      currentEvaluationResponseJson: currentEvaluationResponseJson,
+      planningWindowPolicyJson: planningWindowPolicyJson,
+    );
+  }
+
+  @override
+  Future<bool> isStale(String evaluationId) => delegate.isStale(evaluationId);
+
+  @override
+  Future<void> close() => delegate.close();
+}
+
+final class _FailOnceSavedPlanRepository implements SavedPlanRepository {
+  _FailOnceSavedPlanRepository(this.delegate);
+
+  final SavedPlanRepository delegate;
+  bool failed = false;
+
+  @override
+  Future<void> initialize() => delegate.initialize();
+
+  @override
+  Stream<List<SavedPlanSummary>> watchSummaries() => delegate.watchSummaries();
+
+  @override
+  Future<List<SavedPlanSummary>> listSummaries() => delegate.listSummaries();
+
+  @override
+  Future<SavedPlan?> planForCompetition(String competitionId) =>
+      delegate.planForCompetition(competitionId);
+
+  @override
+  Future<SavedPlanRevision> acceptEvaluation({
+    required String evaluationId,
+    required String candidateId,
+    required SelectionSource selectionSource,
+  }) {
+    if (!failed) {
+      failed = true;
+      throw StateError('simulated acceptance transaction failure');
+    }
+    return delegate.acceptEvaluation(
+      evaluationId: evaluationId,
+      candidateId: candidateId,
+      selectionSource: selectionSource,
+    );
+  }
+
+  @override
+  Future<List<ActiveAcceptedBlock>> activeAcceptedBlocks({
+    String? excludingSavedPlanId,
+  }) =>
+      delegate.activeAcceptedBlocks(
+        excludingSavedPlanId: excludingSavedPlanId,
+      );
+
+  @override
+  Future<SavedPlanDetail?> loadDetail(String savedPlanId) =>
+      delegate.loadDetail(savedPlanId);
+
+  @override
+  Future<void> updateTaskProgress({
+    required String savedPlanTaskId,
+    required int progressPercent,
+    int? actualMinutes,
+    bool clearActualMinutes = false,
+  }) =>
+      delegate.updateTaskProgress(
+        savedPlanTaskId: savedPlanTaskId,
+        progressPercent: progressPercent,
+        actualMinutes: actualMinutes,
+        clearActualMinutes: clearActualMinutes,
+      );
+
+  @override
+  Future<void> refresh() => delegate.refresh();
+
+  @override
+  Future<void> close() => delegate.close();
 }
 
 final class _ToggleReadEvaluationRepository
