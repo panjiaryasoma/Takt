@@ -139,7 +139,7 @@ final class PlanningHostViewModel extends ChangeNotifier {
   Future<void> startPlanning(AnalysisSnapshot snapshot) async {
     if (persistenceExitKind == PersistenceExitKind.correctnessBearing) {
       _setPersistenceFailure(
-        const StateError(
+        StateError(
           'A trusted re-evaluation transition still requires local persistence.',
         ),
       );
@@ -227,7 +227,7 @@ final class PlanningHostViewModel extends ChangeNotifier {
       _failure = PlanningHostFailure(
         code: 'LOCAL_CONTEXT_INVALID',
         message: 'Planning context could not be prepared: $error',
-        retryable: false,
+        recoveryClass: RecoveryClass.reloadContext,
       );
       notifyListeners();
     }
