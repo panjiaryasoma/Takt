@@ -577,11 +577,11 @@ void main() {
     await _pumpBounded(tester);
     await tester.tap(find.text('Add'));
     await _pumpBounded(tester);
-    expect(find.text('Add Schedule'), findsOneWidget);
+    expect(find.byType(TambahJadwalScreen), findsOneWidget);
 
     await tester.binding.handlePopRoute();
     await _pumpBounded(tester);
-    expect(find.text('Add Schedule'), findsNothing);
+    expect(find.byType(TambahJadwalScreen), findsNothing);
     expect(find.text('My Schedule'), findsOneWidget);
 
     await tester.pumpWidget(const SizedBox.shrink());
@@ -596,8 +596,10 @@ void main() {
       repository,
       closeScheduleRepositoryOnDispose: false,
     );
-    addTearDown(viewModel.dispose);
-    addTearDown(repository.close);
+    addTearDown(() async {
+      viewModel.dispose();
+      await repository.close();
+    });
 
     await viewModel.initialize();
     await Future<void>.delayed(Duration.zero);
@@ -625,7 +627,7 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await _pumpBounded(tester);
 
     expect(find.textContaining('cancelled occurrence'), findsOneWidget);
     expect(find.textContaining('does not block planning'), findsOneWidget);
