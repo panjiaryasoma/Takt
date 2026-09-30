@@ -36,6 +36,38 @@ void main() {
   });
 
 
+  testWidgets('Analysis input remains reachable at 320px and 2x text',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.dark,
+        home: Builder(
+          builder: (context) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              textScaler: const TextScaler.linear(2),
+            ),
+            child: const Scaffold(
+              body: AnalisisKompetisiScreen(continuation: false),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Upload PDF'), findsOneWidget);
+    expect(find.text('Enter Link'), findsOneWidget);
+    final submit = find.byKey(const Key('submit-analysis'));
+    await tester.ensureVisible(submit);
+    expect(submit, findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('submit stays disabled until the selected source is valid',
       (tester) async {
     await tester.pumpWidget(
