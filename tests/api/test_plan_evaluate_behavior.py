@@ -1677,3 +1677,171 @@ def test_same_report_version_with_different_material_is_context_invalid() -> Non
 
     with pytest.raises(ReevaluationContextInvalid):
         reevaluate_plan(request, clock=_clock)
+
+
+
+def _id_three() -> UUID:
+    return UUID("00000000-0000-4000-8000-000000000003")
+
+
+def _assert_semantic_determinism(
+    request: PlanEvaluateRequestV1,
+    *,
+    clock,
+    expected_readiness: ReadinessStatus,
+    expected_feasibility: FeasibilityStatus | None,
+) -> None:
+    first = evaluate_plan(
+        request,
+        clock=clock,
+        evaluation_id_factory=_id_one,
+    )
+    second = evaluate_plan(
+        request,
+        clock=clock,
+        evaluation_id_factory=_id_two,
+    )
+
+    assert semantic_projection(first) == semantic_projection(second)
+    assert first.readiness.status is expected_readiness
+    assert second.readiness.status is expected_readiness
+    assert (
+        first.planning.feasibility if first.planning is not None else None
+    ) is expected_feasibility
+    assert (
+        second.planning.feasibility if second.planning is not None else None
+    ) is expected_feasibility
+
+
+def test_5a_semantic_determinism_covers_representative_domain_branches() -> None:
+    feasible = _request(effort_minutes=60)
+
+    tight_task = feasible.planning.workload.tasks[0].model_copy(
+        update={
+            "effort_min_minutes": 30,
+            "effort_likely_minutes": 60,
+            "effort_max_minutes": 200,
+        }
+    )
+    tight = feasible.model_copy(
+        update={
+            "planning": feasible.planning.model_copy(
+                update={"workload": WorkloadInput(tasks=(tight_task,))}
+            )
+        }
+    )
+
+    review = _request_for_report(
+        _review_report(deadline=datetime(2026, 9, 30, 23, 45, tzinfo=UTC)),
+        user=ReadinessUserContextV1(
+            age=20,
+            student_status=True,
+            country="Indonesia",
+        ),
+    )
+    expired_clock = lambda: datetime(2026, 10, 1, 0, 0, tzinfo=UTC)
+
+    cases = (
+        (
+            feasible,
+            _clock,
+            ReadinessStatus.READY_TO_EVALUATE,
+            FeasibilityStatus.FEASIBLE,
+        ),
+        (
+            tight,
+            _clock,
+            ReadinessStatus.READY_TO_EVALUATE,
+            FeasibilityStatus.TIGHT_CAPACITY,
+        ),
+        (
+            _request(effort_minutes=200),
+            _clock,
+            ReadinessStatus.READY_TO_EVALUATE,
+            FeasibilityStatus.NOT_FEASIBLE_UNDER_CURRENT_CONSTRAINTS,
+        ),
+        (
+            review,
+            _clock,
+            ReadinessStatus.NEEDS_REVIEW,
+            None,
+        ),
+        (
+            feasible,
+            expired_clock,
+            ReadinessStatus.DEADLINE_PASSED,
+            None,
+        ),
+    )
+
+    for request, clock, readiness, feasibility in cases:
+        _assert_semantic_determinism(
+            request,
+            clock=clock,
+            expected_readiness=readiness,
+            expected_feasibility=feasibility,
+        )
+
+
+def test_5a_reevaluation_determinism_covers_unchanged_and_superseded() -> None:
+    current = _request(effort_minutes=60)
+    prior = evaluate_plan(
+        current,
+        clock=_clock,
+        evaluation_id_factory=_id_one,
+    )
+    prior_basis = PriorEvaluationBasisSnapshotV1.model_validate(
+        prior.basis.model_dump(mode="json", warnings=False)
+    )
+    prior_snapshot = PriorEvaluationV1(
+        evaluation_id=prior.evaluation_id,
+        basis=prior_basis,
+    )
+
+    unchanged_request = PlanReevaluateRequestV1(
+        prior=prior_snapshot,
+        current=current,
+    )
+    unchanged_a = reevaluate_plan(
+        unchanged_request,
+        clock=_clock,
+        evaluation_id_factory=_id_two,
+    )
+    unchanged_b = reevaluate_plan(
+        unchanged_request,
+        clock=_clock,
+        evaluation_id_factory=_id_three,
+    )
+    assert unchanged_a.transition.kind == "UNCHANGED"
+    assert semantic_projection(unchanged_a) == semantic_projection(unchanged_b)
+
+    changed_preferences = current.planning.availability.preferences.model_copy(
+        update={"buffer_target_minutes": 1}
+    )
+    changed_availability = current.planning.availability.model_copy(
+        update={"preferences": changed_preferences}
+    )
+    changed = current.model_copy(
+        update={
+            "planning": current.planning.model_copy(
+                update={"availability": changed_availability}
+            )
+        }
+    )
+    superseded_request = PlanReevaluateRequestV1(
+        prior=prior_snapshot,
+        current=changed,
+    )
+    superseded_a = reevaluate_plan(
+        superseded_request,
+        clock=_clock,
+        evaluation_id_factory=_id_two,
+    )
+    superseded_b = reevaluate_plan(
+        superseded_request,
+        clock=_clock,
+        evaluation_id_factory=_id_three,
+    )
+    assert superseded_a.transition.kind == "SUPERSEDED"
+    assert superseded_b.transition.kind == "SUPERSEDED"
+    assert semantic_projection(superseded_a) == semantic_projection(superseded_b)

@@ -3,6 +3,7 @@
 from typing import get_args
 
 import apps.api.contracts
+import packages.contracts as shared_contracts
 
 PUBLIC_WIRE_FIELDS = {
     apps.api.contracts.CanonicalReportRefV1: (
@@ -291,3 +292,340 @@ def test_all_public_api_wrapper_field_sets_are_frozen() -> None:
 
     for model, expected_fields in PUBLIC_WIRE_FIELDS.items():
         assert tuple(model.model_fields) == expected_fields
+
+
+# Shared package models are nested directly inside the public API wire. Freezing
+# only apps.api.contracts.ApiModel wrappers is insufficient because a nested
+# contract can otherwise drift while every wrapper field name remains intact.
+SHARED_PUBLIC_WIRE_FIELDS = {
+    shared_contracts.SourceRecord: (
+        "source_id",
+        "source_type",
+        "url_or_document_id",
+        "retrieved_at",
+        "content_hash",
+        "authority_rank",
+        "scope",
+        "freshness_metadata",
+    ),
+    shared_contracts.EvidenceSpan: (
+        "evidence_id",
+        "source_id",
+        "page_or_locator",
+        "raw_text_or_visual_reference",
+        "field_name",
+        "extraction_path",
+        "extractor_version",
+    ),
+    shared_contracts.CandidateField: (
+        "field_name",
+        "raw_value",
+        "normalized_value",
+        "evidence_ids",
+        "extraction_path",
+        "confidence",
+        "scope",
+    ),
+    shared_contracts.CandidateExtractionReport: (
+        "source_id",
+        "extraction_path",
+        "fields",
+        "evidence",
+    ),
+    shared_contracts.CanonicalField: (
+        "field_name",
+        "state",
+        "value",
+        "normalized_value",
+        "candidates",
+        "evidence_ids",
+    ),
+    shared_contracts.CanonicalCompetitionReport: (
+        "competition_id",
+        "report_version",
+        "source_ids",
+        "canonical_fields",
+        "unresolved_critical_fields",
+    ),
+    shared_contracts.ReadinessTriage: (
+        "status",
+        "blocking_reasons",
+        "review_items",
+        "passed_checks",
+        "rule_version",
+    ),
+    shared_contracts.Task: (
+        "task_id",
+        "name",
+        "mandatory",
+        "dependencies",
+        "effort_min_minutes",
+        "effort_likely_minutes",
+        "effort_max_minutes",
+        "assumptions",
+    ),
+    shared_contracts.WorkloadAssumption: ("task_id", "description"),
+    shared_contracts.WorkloadInput: ("tasks", "assumptions"),
+    shared_contracts.PlanningHorizon: ("start", "end"),
+    shared_contracts.PlanningWorkWindow: ("start", "end"),
+    shared_contracts.RecurrenceSpec: (
+        "rrule",
+        "timezone",
+        "active_from",
+        "active_until",
+    ),
+    shared_contracts.RecurrenceException: (
+        "original_start_at",
+        "action",
+        "replacement_start_at",
+        "replacement_end_at",
+    ),
+    shared_contracts.PlanningCommitment: (
+        "commitment_id",
+        "type",
+        "start_at",
+        "end_at",
+        "timezone",
+        "recurrence",
+        "exceptions",
+        "source",
+    ),
+    shared_contracts.AcceptedCommitment: (
+        "accepted_commitment_id",
+        "start_at",
+        "end_at",
+        "source",
+    ),
+    shared_contracts.PlanningPreferences: (
+        "timezone",
+        "max_project_minutes_per_day",
+        "preferred_focus_minutes",
+        "buffer_target_minutes",
+    ),
+    shared_contracts.AvailabilityInput: (
+        "horizon",
+        "work_windows",
+        "commitments",
+        "accepted_commitments",
+        "preferences",
+    ),
+    shared_contracts.AllocationBlock: (
+        "task_id",
+        "start",
+        "end",
+        "allocated_minutes",
+        "availability_source",
+    ),
+}
+
+SHARED_PUBLIC_DEFAULTED_FIELDS = {
+    shared_contracts.CandidateField: {"confidence"},
+    shared_contracts.CandidateExtractionReport: {"fields", "evidence"},
+    shared_contracts.CanonicalField: {
+        "value",
+        "normalized_value",
+        "candidates",
+        "evidence_ids",
+    },
+    shared_contracts.CanonicalCompetitionReport: {"unresolved_critical_fields"},
+    shared_contracts.WorkloadAssumption: {"task_id"},
+    shared_contracts.WorkloadInput: {"assumptions"},
+    shared_contracts.RecurrenceSpec: {"active_until"},
+    shared_contracts.RecurrenceException: {
+        "replacement_start_at",
+        "replacement_end_at",
+    },
+    shared_contracts.PlanningCommitment: {"recurrence", "exceptions"},
+    shared_contracts.AvailabilityInput: {
+        "work_windows",
+        "commitments",
+        "accepted_commitments",
+    },
+}
+
+SHARED_PUBLIC_NULLABLE_FIELDS = {
+    shared_contracts.CandidateField: {"confidence"},
+    shared_contracts.WorkloadAssumption: {"task_id"},
+    shared_contracts.RecurrenceSpec: {"active_until"},
+    shared_contracts.RecurrenceException: {
+        "replacement_start_at",
+        "replacement_end_at",
+    },
+    shared_contracts.PlanningCommitment: {"recurrence"},
+}
+
+PUBLIC_ENUM_VALUES = {
+    shared_contracts.ReadinessStatus: (
+        "READY_TO_EVALUATE",
+        "NEEDS_REVIEW",
+        "ELIGIBILITY_BLOCKED",
+        "DEADLINE_PASSED",
+        "INSUFFICIENT_INFORMATION",
+    ),
+    shared_contracts.FeasibilityStatus: (
+        "FEASIBLE",
+        "FEASIBLE_WITH_TRADEOFFS",
+        "TIGHT_CAPACITY",
+        "NOT_FEASIBLE_UNDER_CURRENT_CONSTRAINTS",
+    ),
+    shared_contracts.RecommendationAction: (
+        "ACCEPT",
+        "CHOOSE_ALTERNATIVE",
+        "EDIT_CONSTRAINTS",
+        "IGNORE",
+    ),
+    shared_contracts.CanonicalFieldState: (
+        "VERIFIED",
+        "SINGLE_SOURCE",
+        "CONFLICT",
+        "MISSING",
+        "UNVERIFIED",
+    ),
+    shared_contracts.SourceType: (
+        "official_rules",
+        "official_organizer",
+        "official_faq",
+        "platform",
+        "secondary",
+        "derived_fixture",
+    ),
+    shared_contracts.ExtractionPath: ("native", "ocr", "vision", "manual"),
+    shared_contracts.CommitmentType: ("FIXED", "FLEXIBLE"),
+    shared_contracts.RecurrenceExceptionAction: ("CANCELLED", "MOVED"),
+    shared_contracts.AvailabilityType: (
+        "AVAILABLE",
+        "FIXED_BUSY",
+        "FLEXIBLE_BUSY",
+        "ACCEPTED_PROJECT_COMMITMENT",
+    ),
+}
+
+CRITICAL_DEFAULT_VALUES = {
+    (apps.api.contracts.ReadinessContextV1, "selected_scope"): None,
+    (apps.api.contracts.ReadinessContextV1, "require_technology_information"): False,
+    (apps.api.contracts.EvaluationBasisV1, "planning"): None,
+    (apps.api.contracts.RecommendationV1, "alternatives"): (),
+    (apps.api.contracts.PublicCandidateV1, "assumptions"): (),
+    (apps.api.contracts.RecommendationSetV1, "alternative_candidates"): (),
+    (apps.api.contracts.PlanningDecisionV1, "reason_codes"): (),
+    (apps.api.contracts.PlanningDecisionV1, "tradeoff_codes"): (),
+    (apps.api.contracts.PlanningDecisionV1, "sensitivity_codes"): (),
+    (apps.api.contracts.ReevaluationTransitionV1, "change_reasons"): (),
+    (apps.api.contracts.CompetitionAnalyzeUrlRequestV1, "previous_report_bundle"): None,
+    (apps.api.contracts.CompetitionAnalyzeUrlRequestV1, "prior_source_artifacts"): (),
+    (apps.api.contracts.CompetitionAnalyzePdfMetadataV1, "previous_report_bundle"): None,
+    (apps.api.contracts.CompetitionAnalyzePdfMetadataV1, "prior_source_artifacts"): (),
+    (shared_contracts.CandidateField, "confidence"): None,
+    (shared_contracts.CandidateExtractionReport, "fields"): [],
+    (shared_contracts.CandidateExtractionReport, "evidence"): [],
+    (shared_contracts.CanonicalField, "value"): None,
+    (shared_contracts.CanonicalField, "normalized_value"): None,
+    (shared_contracts.CanonicalField, "candidates"): [],
+    (shared_contracts.CanonicalField, "evidence_ids"): [],
+    (shared_contracts.CanonicalCompetitionReport, "unresolved_critical_fields"): [],
+    (shared_contracts.WorkloadAssumption, "task_id"): None,
+    (shared_contracts.WorkloadInput, "assumptions"): (),
+    (shared_contracts.RecurrenceSpec, "active_until"): None,
+    (shared_contracts.RecurrenceException, "replacement_start_at"): None,
+    (shared_contracts.RecurrenceException, "replacement_end_at"): None,
+    (shared_contracts.PlanningCommitment, "recurrence"): None,
+    (shared_contracts.PlanningCommitment, "exceptions"): (),
+    (shared_contracts.AvailabilityInput, "work_windows"): (),
+    (shared_contracts.AvailabilityInput, "commitments"): (),
+    (shared_contracts.AvailabilityInput, "accepted_commitments"): (),
+}
+
+
+def _property_schema(model, field_name: str):
+    return model.model_json_schema()["properties"][field_name]
+
+
+def test_nested_shared_public_wire_shape_is_frozen() -> None:
+    for model, expected_fields in SHARED_PUBLIC_WIRE_FIELDS.items():
+        assert tuple(model.model_fields) == expected_fields
+
+        defaulted = {
+            name for name, field in model.model_fields.items() if not field.is_required()
+        }
+        assert defaulted == SHARED_PUBLIC_DEFAULTED_FIELDS.get(model, set())
+
+        nullable = {
+            name
+            for name, field in model.model_fields.items()
+            if _allows_none(field.annotation)
+        }
+        assert nullable == SHARED_PUBLIC_NULLABLE_FIELDS.get(model, set())
+
+
+def test_all_public_wire_enum_values_are_frozen() -> None:
+    for enum_type, expected in PUBLIC_ENUM_VALUES.items():
+        assert tuple(item.value for item in enum_type) == expected
+
+
+def test_public_wire_default_values_are_semantically_frozen() -> None:
+    for (model, field_name), expected in CRITICAL_DEFAULT_VALUES.items():
+        field = model.model_fields[field_name]
+        assert not field.is_required()
+        assert field.get_default(call_default_factory=True) == expected
+
+
+def test_public_wire_critical_types_and_constraints_are_frozen() -> None:
+    task_id = _property_schema(shared_contracts.Task, "task_id")
+    assert task_id["type"] == "string"
+    assert task_id["minLength"] == 1
+
+    mandatory = _property_schema(shared_contracts.Task, "mandatory")
+    assert mandatory["type"] == "boolean"
+
+    effort = _property_schema(shared_contracts.Task, "effort_likely_minutes")
+    assert effort["type"] == "integer"
+    assert effort["minimum"] == 0
+
+    work_windows = _property_schema(shared_contracts.AvailabilityInput, "work_windows")
+    assert work_windows["type"] == "array"
+    assert work_windows["items"]["$ref"].endswith("/PlanningWorkWindow")
+
+    commitment_type = _property_schema(shared_contracts.PlanningCommitment, "type")
+    assert commitment_type["$ref"].endswith("/CommitmentType")
+
+    source_type = _property_schema(shared_contracts.SourceRecord, "source_type")
+    assert source_type["$ref"].endswith("/SourceType")
+
+    availability_source = _property_schema(
+        shared_contracts.AllocationBlock,
+        "availability_source",
+    )
+    assert availability_source["type"] == "string"
+    assert availability_source["minLength"] == 1
+
+    allocated = _property_schema(shared_contracts.AllocationBlock, "allocated_minutes")
+    assert allocated["type"] == "integer"
+    assert allocated["exclusiveMinimum"] == 0
+
+    review_items = _property_schema(shared_contracts.ReadinessTriage, "review_items")
+    assert review_items["type"] == "array"
+    assert review_items["items"]["type"] == "string"
+
+    daily_limit = _property_schema(
+        shared_contracts.PlanningPreferences,
+        "max_project_minutes_per_day",
+    )
+    assert daily_limit["type"] == "integer"
+    assert daily_limit["minimum"] == 0
+    assert daily_limit["maximum"] == 1440
+
+    report_version = _property_schema(
+        shared_contracts.CanonicalCompetitionReport,
+        "report_version",
+    )
+    assert report_version["type"] == "integer"
+    assert report_version["minimum"] == 1
+
+    confidence = _property_schema(shared_contracts.CandidateField, "confidence")
+    numeric = next(
+        item
+        for item in confidence["anyOf"]
+        if item.get("type") == "number"
+    )
+    assert numeric["minimum"] == 0.0
+    assert numeric["maximum"] == 1.0

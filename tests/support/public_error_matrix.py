@@ -94,6 +94,27 @@ PUBLIC_ERROR_MATRIX = (
     ),
     PublicErrorCase(
         "POST /api/v1/competitions/analyze/pdf",
+        "PdfMetadataInvalidJson",
+        422,
+        "VALIDATION_ERROR",
+        "validation",
+    ),
+    PublicErrorCase(
+        "POST /api/v1/competitions/analyze/pdf",
+        "PdfMetadataValidation",
+        422,
+        "VALIDATION_ERROR",
+        "validation",
+    ),
+    PublicErrorCase(
+        "POST /api/v1/competitions/analyze/pdf",
+        "PdfMetadataValidation[source]",
+        422,
+        "SOURCE_METADATA_INVALID",
+        "ingestion",
+    ),
+    PublicErrorCase(
+        "POST /api/v1/competitions/analyze/pdf",
         "PdfUploadUnsupportedMediaType",
         415,
         "UNSUPPORTED_MEDIA_TYPE",
@@ -142,7 +163,6 @@ PUBLIC_ERROR_MATRIX = (
             transition=TRANSITION_PASSTHROUGH,
         )
         for failure, status, code, stage in PLAN_FAILURES
-        if failure != "UnhandledException"
     ),
     PublicErrorCase(
         "POST /api/v1/plans/re-evaluate",

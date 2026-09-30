@@ -222,9 +222,13 @@ INSERT INTO analysis_snapshots (
       );
     });
 
-    test('5A acceptance lineage stays compatible with 4B persisted trace',
+    test('5A acceptance lineage consumes the shared backend/mobile golden',
         () async {
-      final response = decisionFixture();
+      final goldenResponseJson =
+          File('../../tests/fixtures/api/plan_evaluate_response_v1.json')
+              .readAsStringSync();
+      final response =
+          jsonDecode(goldenResponseJson) as Map<String, dynamic>;
       final planning = response['planning'] as Map<String, dynamic>;
       final candidates = planning['candidates'] as List<dynamic>;
       final primary = candidates
@@ -232,21 +236,111 @@ INSERT INTO analysis_snapshots (
           .singleWhere(
             (candidate) =>
                 (candidate['ref'] as Map<String, dynamic>)['candidate_id'] ==
-                primaryId,
+                'candidate-001',
           );
       final sourceBlock =
           (primary['work_blocks'] as List<dynamic>).single
               as Map<String, dynamic>;
 
+      final reportHash = List.filled(64, 'b').join();
+      final goldenSnapshot = AnalysisSnapshot(
+        id: 'snapshot-shared-golden',
+        competitionId: 'cmp-ready',
+        reportVersion: 4,
+        assemblyMaterialFingerprint: reportHash,
+        sourceSetFingerprint: null,
+        wireFingerprint: List.filled(64, 'e').join(),
+        reportChanged: true,
+        responseJson: jsonEncode({
+          'report_bundle': {
+            'report': {
+              'competition_id': 'cmp-ready',
+              'report_version': 4,
+            },
+            'ref': {
+              'assembly_material_fingerprint': reportHash,
+            },
+          },
+        }),
+        cachedAtEpochMs: 2,
+      );
+      await db.customStatement(
+        '''
+INSERT INTO competitions (
+  id, created_at_epoch_ms, updated_at_epoch_ms
+) VALUES (?, ?, ?)
+''',
+        [goldenSnapshot.competitionId, 2, 2],
+      );
+      await db.customStatement(
+        '''
+INSERT INTO analysis_snapshots (
+  id, competition_id, report_version, assembly_material_fingerprint,
+  source_set_fingerprint, wire_fingerprint, report_changed,
+  response_json, cached_at_epoch_ms
+) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+''',
+        [
+          goldenSnapshot.id,
+          goldenSnapshot.competitionId,
+          goldenSnapshot.reportVersion,
+          goldenSnapshot.assemblyMaterialFingerprint,
+          null,
+          goldenSnapshot.wireFingerprint,
+          1,
+          goldenSnapshot.responseJson,
+          goldenSnapshot.cachedAtEpochMs,
+        ],
+      );
+
+      final goldenRequestJson = jsonEncode({
+        'report_bundle': {
+          'report': {
+            'competition_id': 'cmp-ready',
+            'report_version': 4,
+          },
+          'ref': {
+            'assembly_material_fingerprint': reportHash,
+          },
+        },
+        'planning': {
+          'workload': {
+            'tasks': [
+              {
+                'task_id': 'task-1',
+                'name': 'Build demo',
+                'mandatory': true,
+                'dependencies': <String>[],
+                'effort_min_minutes': 60,
+                'effort_likely_minutes': 60,
+                'effort_max_minutes': 60,
+                'assumptions': ['single-person estimate'],
+              },
+            ],
+          },
+          'availability': {
+            'preferences': {
+              'timezone': 'UTC',
+            },
+          },
+        },
+      });
+      final goldenWindowPolicy = jsonEncode({
+        'policy_version': 'planning-window-policy-v1',
+        'timezone': 'UTC',
+        'start_local': '08:00',
+        'end_local': '22:00',
+      });
+
       final evaluation = await evaluations.persistEvaluation(
-        analysisSnapshot: snapshot,
-        evaluationRequestJson: _evaluationRequest(),
-        evaluationResponseJson: jsonEncode(response),
-        planningWindowPolicyJson: _windowPolicyJson(),
+        analysisSnapshot: goldenSnapshot,
+        evaluationRequestJson: goldenRequestJson,
+        evaluationResponseJson: goldenResponseJson,
+        planningWindowPolicyJson: goldenWindowPolicy,
       );
       final revision = await savedPlans.acceptEvaluation(
         evaluationId: evaluation.id,
-        candidateId: primaryId,
+        candidateId: 'candidate-001',
         selectionSource: SelectionSource.primary,
       );
       final detail = await savedPlans.loadDetail(revision.savedPlanId);
@@ -264,13 +358,7 @@ INSERT INTO analysis_snapshots (
 
       final persistedSourceBlock =
           jsonDecode(accepted.sourceBlockJson) as Map<String, dynamic>;
-      expect(persistedSourceBlock['task_id'], sourceBlock['task_id']);
-      expect(persistedSourceBlock['start'], sourceBlock['start']);
-      expect(persistedSourceBlock['end'], sourceBlock['end']);
-      expect(
-        persistedSourceBlock['allocated_minutes'],
-        sourceBlock['allocated_minutes'],
-      );
+      expect(persistedSourceBlock, sourceBlock);
       expect(
         accepted.originalAvailabilitySource,
         sourceBlock['availability_source'],
