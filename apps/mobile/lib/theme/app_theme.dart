@@ -5,7 +5,7 @@ class C {
   C._();
 
   /// Canonical Takt branding asset used by the in-app header.
-  static const logoAsset = 'assets/branding/logo.jpg';
+  static const logoAsset = 'assets/branding/logo.png';
 
   static const bg = Color(0xFF2D3250); // background utama
   static const card = Color(0xFF424769); // card gelap
