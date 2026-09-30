@@ -156,6 +156,16 @@ class JadwalRingkasanScreen extends StatelessWidget {
                     _Legend(color: C.accent, label: 'Competition'),
                   ],
                 ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Fixed and Flexible both block their scheduled interval during planning. Flexible is a label you control; Takt does not move it automatically.',
+                  key: Key('weekly-time-type-explanation'),
+                  style: TextStyle(
+                    color: C.detailMuted,
+                    fontSize: 10,
+                    height: 1.35,
+                  ),
+                ),
                 const SizedBox(height: 12),
                 Row(
                   children: [
@@ -243,7 +253,7 @@ class JadwalRingkasanScreen extends StatelessWidget {
                       color: C.dotBlue,
                       value: '$fixedCount',
                       label: 'Fixed schedules',
-                      hint: 'Time blocks that cannot be moved',
+                      hint: 'Scheduled time is unavailable to planning',
                     ),
                     const SizedBox(width: 12),
                     _SummaryTile(
