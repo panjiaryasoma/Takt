@@ -1,8 +1,8 @@
 """Freeze every Issue-4A public API wrapper field for parallel 5A/5B work."""
 
-import apps.api.contracts
-
 from typing import get_args
+
+import apps.api.contracts
 
 
 PUBLIC_WIRE_FIELDS = {
