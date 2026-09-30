@@ -75,10 +75,14 @@ class HomeScreen extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(width: 24),
-                const Text(
-                  'Welcome',
-                  style: TextStyle(color: C.white, fontSize: 20),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Text(
+                    'Welcome',
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(color: C.white, fontSize: 20),
+                  ),
                 ),
               ],
             ),
