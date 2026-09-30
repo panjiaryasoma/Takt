@@ -36,21 +36,13 @@ class ReviewBriefScreen extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          GestureDetector(
-            onTap: onBack,
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: const BoxDecoration(
-                color: C.card,
-                shape: BoxShape.circle,
-              ),
-              alignment: Alignment.center,
-              child: const Icon(
-                Icons.chevron_left,
-                color: C.accent,
-                size: 22,
-              ),
+          Material(
+            color: C.card,
+            shape: const CircleBorder(),
+            child: IconButton(
+              tooltip: 'Back',
+              onPressed: onBack,
+              icon: const Icon(Icons.chevron_left, color: C.accent),
             ),
           ),
           const SizedBox(height: 12),
@@ -80,16 +72,16 @@ class ReviewBriefScreen extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 16),
-          Row(
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
             children: [
               _MetaChip(
                 label: 'Report v${report.reportVersion}',
               ),
-              const SizedBox(width: 8),
               _MetaChip(
                 label: '${report.sourceIds.length} sources',
               ),
-              const SizedBox(width: 8),
               _MetaChip(
                 label: response.reportChanged
                     ? 'Changed'
@@ -600,23 +592,20 @@ class _MetaChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Flexible(
-      child: Container(
-        padding: const EdgeInsets.symmetric(
-          horizontal: 10,
-          vertical: 6,
-        ),
-        decoration: BoxDecoration(
-          color: C.card,
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Text(
-          label,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(
-            color: C.detailMuted,
-            fontSize: 10,
-          ),
+    return Container(
+      padding: const EdgeInsets.symmetric(
+        horizontal: 10,
+        vertical: 6,
+      ),
+      decoration: BoxDecoration(
+        color: C.card,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: C.detailMuted,
+          fontSize: 10,
         ),
       ),
     );
@@ -668,30 +657,22 @@ class _ActionButton extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        height: 50,
-        alignment: Alignment.center,
-        decoration: BoxDecoration(
-          color: filled ? C.accent : C.card,
-          borderRadius: BorderRadius.circular(12),
-          border: filled
-              ? null
-              : Border.all(
-                  color: C.accent,
-                  width: 1.3,
-                ),
-        ),
-        child: Text(
-          label,
-          style: TextStyle(
-            color: filled ? C.bg : C.accent,
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-          ),
-        ),
-      ),
+    final child = Text(
+      label,
+      textAlign: TextAlign.center,
+      style: const TextStyle(fontWeight: FontWeight.w700),
+    );
+    return ConstrainedBox(
+      constraints: const BoxConstraints(minHeight: 50),
+      child: filled
+          ? FilledButton(
+              onPressed: onTap,
+              child: child,
+            )
+          : OutlinedButton(
+              onPressed: onTap,
+              child: child,
+            ),
     );
   }
 }
