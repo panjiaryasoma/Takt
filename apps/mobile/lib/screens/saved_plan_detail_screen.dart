@@ -194,8 +194,8 @@ class _SavedPlanDetailScreenState extends State<SavedPlanDetailScreen> {
                           ),
                         ),
                         StatusPill(
-                          label: summary.stale ? 'SUPERSEDED' : 'CURRENT',
-                          color: summary.stale ? C.padat : C.kosong,
+                          label: summary.stale ? 'SUPERSEDED' : 'ACCEPTED',
+                          color: summary.stale ? C.padat : C.accent,
                           icon: summary.stale
                               ? Icons.history_toggle_off_rounded
                               : Icons.check_circle_outline_rounded,
