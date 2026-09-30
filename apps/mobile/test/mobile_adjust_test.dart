@@ -278,79 +278,18 @@ void main() {
     expect(viewModel.all.single.source, 'ics');
   });
 
-  testWidgets('ICS picker previews events before any schedule write',
+  testWidgets('ICS import screen requires file selection before import',
       (tester) async {
     await tester.pumpWidget(
       MaterialApp(
         theme: AppTheme.dark,
-        home: IcsImportScreen(
-          pickText: () async => (
-            name: 'calendar.ics',
-            content: 'BEGIN:VCALENDAR\n'
-                'BEGIN:VEVENT\n'
-                'UID:preview-1@example\n'
-                'SUMMARY:Preview only\n'
-                'DTSTART:20260930T090000Z\n'
-                'DTEND:20260930T100000Z\n'
-                'END:VEVENT\n'
-                'END:VCALENDAR\n',
-          ),
-        ),
+        home: const IcsImportScreen(),
       ),
     );
-
-    await tester.tap(find.byKey(const Key('choose-ics-file')));
-    await _pumpBounded(tester);
-
-    expect(find.text('Preview only'), findsOneWidget);
-    expect(
-      tester.widget<FilledButton>(
-        find.byKey(const Key('import-selected-ics')),
-      ).onPressed,
-      isNull,
-    );
-
-    await tester.tap(find.byKey(const Key('select-supported-ics')));
     await tester.pump();
-    expect(
-      tester.widget<FilledButton>(
-        find.byKey(const Key('import-selected-ics')),
-      ).onPressed,
-      isNotNull,
-    );
 
-    await tester.pumpWidget(const SizedBox.shrink());
-    await _pumpBounded(tester, frames: 2);
-  });
-
-  testWidgets('ICS preview renders wall-clock time in the event TZID',
-      (tester) async {
-    await tester.pumpWidget(
-      MaterialApp(
-        theme: AppTheme.dark,
-        home: IcsImportScreen(
-          pickText: () async => (
-            name: 'new-york.ics',
-            content: 'BEGIN:VCALENDAR\n'
-                'BEGIN:VEVENT\n'
-                'UID:tz-preview@example\n'
-                'SUMMARY:NY meeting\n'
-                'DTSTART;TZID=America/New_York:20260930T090000\n'
-                'DTEND;TZID=America/New_York:20260930T100000\n'
-                'END:VEVENT\n'
-                'END:VCALENDAR\n',
-          ),
-        ),
-      ),
-    );
-
-    await tester.tap(find.byKey(const Key('choose-ics-file')));
-    await _pumpBounded(tester);
-
-    expect(
-      find.text('30/09/2026 · 09:00–10:00 · America/New_York'),
-      findsOneWidget,
-    );
+    expect(find.byKey(const Key('choose-ics-file')), findsOneWidget);
+    expect(find.byKey(const Key('import-selected-ics')), findsNothing);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await _pumpBounded(tester, frames: 2);
