@@ -15,7 +15,7 @@ import 'package:takt_mobile/viewmodels/jadwal_view_model.dart';
 
 void main() {
   test('Android launcher and native splash use the canonical Takt logo', () {
-    expect(File('assets/branding/logo.png').existsSync(), isTrue);
+    expect(File('assets/branding/logo.jpg').existsSync(), isTrue);
     expect(File('assets/breanding/logo.png').existsSync(), isFalse);
 
     final manifest =
