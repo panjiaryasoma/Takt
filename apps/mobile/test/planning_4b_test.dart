@@ -222,6 +222,68 @@ INSERT INTO analysis_snapshots (
       );
     });
 
+    test('accepted persistence leaves no foreign-key violations', () async {
+      final evaluation = await evaluations.persistEvaluation(
+        analysisSnapshot: snapshot,
+        evaluationRequestJson: _evaluationRequest(),
+        evaluationResponseJson: jsonEncode(decisionFixture()),
+        planningWindowPolicyJson: _windowPolicyJson(),
+      );
+
+      await savedPlans.acceptEvaluation(
+        evaluationId: evaluation.id,
+        candidateId: primaryId,
+        selectionSource: SelectionSource.primary,
+      );
+
+      final violations =
+          await db.customSelect('PRAGMA foreign_key_check').get();
+      expect(violations, isEmpty);
+    });
+
+    test('Accept transaction rolls back every child when block insert fails',
+        () async {
+      final evaluation = await evaluations.persistEvaluation(
+        analysisSnapshot: snapshot,
+        evaluationRequestJson: _evaluationRequest(),
+        evaluationResponseJson: jsonEncode(decisionFixture()),
+        planningWindowPolicyJson: _windowPolicyJson(),
+      );
+      await db.customStatement(
+        '''
+CREATE TRIGGER fail_6b_accepted_commitment
+BEFORE INSERT ON accepted_commitments
+BEGIN
+  SELECT RAISE(ABORT, 'simulated 6B accepted block failure');
+END
+''',
+      );
+
+      await expectLater(
+        savedPlans.acceptEvaluation(
+          evaluationId: evaluation.id,
+          candidateId: primaryId,
+          selectionSource: SelectionSource.primary,
+        ),
+        throwsA(anything),
+      );
+
+      for (final table in [
+        'saved_plans',
+        'saved_plan_revisions',
+        'saved_plan_tasks',
+        'task_progress',
+        'accepted_commitments',
+      ]) {
+        final row =
+            await db.customSelect('SELECT COUNT(*) AS count FROM $table').getSingle();
+        expect(row.data['count'], 0, reason: '$table must roll back atomically');
+      }
+      final violations =
+          await db.customSelect('PRAGMA foreign_key_check').get();
+      expect(violations, isEmpty);
+    });
+
     test('5A acceptance lineage consumes the shared backend/mobile golden',
         () async {
       final goldenResponseJson =
