@@ -148,6 +148,16 @@ class _PlanningSetupScreenState extends State<PlanningSetupScreen> {
     }
   }
 
+  Future<void> _retryPublication() async {
+    await widget.host.retryPublication();
+    if (!mounted) return;
+    if (widget.host.phase == PlanningHostPhase.decision) {
+      widget.onDecisionReady?.call();
+    } else {
+      setState(() {});
+    }
+  }
+
   Future<void> _retryRequest() async {
     await widget.host.retryRequest();
     if (!mounted) return;
@@ -544,17 +554,29 @@ class _PlanningSetupScreenState extends State<PlanningSetupScreen> {
                       technicalCode: host.failure!.code,
                       stage: host.failure!.stage,
                     )
-                  : _failureDescriptor(host.failure!),
+                  : host.canRetryPublication
+                      ? RecoveryDescriptor(
+                          title: 'Result saved; presentation unavailable',
+                          message: host.failure!.message,
+                          recoveryClass: RecoveryClass.noAutomaticRecovery,
+                          technicalCode: host.failure!.code,
+                          stage: host.failure!.stage,
+                        )
+                      : _failureDescriptor(host.failure!),
               primaryLabel: host.canRetryPersistence
                   ? 'Retry local save'
-                  : host.canRetryRequest
-                      ? 'Retry request'
-                      : null,
+                  : host.canRetryPublication
+                      ? 'Retry reload'
+                      : host.canReloadContext
+                          ? 'Reload context'
+                          : host.canRetryRequest ? 'Retry request' : null,
               onPrimary: host.canRetryPersistence
                   ? _retryPersistence
-                  : host.canRetryRequest
-                      ? _retryRequest
-                      : null,
+                  : host.canRetryPublication
+                      ? _retryPublication
+                      : host.canReloadContext
+                          ? host.reloadContext
+                          : host.canRetryRequest ? _retryRequest : null,
               secondaryLabel: host.canDiscardPendingResult
                   ? 'Discard unsaved result'
                   : null,
@@ -571,9 +593,9 @@ class _PlanningSetupScreenState extends State<PlanningSetupScreen> {
                 style: const TextStyle(color: C.accent),
               ),
             ),
-          if (!host.canRetryPersistence && !host.canRetryRequest)
+          if (host.failure == null || host.canEditFailedInput)
             FilledButton(
-              onPressed: busy ? null : _evaluate,
+              onPressed: host.canEvaluate || host.canEditFailedInput ? _evaluate : null,
               child: Text(
                 busy
                     ? 'Evaluating…'
@@ -581,14 +603,6 @@ class _PlanningSetupScreenState extends State<PlanningSetupScreen> {
                         ? 'Re-evaluate plan'
                         : 'Evaluate',
               ),
-            ),
-          if (host.canCreateFreshBaseline)
-            TextButton(
-              onPressed: () {
-                host.createFreshEvaluationBaseline();
-                setState(() {});
-              },
-              child: const Text('Create fresh evaluation baseline'),
             ),
           if (host.phase == PlanningHostPhase.unchanged)
             const Padding(
@@ -727,9 +741,5 @@ int _clockMinutes(String value) {
   return hour * 60 + minute;
 }
 
-String _cleanError(Object error) {
-  final text = error.toString();
-  return text
-      .replaceFirst('FormatException: ', '')
-      .replaceFirst('Invalid argument(s): ', '');
-}
+String _cleanError(Object error) =>
+    'Check the entered values, task dependencies, and planning hours.';

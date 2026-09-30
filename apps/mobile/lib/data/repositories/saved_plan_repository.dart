@@ -67,6 +67,7 @@ abstract class SavedPlanRepository {
 
   Future<SavedPlanDetail?> loadDetail(String savedPlanId);
 
+  /// Completes after the write commits. Projection refresh is a separate read.
   Future<void> updateTaskProgress({
     required String savedPlanTaskId,
     required int progressPercent,

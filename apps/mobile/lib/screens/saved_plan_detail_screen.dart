@@ -20,7 +20,7 @@ class SavedPlanDetailScreen extends StatefulWidget {
   final String savedPlanId;
   final SavedPlanDetailViewModel viewModel;
   final VoidCallback? onBack;
-  final ValueChanged<SavedPlanSummary>? onReevaluate;
+  final Future<void> Function(SavedPlanSummary)? onReevaluate;
   final ValueChanged<SavedPlanSummary>? onViewSchedule;
 
   @override
@@ -66,6 +66,12 @@ class _SavedPlanDetailScreenState extends State<SavedPlanDetailScreen> {
     if (mounted) setState(() {});
   }
 
+  Future<void> _prepareReevaluation(SavedPlanSummary summary) async {
+    final callback = widget.onReevaluate;
+    if (callback == null) return;
+    await widget.viewModel.prepareReevaluation(() => callback(summary));
+  }
+
   Future<void> _editProgress(SavedPlanTaskState state) async {
     final progress = TextEditingController(
       text: state.progress.progressPercent.toString(),
@@ -82,7 +88,7 @@ class _SavedPlanDetailScreenState extends State<SavedPlanDetailScreen> {
         builder: (context, setDialogState) => AlertDialog(
           backgroundColor: C.card,
           title: Text(state.task.name),
-          content: Column(
+          content: SingleChildScrollView(child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               TextField(
@@ -111,6 +117,7 @@ class _SavedPlanDetailScreenState extends State<SavedPlanDetailScreen> {
               if (error != null)
                 Text(error!, style: const TextStyle(color: C.padat)),
             ],
+          ),
           ),
           actions: [
             TextButton(
@@ -167,7 +174,7 @@ class _SavedPlanDetailScreenState extends State<SavedPlanDetailScreen> {
       return const Center(child: CircularProgressIndicator());
     }
     if (detail == null) {
-      return Column(
+      return ListView(
         children: [
           AppHeader(title: 'Saved Plan', onBack: widget.onBack),
           const HeaderDivider(),
@@ -178,7 +185,7 @@ class _SavedPlanDetailScreenState extends State<SavedPlanDetailScreen> {
                 title: 'Saved plan is unavailable',
                 message: vm.error ?? 'Saved plan details could not be loaded.',
                 recoveryClass: RecoveryClass.reloadContext,
-                technicalCode: 'LOCAL_CONTEXT_INVALID',
+                technicalCode: vm.errorCode ?? 'LOCAL_CONTEXT_READ_FAILED',
                 stage: 'persistence',
                 primaryAction: RecoveryAction.reloadContext,
               ),
@@ -205,17 +212,17 @@ class _SavedPlanDetailScreenState extends State<SavedPlanDetailScreen> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
-                    Row(
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: Text(
+                        Text(
                             summary.title,
                             style: const TextStyle(
                               fontSize: 19,
                               fontWeight: FontWeight.w700,
                             ),
-                          ),
                         ),
+                        const SizedBox(height: 8),
                         StatusPill(
                           label: summary.stale ? 'SUPERSEDED' : 'ACCEPTED',
                           color: summary.stale ? C.padat : C.accent,
@@ -267,10 +274,14 @@ class _SavedPlanDetailScreenState extends State<SavedPlanDetailScreen> {
                       ),
                     ],
                     const SizedBox(height: 14),
-                    FilledButton(
-                      onPressed: () => widget.onReevaluate?.call(summary),
-                      child: const Text('Re-evaluate'),
-                    ),
+                    if (vm.preparing) const LinearProgressIndicator(),
+                    if (!vm.preparationFailed)
+                      FilledButton(
+                        onPressed: vm.preparing || vm.saving || vm.loading ||
+                                widget.onReevaluate == null
+                            ? null : () => _prepareReevaluation(summary),
+                        child: const Text('Re-evaluate'),
+                      ),
                     OutlinedButton(
                       onPressed: () => widget.onViewSchedule?.call(summary),
                       child: const Text('View Schedule'),
@@ -278,6 +289,25 @@ class _SavedPlanDetailScreenState extends State<SavedPlanDetailScreen> {
                   ],
                 ),
               ),
+              if (vm.error != null)
+                RecoveryPanel(
+                  descriptor: RecoveryDescriptor(
+                    title: vm.preparationFailed
+                        ? 'Planning context is unavailable'
+                        : vm.errorCode == 'LOCAL_REFRESH_FAILED'
+                            ? 'Progress saved; display needs refresh'
+                            : 'Saved plan needs attention',
+                    message: vm.error!,
+                    recoveryClass: RecoveryClass.reloadContext,
+                    technicalCode: vm.errorCode ?? 'LOCAL_CONTEXT_READ_FAILED',
+                    stage: vm.preparationFailed ? 'local_context' : 'local',
+                  ),
+                  primaryLabel: vm.preparationFailed ? 'Retry load context' : 'Retry refresh',
+                  onPrimary: vm.preparing || vm.saving || vm.loading ? null
+                      : vm.preparationFailed
+                          ? () => _prepareReevaluation(summary)
+                          : () => vm.load(widget.savedPlanId),
+                ),
               const _SectionTitle('Tasks and progress'),
               if (detail.tasks.isEmpty)
                 const _Card(
@@ -341,11 +371,6 @@ class _SavedPlanDetailScreenState extends State<SavedPlanDetailScreen> {
                     '${revision.selectedCandidateId}\n'
                     'Accepted ${_instant(revision.acceptedAt)}',
                   ),
-                ),
-              if (vm.error != null)
-                Text(
-                  vm.error!,
-                  style: const TextStyle(color: C.padat),
                 ),
             ],
           ),

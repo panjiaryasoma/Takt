@@ -79,6 +79,15 @@ class AnalysisFailure implements Exception {
         origin: FailureOrigin.local,
       );
 
+  factory AnalysisFailure.localContext(Object error, {bool readFailed = false}) =>
+      AnalysisFailure(
+        code: readFailed ? 'LOCAL_CONTEXT_READ_FAILED' : 'LOCAL_CONTEXT_INVALID',
+        stage: 'local_context',
+        message: error.toString(),
+        userMessage: 'The saved analysis context could not be loaded on this device. Reload it or start a new analysis.',
+        origin: FailureOrigin.local,
+      );
+
   factory AnalysisFailure.persistence(Object error) => AnalysisFailure(
         code: 'LOCAL_PERSISTENCE_FAILED',
         stage: 'persistence',

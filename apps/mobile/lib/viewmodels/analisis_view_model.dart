@@ -81,6 +81,7 @@ final class AnalisisViewModel extends ChangeNotifier {
       _isCurrent(_pendingPersistence!.identity);
 
   bool get canDiscardUnsavedResult => canRetryPersistence;
+  bool get canLeaveProgress => !busy && _pendingPersistence == null;
 
   bool get requiresFreshAnalysis {
     final code = _failure?.code;
@@ -172,12 +173,12 @@ final class AnalisisViewModel extends ChangeNotifier {
   }
 
   void updateSourceDraft(AnalysisSourceDraft draft) {
-    if (busy) return;
+    if (busy || _pendingPersistence != null) return;
     _sourceDraft = draft;
   }
 
   void beginSourceEdit() {
-    if (_phase == AnalysisPhase.persisting) return;
+    if (_phase == AnalysisPhase.persisting || _pendingPersistence != null) return;
     _invalidateOperation();
     _failure = null;
     _phase = _response == null ? AnalysisPhase.idle : AnalysisPhase.ready;
@@ -189,7 +190,7 @@ final class AnalisisViewModel extends ChangeNotifier {
     required SourceTypeWire sourceType,
     required bool continuation,
   }) async {
-    if (busy) return;
+    if (busy || _pendingPersistence != null) return;
     _phase = AnalysisPhase.validating;
     _failure = null;
     notifyListeners();
@@ -227,7 +228,7 @@ final class AnalisisViewModel extends ChangeNotifier {
     } on AnalysisFailure catch (error) {
       _setRequestFailure(error);
     } on Object catch (error) {
-      _setRequestFailure(AnalysisFailure.contract(error));
+      _setRequestFailure(AnalysisFailure.localContext(error));
     }
   }
 
@@ -237,7 +238,7 @@ final class AnalisisViewModel extends ChangeNotifier {
     required SourceTypeWire sourceType,
     required bool continuation,
   }) async {
-    if (busy) return;
+    if (busy || _pendingPersistence != null) return;
     _phase = AnalysisPhase.validating;
     _failure = null;
     notifyListeners();
@@ -278,7 +279,7 @@ final class AnalisisViewModel extends ChangeNotifier {
     } on AnalysisFailure catch (error) {
       _setRequestFailure(error);
     } on Object catch (error) {
-      _setRequestFailure(AnalysisFailure.contract(error));
+      _setRequestFailure(AnalysisFailure.localContext(error));
     }
   }
 
@@ -328,7 +329,8 @@ final class AnalisisViewModel extends ChangeNotifier {
     return _repository.latestSnapshot(competitionId);
   }
 
-  Future<void> loadSnapshot(AnalysisSnapshot snapshot) async {
+  Future<bool> loadSnapshot(AnalysisSnapshot snapshot) async {
+    if (!canLeaveProgress) return false;
     _generation++;
     _operation = null;
     _pendingPersistence = null;
@@ -344,15 +346,17 @@ final class AnalisisViewModel extends ChangeNotifier {
       _failure = null;
       _phase = AnalysisPhase.ready;
       notifyListeners();
+      return true;
     } on Object catch (error) {
       _phase = AnalysisPhase.requestError;
-      _failure = AnalysisFailure.contract(error);
+      _failure = AnalysisFailure.localContext(error);
       notifyListeners();
+      return false;
     }
   }
 
   void resetForNewCompetition() {
-    if (_phase == AnalysisPhase.persisting) return;
+    if (_phase == AnalysisPhase.persisting || _pendingPersistence != null) return;
     _generation++;
     _phase = AnalysisPhase.idle;
     _competitionId = null;
@@ -437,7 +441,12 @@ final class AnalisisViewModel extends ChangeNotifier {
   Future<_ContinuationMaterial> _continuationMaterial(
     String competitionId,
   ) async {
-    final snapshot = await _repository.latestSnapshot(competitionId);
+    late final AnalysisSnapshot? snapshot;
+    try {
+      snapshot = await _repository.latestSnapshot(competitionId);
+    } on Object catch (error) {
+      throw AnalysisFailure.localContext(error, readFailed: true);
+    }
     if (snapshot == null) {
       throw const AnalysisFailure(
         code: 'LOCAL_CONTEXT_MISSING',

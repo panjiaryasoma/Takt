@@ -162,6 +162,10 @@ void main() {
   testWidgets(
       'pending acceptance shows retry/cancel persistence without a second decision',
       (tester) async {
+    tester.view.physicalSize = const Size(320, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
     var retries = 0;
     var cancels = 0;
     await tester.pumpWidget(
@@ -170,6 +174,7 @@ void main() {
         onAccept: (_, _) async {},
         onEdit: (_) {},
         onIgnore: (_) {},
+        scale: 2,
         acceptancePersistencePending: true,
         acceptancePersistenceMessage:
             'The confirmed choice could not be committed locally.',

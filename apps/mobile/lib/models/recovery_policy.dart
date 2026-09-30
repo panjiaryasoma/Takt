@@ -73,8 +73,8 @@ final class RecoveryDescriptor {
 /// 6B presentation-side mapper.
 ///
 /// This is intentionally explicit rather than status-code inference. The
-/// cross-language recovery-policy artifact owned by Day 6 is the eventual
-/// parity authority after H-6A merges; unknown backend failures fail closed.
+/// 6A JSON recovery policy is the parity authority, joined to the 5A public
+/// error matrix by the cross-language test. Unknown failures fail closed.
 abstract final class RecoveryPolicy {
   static RecoveryClass classify(FailureIdentity failure) {
     return switch (failure.origin) {
@@ -104,7 +104,8 @@ abstract final class RecoveryPolicy {
       };
 
   static RecoveryClass _local(String code) => switch (code) {
-        'LOCAL_CONTEXT_MISSING' || 'LOCAL_CONTEXT_INVALID' =>
+        'LOCAL_CONTEXT_MISSING' || 'LOCAL_CONTEXT_INVALID' ||
+        'LOCAL_CONTEXT_READ_FAILED' =>
           RecoveryClass.reloadContext,
         'LOCAL_PERSISTENCE_FAILED' ||
         'LOCAL_ACCEPT_PERSISTENCE_FAILED' ||
@@ -114,7 +115,8 @@ abstract final class RecoveryPolicy {
       };
 
   static RecoveryClass _backend(String code) => switch (code) {
-        'VALIDATION_ERROR' || 'SOURCE_METADATA_INVALID' =>
+        'VALIDATION_ERROR' || 'SOURCE_METADATA_INVALID' ||
+        'SOURCE_LIMIT_EXCEEDED' || 'PLANNING_INPUT_INVALID' =>
           RecoveryClass.fixInput,
         'INVALID_SOURCE' => RecoveryClass.fixInput,
         'SOURCE_FETCH_FAILED' ||
@@ -122,24 +124,21 @@ abstract final class RecoveryPolicy {
         'OCR_TIMEOUT' ||
         'OCR_PROVIDER_ERROR' =>
           RecoveryClass.retrySameInput,
-        'SOURCE_LIMIT_EXCEEDED' ||
         'UNSUPPORTED_MEDIA_TYPE' ||
         'NATIVE_EXTRACTION_FAILED' ||
         'OCR_EXTRACTION_FAILED' =>
           RecoveryClass.reuploadSource,
-        'PLANNING_INPUT_INVALID' => RecoveryClass.editConstraints,
-        'SOLVER_INDETERMINATE' ||
+        'SOLVER_INDETERMINATE' => RecoveryClass.editConstraints,
         'AVAILABILITY_EXECUTION_FAILED' ||
         'SOLVER_EXECUTION_FAILED' ||
-        'PLANNING_RUNTIME_UNAVAILABLE' ||
-        'PLANNING_EXECUTION_FAILED' ||
-        'EVALUATION_INVARIANT_FAILED' =>
+        'PLANNING_RUNTIME_UNAVAILABLE' =>
           RecoveryClass.retrySameInput,
-        'REEVALUATION_CONTEXT_INVALID' ||
-        'REPORT_BUNDLE_INVALID' ||
-        'UNSUPPORTED_REPORT_CONTRACT' =>
+        'ANALYSIS_CONTEXT_INVALID' || 'REEVALUATION_CONTEXT_INVALID' ||
+        'REPORT_BUNDLE_INVALID' =>
           RecoveryClass.reloadContext,
-        'UNSUPPORTED_REEVALUATION_CONTRACT' => RecoveryClass.reevaluate,
+        'UNSUPPORTED_REPORT_CONTRACT' ||
+        'UNSUPPORTED_REEVALUATION_CONTRACT' ||
+        'PLANNING_EXECUTION_FAILED' || 'EVALUATION_INVARIANT_FAILED' ||
         'CANDIDATE_NORMALIZATION_FAILED' ||
         'SNAPSHOT_INTEGRITY_FAILED' ||
         'SNAPSHOT_BATCH_INVALID' ||

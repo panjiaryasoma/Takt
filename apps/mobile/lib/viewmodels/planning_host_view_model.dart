@@ -24,6 +24,8 @@ enum PlanningHostPhase {
   requesting,
   persisting,
   persistenceError,
+  publishing,
+  publicationError,
   decision,
   unchanged,
   accepted,
@@ -81,13 +83,13 @@ final class PlanningHostViewModel extends ChangeNotifier {
   EvaluationSession? _activeSession;
   PlanningHostFailure? _failure;
   _PendingPersistence? _pendingPersistence;
+  _PendingPublication? _pendingPublication;
   _PlanRequestContext? _lastRequest;
   _PendingAcceptance? _pendingAcceptance;
   bool _acceptanceSaving = false;
   String? _message;
   int _inputRevision = 0;
   int _generation = 0;
-  bool _forceFreshBaseline = false;
 
   PlanningHostPhase get phase => _phase;
   AnalysisSnapshot? get analysisSnapshot => _analysisSnapshot;
@@ -102,6 +104,7 @@ final class PlanningHostViewModel extends ChangeNotifier {
   bool get busy => _phase == PlanningHostPhase.loading ||
       _phase == PlanningHostPhase.requesting ||
       _phase == PlanningHostPhase.persisting ||
+      _phase == PlanningHostPhase.publishing ||
       _acceptanceSaving;
   bool get canRetryPersistence =>
       _phase == PlanningHostPhase.persistenceError &&
@@ -113,7 +116,7 @@ final class PlanningHostViewModel extends ChangeNotifier {
         null => null,
       };
   bool get canDiscardPendingResult =>
-      persistenceExitKind == PersistenceExitKind.discardableResult;
+      canRetryPersistence && persistenceExitKind == PersistenceExitKind.discardableResult;
   bool get hasKnownUnpersistedStaleWitness {
     final pending = _pendingPersistence;
     return switch (pending) {
@@ -130,25 +133,40 @@ final class PlanningHostViewModel extends ChangeNotifier {
   bool get canCancelPendingAcceptance =>
       _pendingAcceptance != null && !_acceptanceSaving;
   bool get hasPendingAcceptance => _pendingAcceptance != null;
-  bool get inputsLocked => busy || canRetryPersistence || hasPendingAcceptance;
+  bool get _policyRequiresRecovery => switch (_failure?.recoveryClass) {
+        RecoveryClass.noAutomaticRecovery || RecoveryClass.reloadContext => true,
+        _ => false,
+      };
+  bool get inputsLocked => busy || _pendingPersistence != null ||
+      _pendingPublication != null || hasPendingAcceptance ||
+      _policyRequiresRecovery;
+  bool get canEvaluate => !inputsLocked && _failure == null && _draft != null;
+  bool get canEditFailedInput => !busy && _pendingPersistence == null &&
+      _pendingPublication == null && !hasPendingAcceptance &&
+      switch (_failure?.recoveryClass) {
+        RecoveryClass.fixInput || RecoveryClass.editConstraints ||
+        RecoveryClass.retrySameInput => true,
+        _ => false,
+      };
+  bool get canReloadContext => !busy && _pendingPersistence == null &&
+      _pendingPublication == null && !hasPendingAcceptance &&
+      _failure?.recoveryClass == RecoveryClass.reloadContext &&
+      _analysisSnapshot != null;
+  bool get canRetryPublication =>
+      _phase == PlanningHostPhase.publicationError && _pendingPublication != null;
+
+  Future<void> reloadContext() async {
+    if (!canReloadContext) return;
+    await startPlanning(_analysisSnapshot!);
+  }
   bool get canRetryRequest =>
       _phase == PlanningHostPhase.error &&
       _failure?.recoveryClass == RecoveryClass.retrySameInput &&
       _lastRequest != null;
-  bool get canCreateFreshBaseline =>
-      _phase == PlanningHostPhase.error &&
-      _failure?.code == 'UNSUPPORTED_REEVALUATION_CONTRACT' &&
-      _savedPlan != null;
-
   Future<void> startPlanning(AnalysisSnapshot snapshot) async {
-    if (persistenceExitKind == PersistenceExitKind.correctnessBearing) {
-      _setPersistenceFailure(
-        StateError(
-          'A trusted re-evaluation transition still requires local persistence.',
-        ),
-      );
-      return;
-    }
+    // Unresolved local work can only leave through its explicit recovery action.
+    if (_pendingPersistence != null || _pendingPublication != null ||
+        navigationLockedByPersistence) return;
     if (_pendingAcceptance != null) {
       _failure = const PlanningHostFailure(
         code: 'LOCAL_ACCEPT_PERSISTENCE_FAILED',
@@ -162,7 +180,7 @@ final class PlanningHostViewModel extends ChangeNotifier {
 
     final contextGeneration = ++_generation;
     _phase = PlanningHostPhase.loading;
-    _analysisSnapshot = null;
+    _analysisSnapshot = snapshot;
     _draft = null;
     _savedPlan = null;
     _priorEvaluation = null;
@@ -174,7 +192,6 @@ final class PlanningHostViewModel extends ChangeNotifier {
     _failure = null;
     _message = null;
     _inputRevision = 0;
-    _forceFreshBaseline = false;
     notifyListeners();
 
     try {
@@ -222,15 +239,14 @@ final class PlanningHostViewModel extends ChangeNotifier {
       _priorEvaluation = prior;
       _draft = nextDraft;
       _inputRevision = 0;
-      _forceFreshBaseline = false;
       _phase = PlanningHostPhase.setup;
       notifyListeners();
-    } on Object catch (error) {
+    } on Object {
       if (contextGeneration != _generation) return;
       _phase = PlanningHostPhase.error;
       _failure = PlanningHostFailure(
-        code: 'LOCAL_CONTEXT_INVALID',
-        message: 'Planning context could not be prepared: $error',
+        code: 'LOCAL_CONTEXT_READ_FAILED',
+        message: 'Planning context could not be loaded on this device. Reload the context to continue.',
         recoveryClass: RecoveryClass.reloadContext,
       );
       notifyListeners();
@@ -299,25 +315,33 @@ final class PlanningHostViewModel extends ChangeNotifier {
   }
 
   Future<void> useCurrentDefaults() async {
-    final state = await _scheduleRepository.loadState();
-    final current = _requireDraft();
-    _mutateDraft(
-      current.copyWith(
+    if (inputsLocked) return;
+    final generation = _generation;
+    final revision = _inputRevision;
+    try {
+      final state = await _scheduleRepository.loadState();
+      if (!_isCurrent(generation, revision) || inputsLocked) return;
+      final current = _requireDraft();
+      _mutateDraft(current.copyWith(
         preferences: state.preferences,
         windowPolicy: current.windowPolicy.copyWith(
           timezone: state.preferences.timezone,
         ),
-      ),
-    );
+      ));
+    } on Object {
+      if (!_isCurrent(generation, revision)) return;
+      _setLocalFailure('LOCAL_CONTEXT_READ_FAILED',
+          'Saved planning defaults could not be loaded. Reload the context to continue.');
+    }
   }
 
   Future<void> evaluate() async {
-    if (busy) return;
+    if (!canEvaluate) return;
     final snapshot = _analysisSnapshot;
     final draft = _draft;
     if (snapshot == null || draft == null) {
       _setLocalFailure(
-        'PLANNING_INPUT_UNAVAILABLE',
+        'LOCAL_CONTEXT_MISSING',
         'No persisted analysis is selected for planning.',
       );
       return;
@@ -329,6 +353,7 @@ final class PlanningHostViewModel extends ChangeNotifier {
     _failure = null;
     _message = null;
     _pendingPersistence = null;
+    _activeSession = null;
     notifyListeners();
 
     late final PlanningAssembly assembly;
@@ -354,11 +379,11 @@ final class PlanningHostViewModel extends ChangeNotifier {
         notifyListeners();
       }
       return;
-    } on Object catch (error) {
+    } on Object {
       if (_isCurrent(capturedGeneration, capturedRevision)) {
         _setLocalFailure(
-          'PLANNING_INPUT_UNAVAILABLE',
-          'Planning input could not be assembled: $error',
+          'LOCAL_CONTEXT_READ_FAILED',
+          'Saved planning inputs could not be loaded. Reload the context to continue.',
         );
       }
       return;
@@ -366,7 +391,7 @@ final class PlanningHostViewModel extends ChangeNotifier {
 
     if (!_isCurrent(capturedGeneration, capturedRevision)) return;
 
-    if (_savedPlan == null || _forceFreshBaseline) {
+    if (_savedPlan == null) {
       _lastRequest = _FreshPlanRequest(
         generation: capturedGeneration,
         revision: capturedRevision,
@@ -442,39 +467,22 @@ final class PlanningHostViewModel extends ChangeNotifier {
     required int generation,
     required int revision,
   }) async {
+    late final PlanEvaluateTransportResult transport;
     try {
-      final transport = await _apiClient.evaluate(
+      transport = await _apiClient.evaluate(
         evaluationRequestJson: assembly.requestJson,
       );
-      if (!_isCurrent(generation, revision)) return;
-
-      _lastRequest = null;
-      _phase = PlanningHostPhase.persisting;
-      notifyListeners();
-      try {
-        final persisted = await _evaluationRepository.persistEvaluation(
-          analysisSnapshot: snapshot,
-          evaluationRequestJson: transport.evaluationRequestJson,
-          evaluationResponseJson: transport.evaluationResponseJson,
-          planningWindowPolicyJson: assembly.windowPolicyJson,
-        );
-        if (!_isCurrent(generation, revision)) return;
-        await _publishPersisted(persisted, generation, revision);
-      } on Object catch (error) {
-        if (!_isCurrent(generation, revision)) return;
-        _pendingPersistence = _PendingInitial(
-          generation: generation,
-          revision: revision,
-          snapshot: snapshot,
-          assembly: assembly,
-          transport: transport,
-        );
-        _setPersistenceFailure(error);
-      }
     } on PlanApiFailure catch (error) {
-      if (!_isCurrent(generation, revision)) return;
-      _setApiFailure(error);
+      if (_isCurrent(generation, revision)) _setApiFailure(error);
+      return;
     }
+    if (!_isCurrent(generation, revision)) return;
+    _lastRequest = null;
+    _pendingPersistence = _PendingInitial(
+      generation: generation, revision: revision, snapshot: snapshot,
+      assembly: assembly, transport: transport,
+    );
+    await _savePending();
   }
 
   Future<void> _reevaluate({
@@ -484,83 +492,35 @@ final class PlanningHostViewModel extends ChangeNotifier {
     required int generation,
     required int revision,
   }) async {
+    late final PlanReevaluateTransportResult transport;
     try {
-      final transport = await _apiClient.reevaluate(
+      transport = await _apiClient.reevaluate(
         priorEvaluationId: prior.id,
         priorEvaluationResponseJson: prior.responseJson,
         currentEvaluationRequestJson: assembly.requestJson,
       );
-      if (!_isCurrent(generation, revision)) return;
-
-      _lastRequest = null;
-      _phase = PlanningHostPhase.persisting;
-      notifyListeners();
-      try {
-        final persisted = await _persistReevaluationSuccess(
-          snapshot: snapshot,
-          prior: prior,
-          assembly: assembly,
-          transport: transport,
-        );
-        if (!_isCurrent(generation, revision)) return;
-        if (persisted.evaluation == null) {
-          _activeSession = null;
-          _phase = PlanningHostPhase.unchanged;
-          _message = 'No material planning changes were found.';
-          _failure = null;
-          notifyListeners();
-          return;
-        }
-        await _publishPersisted(
-          persisted.evaluation!,
-          generation,
-          revision,
-        );
-      } on Object catch (error) {
-        if (!_isCurrent(generation, revision)) return;
-        _pendingPersistence = _PendingReevaluationSuccess(
-          generation: generation,
-          revision: revision,
-          snapshot: snapshot,
-          prior: prior,
-          assembly: assembly,
-          transport: transport,
-        );
-        _setPersistenceFailure(error);
-      }
     } on PlanApiFailure catch (error) {
       if (!_isCurrent(generation, revision)) return;
-      final transition = error.transition;
-      final request = error.transportRequestJson;
-      final response = error.transportResponseJson;
-      final errorJson = error.errorJson;
-      if (transition != null &&
-          request != null &&
-          response != null &&
-          errorJson != null) {
+      if (error.transition != null && error.transportRequestJson != null &&
+          error.transportResponseJson != null && error.errorJson != null) {
         _lastRequest = null;
-        try {
-          await _evaluationRepository.persistReevaluation(
-            priorEvaluationId: prior.id,
-            transition: transition,
-            transportRequestJson: request,
-            transportResponseJson: response,
-            errorJson: errorJson,
-          );
-          await _savedPlanRepository.refresh();
-        } on Object catch (persistenceError) {
-          _pendingPersistence = _PendingReevaluationFailure(
-            generation: generation,
-            revision: revision,
-            prior: prior,
-            failure: error,
-          );
-          _setPersistenceFailure(persistenceError);
-          return;
-        }
+        _pendingPersistence = _PendingReevaluationFailure(
+          generation: generation, revision: revision, prior: prior,
+          failure: error,
+        );
+        await _savePending();
+      } else {
+        _setApiFailure(error);
       }
-      _setApiFailure(error);
+      return;
     }
+    if (!_isCurrent(generation, revision)) return;
+    _lastRequest = null;
+    _pendingPersistence = _PendingReevaluationSuccess(
+      generation: generation, revision: revision, snapshot: snapshot,
+      prior: prior, assembly: assembly, transport: transport,
+    );
+    await _savePending();
   }
 
   Future<ReevaluationPersistenceResult> _persistReevaluationSuccess({
@@ -588,67 +548,102 @@ final class PlanningHostViewModel extends ChangeNotifier {
   }
 
   Future<void> retryPersistence() async {
+    if (!canRetryPersistence) return;
+    await _savePending();
+  }
+
+  Future<void> _savePending() async {
     final pending = _pendingPersistence;
-    if (pending == null ||
-        !_isCurrent(pending.generation, pending.revision)) {
+    if (pending == null || !_isCurrent(pending.generation, pending.revision)) {
       return;
     }
     _phase = PlanningHostPhase.persisting;
     _failure = null;
     notifyListeners();
-
+    Evaluation? evaluation;
+    PlanApiFailure? failure;
     try {
+      // Only the transaction belongs in this catch. Publication is read-only.
       switch (pending) {
         case _PendingInitial():
-          final persisted = await _evaluationRepository.persistEvaluation(
+          evaluation = await _evaluationRepository.persistEvaluation(
             analysisSnapshot: pending.snapshot,
             evaluationRequestJson: pending.transport.evaluationRequestJson,
             evaluationResponseJson: pending.transport.evaluationResponseJson,
             planningWindowPolicyJson: pending.assembly.windowPolicyJson,
           );
-          _pendingPersistence = null;
-          await _publishPersisted(
-            persisted,
-            pending.generation,
-            pending.revision,
-          );
-          return;
         case _PendingReevaluationSuccess():
           final persisted = await _persistReevaluationSuccess(
-            snapshot: pending.snapshot,
-            prior: pending.prior,
-            assembly: pending.assembly,
-            transport: pending.transport,
+            snapshot: pending.snapshot, prior: pending.prior,
+            assembly: pending.assembly, transport: pending.transport,
           );
-          _pendingPersistence = null;
-          if (persisted.evaluation == null) {
-            _phase = PlanningHostPhase.unchanged;
-            _message = 'No material planning changes were found.';
-            notifyListeners();
-          } else {
-            await _publishPersisted(
-              persisted.evaluation!,
-              pending.generation,
-              pending.revision,
-            );
-          }
-          return;
+          evaluation = persisted.evaluation;
         case _PendingReevaluationFailure():
-          final error = pending.failure;
+          failure = pending.failure;
           await _evaluationRepository.persistReevaluation(
             priorEvaluationId: pending.prior.id,
-            transition: error.transition!,
-            transportRequestJson: error.transportRequestJson!,
-            transportResponseJson: error.transportResponseJson!,
-            errorJson: error.errorJson!,
+            transition: failure.transition!,
+            transportRequestJson: failure.transportRequestJson!,
+            transportResponseJson: failure.transportResponseJson!,
+            errorJson: failure.errorJson!,
           );
-          await _savedPlanRepository.refresh();
-          _pendingPersistence = null;
-          _setApiFailure(error);
-          return;
       }
     } on Object catch (error) {
-      _setPersistenceFailure(error);
+      if (_isCurrent(pending.generation, pending.revision)) {
+        _setPersistenceFailure(error);
+      }
+      return;
+    }
+    if (!_isCurrent(pending.generation, pending.revision)) return;
+    _pendingPersistence = null;
+    _pendingPublication = _PendingPublication(
+      generation: pending.generation, revision: pending.revision,
+      evaluation: evaluation, failure: failure,
+      refreshPlans: pending is! _PendingInitial,
+    );
+    await _restorePublication();
+  }
+
+  Future<void> retryPublication() async {
+    if (!canRetryPublication) return;
+    await _restorePublication();
+  }
+
+  Future<void> _restorePublication() async {
+    final pending = _pendingPublication;
+    if (pending == null || !_isCurrent(pending.generation, pending.revision)) {
+      return;
+    }
+    _phase = PlanningHostPhase.publishing;
+    _failure = null;
+    notifyListeners();
+    try {
+      if (pending.refreshPlans) await _savedPlanRepository.refresh();
+      if (!_isCurrent(pending.generation, pending.revision)) return;
+      final evaluation = pending.evaluation;
+      if (evaluation != null) {
+        await _publishPersisted(evaluation, pending.generation, pending.revision);
+      } else {
+        _pendingPublication = null;
+        if (pending.failure != null) {
+          _setApiFailure(pending.failure!);
+        } else {
+          _activeSession = null;
+          _phase = PlanningHostPhase.unchanged;
+          _message = 'No material planning changes were found.';
+          _failure = null;
+          notifyListeners();
+        }
+      }
+    } on Object {
+      if (!_isCurrent(pending.generation, pending.revision)) return;
+      _phase = PlanningHostPhase.publicationError;
+      _failure = const PlanningHostFailure(
+        code: 'LOCAL_PUBLICATION_FAILED', stage: 'publication',
+        message: 'The result is saved on this device, but its presentation could not be loaded. Retry reload; the saved result will be kept.',
+        recoveryClass: RecoveryClass.noAutomaticRecovery,
+      );
+      notifyListeners();
     }
   }
 
@@ -693,6 +688,7 @@ final class PlanningHostViewModel extends ChangeNotifier {
       evaluationRequestJson: reloaded.requestJson,
       evaluationResponseJson: reloaded.responseJson,
     );
+    _pendingPublication = null;
     _phase = PlanningHostPhase.decision;
     _failure = null;
     _message = null;
@@ -765,7 +761,7 @@ final class PlanningHostViewModel extends ChangeNotifier {
         candidateId: pending.intent.candidateId,
         selectionSource: pending.intent.selectionSource,
       );
-    } on Object catch (error) {
+    } on Object {
       if (!_isCurrent(pending.generation, pending.revision) ||
           !identical(_activeSession, pending.session)) {
         _acceptanceSaving = false;
@@ -781,7 +777,9 @@ final class PlanningHostViewModel extends ChangeNotifier {
         stage: 'persistence',
       );
       notifyListeners();
-      throw AcceptancePersistenceExceptionProxy(error.toString());
+      throw const AcceptancePersistenceExceptionProxy(
+        'The confirmed choice could not be saved on this device.',
+      );
     }
 
     if (!_isCurrent(pending.generation, pending.revision) ||
@@ -866,22 +864,15 @@ final class PlanningHostViewModel extends ChangeNotifier {
     notifyListeners();
   }
 
-  void createFreshEvaluationBaseline() {
-    if (!canCreateFreshBaseline || _pendingAcceptance != null) return;
-    _forceFreshBaseline = true;
-    _phase = PlanningHostPhase.setup;
-    _failure = null;
-    _message =
-        'Fresh compatibility baseline selected. The accepted plan remains active until a new result is accepted.';
-    notifyListeners();
-  }
-
   void _mutateDraft(PlanningDraft next) {
-    if (_pendingPersistence != null || _pendingAcceptance != null) {
+    if (_pendingPersistence != null || _pendingPublication != null ||
+        _pendingAcceptance != null) {
       throw StateError(
         'Resolve pending persistence before editing constraints.',
       );
     }
+    if (_policyRequiresRecovery) return;
+    if (_draft != null && _sameInputs(_draft!, next)) return;
     _draft = next;
     _inputRevision++;
     _lastRequest = null;
@@ -890,6 +881,19 @@ final class PlanningHostViewModel extends ChangeNotifier {
     _failure = null;
     _message = null;
     notifyListeners();
+  }
+
+  static bool _sameInputs(PlanningDraft left, PlanningDraft right) {
+    Object semanticValues(PlanningDraft value) => [
+      value.readinessContext.toWire(),
+      value.tasks.map((task) => task.toWire()).toList(),
+      value.preferences.timezone,
+      value.preferences.maxProjectMinutesPerDay,
+      value.preferences.preferredFocusMinutes,
+      value.preferences.bufferTargetMinutes,
+      value.windowPolicy.toJson(),
+    ];
+    return jsonEncode(semanticValues(left)) == jsonEncode(semanticValues(right));
   }
 
   PlanningDraft _requireDraft() {
@@ -914,7 +918,8 @@ final class PlanningHostViewModel extends ChangeNotifier {
   }
 
   bool get navigationLockedByPersistence =>
-      _phase == PlanningHostPhase.persisting || _acceptanceSaving;
+      _phase == PlanningHostPhase.persisting ||
+      _phase == PlanningHostPhase.publishing || _acceptanceSaving;
 
   bool _isCurrent(int generation, int revision) =>
       generation == _generation && revision == _inputRevision;
@@ -969,11 +974,11 @@ final class PlanningHostViewModel extends ChangeNotifier {
       'REPORT_BUNDLE_INVALID' || 'UNSUPPORTED_REPORT_CONTRACT' =>
         'This analysis report cannot be planned safely. Refresh the analysis first.',
       'SOLVER_INDETERMINATE' =>
-        'The solver could not determine a result. Retry or edit the constraints.',
+        'The solver could not determine a result. Edit the constraints before evaluating again.',
       'REEVALUATION_CONTEXT_INVALID' =>
         'The prior and current planning context no longer compare safely. Reload the saved plan before trying again.',
       'UNSUPPORTED_REEVALUATION_CONTRACT' =>
-        'This saved plan uses an older re-evaluation contract. A fresh baseline can be created explicitly.',
+        'This saved plan uses an unsupported re-evaluation contract. Evaluation is unavailable until compatibility is restored.',
       'CLIENT_NETWORK_ERROR' ||
       'CLIENT_TIMEOUT' ||
       'CLIENT_CONNECTION_FAILED' =>
@@ -986,12 +991,9 @@ final class PlanningHostViewModel extends ChangeNotifier {
         'The planning service returned an unrecognized error response.',
       'AVAILABILITY_EXECUTION_FAILED' ||
       'SOLVER_EXECUTION_FAILED' ||
-      'PLANNING_RUNTIME_UNAVAILABLE' ||
-      'PLANNING_EXECUTION_FAILED' ||
-      'EVALUATION_INVARIANT_FAILED' ||
-      'INTERNAL_ERROR' =>
+      'PLANNING_RUNTIME_UNAVAILABLE' =>
         'The planning service could not complete this evaluation. Try again.',
-      _ => 'Planning could not be completed safely. Review the inputs or try again.',
+      _ => 'Planning could not be completed safely. No automatic retry is available for this failure.',
     };
   }
 
@@ -1189,4 +1191,17 @@ final class _PendingReevaluationFailure extends _PendingPersistence {
 
   final Evaluation prior;
   final PlanApiFailure failure;
+}
+
+// The transaction has committed. This continuation may perform reads only.
+final class _PendingPublication {
+  const _PendingPublication({
+    required this.generation, required this.revision,
+    required this.evaluation, required this.failure, required this.refreshPlans,
+  });
+  final int generation;
+  final int revision;
+  final Evaluation? evaluation;
+  final PlanApiFailure? failure;
+  final bool refreshPlans;
 }
