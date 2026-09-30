@@ -32,6 +32,8 @@ void main() {
     expect(find.text('Project limit / day'), findsOneWidget);
     expect(find.text('Tersedia'), findsNothing);
     expect(find.text('Welcome, Raka'), findsNothing);
+    expect(find.text('9:41'), findsNothing,
+        reason: 'The app must not render a fake status bar.');
     expect(tester.takeException(), isNull);
   });
 
