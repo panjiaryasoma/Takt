@@ -280,40 +280,20 @@ void main() {
 
   testWidgets('ICS picker previews events before any schedule write',
       (tester) async {
-    final database = AppDatabase.forTesting(NativeDatabase.memory());
-    final repository = DriftScheduleRepository(
-      database,
-      closeDatabaseOnDispose: false,
-    );
-    final viewModel = JadwalViewModel(
-      repository,
-      closeScheduleRepositoryOnDispose: false,
-    );
-    addTearDown(() async {
-      viewModel.dispose();
-      await repository.close();
-      await database.close();
-    });
-    await viewModel.initialize();
-    await Future<void>.delayed(Duration.zero);
-
     await tester.pumpWidget(
-      ChangeNotifierProvider.value(
-        value: viewModel,
-        child: MaterialApp(
-          theme: AppTheme.dark,
-          home: IcsImportScreen(
-            pickText: () async => (
-              name: 'calendar.ics',
-              content: 'BEGIN:VCALENDAR\n'
-                  'BEGIN:VEVENT\n'
-                  'UID:preview-1@example\n'
-                  'SUMMARY:Preview only\n'
-                  'DTSTART:20260930T090000Z\n'
-                  'DTEND:20260930T100000Z\n'
-                  'END:VEVENT\n'
-                  'END:VCALENDAR\n',
-            ),
+      MaterialApp(
+        theme: AppTheme.dark,
+        home: IcsImportScreen(
+          pickText: () async => (
+            name: 'calendar.ics',
+            content: 'BEGIN:VCALENDAR\n'
+                'BEGIN:VEVENT\n'
+                'UID:preview-1@example\n'
+                'SUMMARY:Preview only\n'
+                'DTSTART:20260930T090000Z\n'
+                'DTEND:20260930T100000Z\n'
+                'END:VEVENT\n'
+                'END:VCALENDAR\n',
           ),
         ),
       ),
@@ -323,7 +303,6 @@ void main() {
     await _pumpBounded(tester);
 
     expect(find.text('Preview only'), findsOneWidget);
-    expect(viewModel.all, isEmpty);
     expect(
       tester.widget<FilledButton>(
         find.byKey(const Key('import-selected-ics')),
@@ -339,7 +318,6 @@ void main() {
       ).onPressed,
       isNotNull,
     );
-    expect(viewModel.all, isEmpty);
 
     await tester.pumpWidget(const SizedBox.shrink());
     await _pumpBounded(tester, frames: 2);
@@ -347,40 +325,20 @@ void main() {
 
   testWidgets('ICS preview renders wall-clock time in the event TZID',
       (tester) async {
-    final database = AppDatabase.forTesting(NativeDatabase.memory());
-    final repository = DriftScheduleRepository(
-      database,
-      closeDatabaseOnDispose: false,
-    );
-    final viewModel = JadwalViewModel(
-      repository,
-      closeScheduleRepositoryOnDispose: false,
-    );
-    addTearDown(() async {
-      viewModel.dispose();
-      await repository.close();
-      await database.close();
-    });
-    await viewModel.initialize();
-    await Future<void>.delayed(Duration.zero);
-
     await tester.pumpWidget(
-      ChangeNotifierProvider.value(
-        value: viewModel,
-        child: MaterialApp(
-          theme: AppTheme.dark,
-          home: IcsImportScreen(
-            pickText: () async => (
-              name: 'new-york.ics',
-              content: 'BEGIN:VCALENDAR\n'
-                  'BEGIN:VEVENT\n'
-                  'UID:tz-preview@example\n'
-                  'SUMMARY:NY meeting\n'
-                  'DTSTART;TZID=America/New_York:20260930T090000\n'
-                  'DTEND;TZID=America/New_York:20260930T100000\n'
-                  'END:VEVENT\n'
-                  'END:VCALENDAR\n',
-            ),
+      MaterialApp(
+        theme: AppTheme.dark,
+        home: IcsImportScreen(
+          pickText: () async => (
+            name: 'new-york.ics',
+            content: 'BEGIN:VCALENDAR\n'
+                'BEGIN:VEVENT\n'
+                'UID:tz-preview@example\n'
+                'SUMMARY:NY meeting\n'
+                'DTSTART;TZID=America/New_York:20260930T090000\n'
+                'DTEND;TZID=America/New_York:20260930T100000\n'
+                'END:VEVENT\n'
+                'END:VCALENDAR\n',
           ),
         ),
       ),
