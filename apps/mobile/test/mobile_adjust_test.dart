@@ -105,7 +105,17 @@ void main() {
 
     final first = await viewModel.importIcsEvents([event]);
     await Future<void>.delayed(Duration.zero);
-    final second = await viewModel.importIcsEvents([event]);
+    final changedExport = IcsCalendarParser().parse(
+      'BEGIN:VCALENDAR\n'
+      'BEGIN:VEVENT\n'
+      'UID:dedupe-1@example\n'
+      'SUMMARY:Imported class moved\n'
+      'DTSTART:20260930T110000Z\n'
+      'DTEND:20260930T120000Z\n'
+      'END:VEVENT\n'
+      'END:VCALENDAR\n',
+    ).events.single;
+    final second = await viewModel.importIcsEvents([changedExport]);
 
     expect(first.success, isTrue);
     expect(first.imported, 1);
