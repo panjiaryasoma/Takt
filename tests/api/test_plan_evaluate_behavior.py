@@ -261,7 +261,7 @@ def test_identical_semantic_inputs_are_deterministic_except_execution_identity()
     assert semantic_projection(first) == semantic_projection(second)
 
     projected = semantic_projection(first)
-    assert projected["evaluated_at"] == _clock().isoformat()
+    assert projected["evaluated_at"] == "2026-09-27T13:20:17Z"
     assert projected["basis"]["report"]["competition_id"] == (
         request.report_bundle.ref.competition_id
     )
