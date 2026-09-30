@@ -1,8 +1,8 @@
 """Freeze every Issue-4A public API wrapper field for parallel 5A/5B work."""
 
-from typing import get_args
-
 import apps.api.contracts
+
+from typing import get_args
 
 
 PUBLIC_WIRE_FIELDS = {
@@ -281,7 +281,7 @@ def test_public_wire_requiredness_and_nullability_are_frozen() -> None:
 def test_all_public_api_wrapper_field_sets_are_frozen() -> None:
     public_models = {
         model
-        for name, model in vars(wire).items()
+        for name, model in vars(apps.api.contracts).items()
         if isinstance(model, type)
         and issubclass(model, apps.api.contracts.ApiModel)
         and model is not apps.api.contracts.ApiModel
