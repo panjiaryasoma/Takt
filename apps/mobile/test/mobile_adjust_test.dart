@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -11,6 +13,26 @@ import 'package:takt_mobile/theme/app_theme.dart';
 import 'package:takt_mobile/viewmodels/jadwal_view_model.dart';
 
 void main() {
+  test('Android launcher and native splash use the canonical Takt logo', () {
+    expect(File('assets/branding/logo.png').existsSync(), isTrue);
+    expect(File('assets/breanding/logo.png').existsSync(), isFalse);
+
+    final manifest =
+        File('android/app/src/main/AndroidManifest.xml').readAsStringSync();
+    final splash =
+        File('android/app/src/main/res/drawable/launch_background.xml')
+            .readAsStringSync();
+    final android12 =
+        File('android/app/src/main/res/values-v31/styles.xml')
+            .readAsStringSync();
+
+    expect(manifest, contains('android:icon="@drawable/takt_logo"'));
+    expect(splash, contains('@drawable/takt_logo'));
+    expect(splash, contains('@color/takt_bg'));
+    expect(android12, contains('android:windowSplashScreenAnimatedIcon'));
+    expect(android12, contains('@drawable/takt_logo'));
+  });
+
   test('Google-style ICS parses timed events and fails closed on all-day data', () {
     final result = IcsCalendarParser().parse(
       'BEGIN:VCALENDAR\r\n'
