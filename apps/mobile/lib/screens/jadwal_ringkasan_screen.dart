@@ -19,9 +19,16 @@ class _Task {
 }
 
 class JadwalRingkasanScreen extends StatelessWidget {
-  const JadwalRingkasanScreen({super.key, required this.onSwitchTab});
+  const JadwalRingkasanScreen({
+    super.key,
+    required this.onSwitchTab,
+    this.now,
+  });
 
   final ValueChanged<int> onSwitchTab;
+
+  /// Test seam only. Production uses the device-local current time.
+  final DateTime? now;
 
   static const int _startHour = 7;
   static const int _endHour = 22;
@@ -92,6 +99,11 @@ class JadwalRingkasanScreen extends StatelessWidget {
     final monday = DateTime(selected.year, selected.month, selected.day)
         .subtract(Duration(days: selected.weekday - 1));
     final nextMonday = monday.add(const Duration(days: 7));
+    final localNow = now ?? DateTime.now();
+    final currentDay = DateTime(localNow.year, localNow.month, localNow.day);
+    final currentMonday =
+        currentDay.subtract(Duration(days: currentDay.weekday - 1));
+    final isCurrentWeek = monday == currentMonday;
     final occurrences = vm.occurrencesBetween(monday, nextMonday);
     final acceptedBlocks = vm.acceptedBlocksBetween(monday, nextMonday);
     final tasks = _tasksForWeek(occurrences, acceptedBlocks);
@@ -165,27 +177,34 @@ class JadwalRingkasanScreen extends StatelessWidget {
                   ],
                 ),
                 const SizedBox(height: 4),
-                ..._days.map(
-                  (day) => Padding(
+                for (var index = 0; index < _days.length; index++)
+                  Padding(
                     padding: const EdgeInsets.only(bottom: 6),
                     child: Row(
                       children: [
                         SizedBox(
                           width: 30,
                           child: Text(
-                            day,
+                            _days[index],
+                            key: Key('weekly-day-${_days[index]}'),
                             style: TextStyle(
-                              color: day == 'Sat' ? C.accent : C.white,
+                              color: isCurrentWeek &&
+                                      localNow.weekday == index + 1
+                                  ? C.accent
+                                  : C.white,
                               fontSize: 10,
                               fontWeight: FontWeight.w500,
                             ),
                           ),
                         ),
-                        Expanded(child: _GanttRow(tasks: tasks[day] ?? const [])),
+                        Expanded(
+                          child: _GanttRow(
+                            tasks: tasks[_days[index]] ?? const [],
+                          ),
+                        ),
                       ],
                     ),
                   ),
-                ),
                 if (occurrences.isEmpty && acceptedBlocks.isEmpty)
                   const Padding(
                     padding: EdgeInsets.only(top: 8),
