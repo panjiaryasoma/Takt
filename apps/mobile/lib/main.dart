@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 
 import 'config/api_config.dart';
@@ -42,6 +43,15 @@ import 'widgets/common.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: C.bg,
+      statusBarIconBrightness: Brightness.light,
+      statusBarBrightness: Brightness.dark,
+      systemNavigationBarColor: C.bg,
+      systemNavigationBarIconBrightness: Brightness.light,
+    ),
+  );
   final monetization = await bootstrapRevenueCat();
   if (monetization.configurationError != null) {
     debugPrint('RevenueCat disabled: ${monetization.configurationError}');
@@ -572,12 +582,7 @@ class _RootShellState extends State<RootShell> {
       backgroundColor: C.bg,
       body: SafeArea(
         bottom: false,
-        child: Column(
-          children: [
-            const StatusBarMock(),
-            Expanded(child: _body()),
-          ],
-        ),
+        child: _body(),
       ),
       bottomNavigationBar: _BottomNav(
         activeIndex: _navIndex,
