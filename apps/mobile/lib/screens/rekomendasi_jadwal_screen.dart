@@ -170,7 +170,7 @@ class _RekomendasiJadwalScreenState extends State<RekomendasiJadwalScreen> {
             const Text('Suggested schedule · Not added to calendar', style: TextStyle(color: C.accent)),
             const SizedBox(height: 8),
             Text('Evaluated ${_instant(view.response.evaluatedAt)}', style: const TextStyle(color: C.detailMuted)),
-            if (_vm.isStale) const _ReportCard(highlight: true, child: Text(
+            if (_vm.isSessionOutdated) const _ReportCard(highlight: true, child: Text(
               'Inputs have changed. Go back for a new evaluation before accepting a suggested schedule.',
               key: Key('stale-notice'))),
             _ReportCard(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
