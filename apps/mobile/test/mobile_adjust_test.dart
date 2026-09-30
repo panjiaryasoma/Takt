@@ -61,8 +61,10 @@ void main() {
     expect(imageSet, contains('"filename" : "takt_logo.jpg"'));
     expect(project, contains('Generate Takt Branding'));
     expect(
-      project.indexOf('Generate Takt Branding'),
-      lessThan(project.indexOf('/* Resources */')),
+      project,
+      contains(
+        'A37B3D9E2F614EBA95C14001 /* Generate Takt Branding */,',
+      ),
     );
     expect(generator, contains('/usr/bin/sips'));
     expect(generator, contains('Icon-App-1024x1024@1x.png'));
@@ -347,7 +349,7 @@ void main() {
       const Offset(-420, 0),
     );
     await tester.pumpAndSettle();
-    expect(find.text('Analyze a competition'), findsWidgets);
+    expect(find.text('Analyze Competition'), findsOneWidget);
   });
 
   testWidgets('weekly summary highlights device-local today only in current week',
