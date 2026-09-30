@@ -27,7 +27,8 @@ void main() {
         File('android/app/src/main/res/values-v31/styles.xml')
             .readAsStringSync();
 
-    expect(manifest, contains('android:icon="@drawable/takt_logo"'));
+    expect(manifest, contains('android:icon="@mipmap/ic_launcher"'));
+    expect(File('android/app/src/main/res/mipmap-xxxhdpi/ic_launcher.jpg').existsSync(), isTrue);
     expect(splash, contains('@drawable/takt_logo'));
     expect(splash, contains('@color/takt_bg'));
     expect(android12, contains('android:windowSplashScreenAnimatedIcon'));
