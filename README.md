@@ -890,11 +890,11 @@ Refresh failures preserve the last trustworthy entitlement state.
 
 For the Shipaton Android demo:
 
-~~~bash
+~~~powershell
 cd apps/mobile
 cp config/revenuecat.test.example.json config/revenuecat.test.local.json
 
-flutter run --debug \
+flutter build apk --debug `
   --dart-define-from-file=config/revenuecat.test.local.json
 ~~~
 
