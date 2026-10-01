@@ -221,6 +221,51 @@ def test_official_rules_narrative_does_not_create_competition_name():
     assert fields[0].normalized_value == "Nebius x NVIDIA Global AI Hackathon"
 
 
+def test_devpost_readiness_sections_can_span_multiple_html_blocks():
+    report = normalize_candidate_report(
+        _document(
+            "native",
+            "blocks",
+            [
+                "3. Eligibility",
+                "The Hackathon IS open to:",
+                (
+                    "Individuals who are at least the age of majority where "
+                    "they reside as of the time of entry."
+                ),
+                "4. How To Enter",
+                "Project Requirements",
+                (
+                    "What to Create: Entrants must create a working software "
+                    "application that runs on either Nebius Token Factory or "
+                    "Nebius AI Cloud and uses at least one NVIDIA open source model."
+                ),
+                "Submission Requirements",
+                "Submissions to the Hackathon must meet the following requirements:",
+                "Provide a URL to a working demo, hosted application, or test build.",
+                "Include a text description that explains the Project.",
+                "Provide a URL to your public code repository.",
+                "Include a README with setup instructions.",
+                "Include a demonstration video of your Project.",
+                "Multiple Submissions",
+            ],
+        )
+    )
+
+    fields = {field.field_name: field for field in report.fields}
+    assert fields["eligibility"].normalized_value == {
+        "minimum_age": 21,
+        "requires_student": False,
+        "allowed_regions": [],
+    }
+    assert "working demo" in fields["deliverables"].normalized_value
+    assert "demonstration video" in fields["deliverables"].normalized_value
+    assert fields["required_technologies"].normalized_value == [
+        "Nebius Token Factory or Nebius AI Cloud",
+        "at least one NVIDIA open source model",
+    ]
+
+
 @pytest.mark.parametrize("path", ["native", "ocr"])
 @pytest.mark.parametrize("zone", ["UTC+07:00", "GMT+7", "UTC +07:00", "WIBB"])
 def test_unsupported_timezone_must_not_be_truncated_into_a_known_zone(path, zone):
