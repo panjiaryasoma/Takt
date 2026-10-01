@@ -297,13 +297,12 @@ def _resolve_eligibility_scope_validated(
         rule = _as_eligibility_rule(payload)
         if rule is None:
             return None
-        selected = selected_scope.strip()
         return ResolvedEligibilityScope(
-            selected_scope=selected,
+            selected_scope="unscoped",
             effective_rule=rule,
             provenance=_eligibility_provenance(
                 field,
-                selected_scope=selected,
+                selected_scope="unscoped",
             ),
         )
 
