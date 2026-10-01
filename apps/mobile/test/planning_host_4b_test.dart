@@ -543,6 +543,28 @@ void main() {
     host.dispose();
   });
 
+  test('unexpected request exception unlocks setup with retry available',
+      () async {
+    final api = _RawFailurePlanApi();
+    final host = PlanningHostViewModel(
+      apiClient: api,
+      scheduleRepository: schedule,
+      evaluationRepository: evaluations,
+      savedPlanRepository: savedPlans,
+    );
+
+    await host.startPlanning(snapshot);
+    host.addTask(_task());
+    await host.evaluate();
+
+    expect(host.phase, PlanningHostPhase.error);
+    expect(host.busy, isFalse);
+    expect(host.inputsLocked, isFalse);
+    expect(host.failure?.code, 'CLIENT_RUNTIME_ERROR');
+    expect(host.canRetryRequest, isTrue);
+    host.dispose();
+  });
+
   test('planning request retry reuses the exact assembled request', () async {
     final api = _FailOncePlanApi();
     final host = PlanningHostViewModel(
@@ -1382,6 +1404,27 @@ final class _ControlledPlanApi implements PlanApiClient {
     required String currentEvaluationRequestJson,
   }) {
     throw UnimplementedError();
+  }
+
+  @override
+  void close() {}
+}
+
+final class _RawFailurePlanApi implements PlanApiClient {
+  @override
+  Future<PlanEvaluateTransportResult> evaluate({
+    required String evaluationRequestJson,
+  }) {
+    throw StateError('simulated unexpected transport/runtime failure');
+  }
+
+  @override
+  Future<PlanReevaluateTransportResult> reevaluate({
+    required String priorEvaluationId,
+    required String priorEvaluationResponseJson,
+    required String currentEvaluationRequestJson,
+  }) {
+    throw StateError('simulated unexpected transport/runtime failure');
   }
 
   @override
