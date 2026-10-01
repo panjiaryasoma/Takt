@@ -236,135 +236,11 @@ class _PlanningSetupScreenState extends State<PlanningSetupScreen> {
 
   Future<PlanningTaskDraft?> _taskDialog({
     PlanningTaskDraft? existing,
-  }) async {
-    final name = TextEditingController(text: existing?.name ?? '');
-    final min = TextEditingController(
-      text: (existing?.effortMinMinutes ?? 60).toString(),
-    );
-    final likely = TextEditingController(
-      text: (existing?.effortLikelyMinutes ?? 120).toString(),
-    );
-    final max = TextEditingController(
-      text: (existing?.effortMaxMinutes ?? 180).toString(),
-    );
-    final dependencies = TextEditingController(
-      text: existing?.dependencies.join(', ') ?? '',
-    );
-    final assumptions = TextEditingController(
-      text: existing?.assumptions.join(', ') ?? '',
-    );
-    var mandatory = existing?.mandatory ?? true;
-    String? error;
-
-    final result = await showDialog<PlanningTaskDraft>(
+  }) {
+    return showDialog<PlanningTaskDraft>(
       context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          backgroundColor: C.card,
-          title: Text(existing == null ? 'Add planning task' : 'Edit planning task'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                _DialogField(controller: name, label: 'Task name'),
-                _DialogField(
-                  controller: min,
-                  label: 'Minimum effort (minutes)',
-                  numeric: true,
-                ),
-                _DialogField(
-                  controller: likely,
-                  label: 'Likely effort (minutes)',
-                  numeric: true,
-                ),
-                _DialogField(
-                  controller: max,
-                  label: 'Maximum effort (minutes)',
-                  numeric: true,
-                ),
-                _DialogField(
-                  controller: dependencies,
-                  label: 'Dependency task IDs (comma-separated)',
-                ),
-                _DialogField(
-                  controller: assumptions,
-                  label: 'Assumptions (comma-separated)',
-                ),
-                SwitchListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('Mandatory'),
-                  value: mandatory,
-                  onChanged: (value) =>
-                      setDialogState(() => mandatory = value),
-                ),
-                if (existing != null)
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: Text(
-                      'Stable ID: ${existing.taskId}',
-                      style: const TextStyle(
-                        color: C.detailMuted,
-                        fontSize: 11,
-                      ),
-                    ),
-                  ),
-                if (error != null)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      error!,
-                      style: const TextStyle(color: C.padat),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                try {
-                  final task = existing == null
-                      ? PlanningTaskDraft.create(
-                          name: name.text.trim(),
-                          mandatory: mandatory,
-                          effortMinMinutes: int.parse(min.text.trim()),
-                          effortLikelyMinutes: int.parse(likely.text.trim()),
-                          effortMaxMinutes: int.parse(max.text.trim()),
-                          dependencies: _csv(dependencies.text),
-                          assumptions: _csv(assumptions.text),
-                        )
-                      : existing.copyWith(
-                          name: name.text.trim(),
-                          mandatory: mandatory,
-                          effortMinMinutes: int.parse(min.text.trim()),
-                          effortLikelyMinutes: int.parse(likely.text.trim()),
-                          effortMaxMinutes: int.parse(max.text.trim()),
-                          dependencies: _csv(dependencies.text),
-                          assumptions: _csv(assumptions.text),
-                        );
-                  Navigator.pop(dialogContext, task);
-                } on Object catch (value) {
-                  setDialogState(() => error = _cleanError(value));
-                }
-              },
-              child: const Text('Save task'),
-            ),
-          ],
-        ),
-      ),
+      builder: (dialogContext) => _PlanningTaskDialog(existing: existing),
     );
-
-    name.dispose();
-    min.dispose();
-    likely.dispose();
-    max.dispose();
-    dependencies.dispose();
-    assumptions.dispose();
-    return result;
   }
 
   @override
@@ -617,6 +493,165 @@ class _PlanningSetupScreenState extends State<PlanningSetupScreen> {
             ),
         ],
       ),
+    );
+  }
+}
+
+
+class _PlanningTaskDialog extends StatefulWidget {
+  const _PlanningTaskDialog({this.existing});
+
+  final PlanningTaskDraft? existing;
+
+  @override
+  State<_PlanningTaskDialog> createState() => _PlanningTaskDialogState();
+}
+
+class _PlanningTaskDialogState extends State<_PlanningTaskDialog> {
+  late final TextEditingController _name;
+  late final TextEditingController _min;
+  late final TextEditingController _likely;
+  late final TextEditingController _max;
+  late final TextEditingController _dependencies;
+  late final TextEditingController _assumptions;
+  late bool _mandatory;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    final existing = widget.existing;
+    _name = TextEditingController(text: existing?.name ?? '');
+    _min = TextEditingController(
+      text: (existing?.effortMinMinutes ?? 60).toString(),
+    );
+    _likely = TextEditingController(
+      text: (existing?.effortLikelyMinutes ?? 120).toString(),
+    );
+    _max = TextEditingController(
+      text: (existing?.effortMaxMinutes ?? 180).toString(),
+    );
+    _dependencies = TextEditingController(
+      text: existing?.dependencies.join(', ') ?? '',
+    );
+    _assumptions = TextEditingController(
+      text: existing?.assumptions.join(', ') ?? '',
+    );
+    _mandatory = existing?.mandatory ?? true;
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _min.dispose();
+    _likely.dispose();
+    _max.dispose();
+    _dependencies.dispose();
+    _assumptions.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    FocusScope.of(context).unfocus();
+    try {
+      final existing = widget.existing;
+      final task = existing == null
+          ? PlanningTaskDraft.create(
+              name: _name.text.trim(),
+              mandatory: _mandatory,
+              effortMinMinutes: int.parse(_min.text.trim()),
+              effortLikelyMinutes: int.parse(_likely.text.trim()),
+              effortMaxMinutes: int.parse(_max.text.trim()),
+              dependencies: _csv(_dependencies.text),
+              assumptions: _csv(_assumptions.text),
+            )
+          : existing.copyWith(
+              name: _name.text.trim(),
+              mandatory: _mandatory,
+              effortMinMinutes: int.parse(_min.text.trim()),
+              effortLikelyMinutes: int.parse(_likely.text.trim()),
+              effortMaxMinutes: int.parse(_max.text.trim()),
+              dependencies: _csv(_dependencies.text),
+              assumptions: _csv(_assumptions.text),
+            );
+      Navigator.of(context).pop(task);
+    } on Object catch (value) {
+      setState(() => _error = _cleanError(value));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final existing = widget.existing;
+    return AlertDialog(
+      backgroundColor: C.card,
+      title: Text(existing == null ? 'Add planning task' : 'Edit planning task'),
+      content: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _DialogField(controller: _name, label: 'Task name'),
+            _DialogField(
+              controller: _min,
+              label: 'Minimum effort (minutes)',
+              numeric: true,
+            ),
+            _DialogField(
+              controller: _likely,
+              label: 'Likely effort (minutes)',
+              numeric: true,
+            ),
+            _DialogField(
+              controller: _max,
+              label: 'Maximum effort (minutes)',
+              numeric: true,
+            ),
+            _DialogField(
+              controller: _dependencies,
+              label: 'Dependency task IDs (comma-separated)',
+            ),
+            _DialogField(
+              controller: _assumptions,
+              label: 'Assumptions (comma-separated)',
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('Mandatory'),
+              value: _mandatory,
+              onChanged: (value) => setState(() => _mandatory = value),
+            ),
+            if (existing != null)
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Stable ID: ${existing.taskId}',
+                  style: const TextStyle(
+                    color: C.detailMuted,
+                    fontSize: 11,
+                  ),
+                ),
+              ),
+            if (_error != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: Text(
+                  _error!,
+                  style: const TextStyle(color: C.padat),
+                ),
+              ),
+          ],
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.of(context).pop(),
+          child: const Text('Cancel'),
+        ),
+        FilledButton(
+          onPressed: _save,
+          child: const Text('Save task'),
+        ),
+      ],
     );
   }
 }
