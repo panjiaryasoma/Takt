@@ -385,7 +385,9 @@ def _normalize_submission_period(value: str) -> str | None:
     parsed_date = None
     for date_format in ("%B %d %Y", "%b %d %Y"):
         try:
-            parsed_date = datetime.strptime(date_text, date_format)
+            parsed_date = datetime.strptime(date_text, date_format).replace(
+                tzinfo=timezone(timedelta(hours=-7))
+            )
             break
         except ValueError:
             continue
@@ -397,7 +399,6 @@ def _normalize_submission_period(value: str) -> str | None:
         hour=hour,
         minute=minute,
         second=0,
-        tzinfo=timezone(timedelta(hours=-7)),
     )
     return aware.isoformat()
 
