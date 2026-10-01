@@ -719,7 +719,7 @@ def test_default_candidate_normalizer_preserves_ocr_locator_and_version() -> Non
         assert item.raw_text_or_visual_reference == observed[item.page_or_locator]
         assert document.provider_id in item.extractor_version
         assert document.provider_version in item.extractor_version
-        assert "candidate-normalizer:rule-based-v1" in item.extractor_version
+        assert "candidate-normalizer:rule-based-v2" in item.extractor_version
 
 
 @pytest.mark.skipif(shutil.which("tesseract") is None, reason="Tesseract CLI is not installed")
@@ -747,4 +747,4 @@ def test_real_tesseract_output_becomes_candidate_extraction_report() -> None:
         assert item.page_or_locator in observed
         assert item.raw_text_or_visual_reference == observed[item.page_or_locator]
         assert document.provider_version in item.extractor_version
-        assert "candidate-normalizer:rule-based-v1" in item.extractor_version
+        assert "candidate-normalizer:rule-based-v2" in item.extractor_version

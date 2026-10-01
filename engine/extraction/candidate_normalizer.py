@@ -24,14 +24,14 @@ from packages.contracts import (
     ExtractionPath,
 )
 
-CANDIDATE_NORMALIZER_VERSION = "rule-based-v1"
+CANDIDATE_NORMALIZER_VERSION = "rule-based-v2"
 
 _MONTH_PATTERN = (
     r"January|February|March|April|May|June|July|August|September|October|"
     r"November|December"
 )
-_DEADLINE_LABEL_RE = re.compile(
-    r"\bsubmission\s+deadline\b\s*[:\-]?\s*(?P<value>.+)$",
+_FACT_LABEL_RE = re.compile(
+    r"\b(?P<label>submission\s+deadline|team\s+size)\b\s*[:\-]?\s*",
     re.IGNORECASE,
 )
 _DEADLINE_VALUE_RE = re.compile(
@@ -39,11 +39,7 @@ _DEADLINE_VALUE_RE = re.compile(
     r"(?P<day>\d{1,2})(?:,)?\s+"
     r"(?P<year>\d{4})"
     r"(?:\s+(?:at\s+)?(?P<hour>\d{1,2})[:.\s](?P<minute>\d{2})"
-    r"(?:\s*(?P<timezone>WIB|WITA|WIT|UTC|GMT))?)?",
-    re.IGNORECASE,
-)
-_TEAM_SIZE_LABEL_RE = re.compile(
-    r"\bteam\s+size\b\s*[:\-]?\s*(?P<value>.+)$",
+    r"(?:\s*(?P<timezone>WIB|WITA|WIT|UTC|GMT)(?!\w|\s*[+-]))?)?",
     re.IGNORECASE,
 )
 _TEAM_SIZE_RANGE_RE = re.compile(
@@ -219,7 +215,6 @@ class RuleBasedCandidateNormalizer:
 
         fields: list[CandidateField] = []
         evidence: list[EvidenceSpan] = []
-        seen_fields: set[str] = set()
         extractor_fingerprint = extractor_fingerprint_for_document(document)
 
         for block in document.blocks:
@@ -231,41 +226,28 @@ class RuleBasedCandidateNormalizer:
             if not isinstance(block.text, str) or not block.text.strip():
                 continue
 
-            deadline_match = _DEADLINE_LABEL_RE.search(block.text)
-            if deadline_match is not None and "submission_deadline" not in seen_fields:
-                raw_value = deadline_match.group("value").strip()
-                normalized_value = _normalize_deadline(raw_value)
+            matches = list(_FACT_LABEL_RE.finditer(block.text))
+            for index, match in enumerate(matches):
+                end = matches[index + 1].start() if index + 1 < len(matches) else len(block.text)
+                raw_value = block.text[match.end():end].strip()
+                if match.group("label").lower().startswith("submission"):
+                    field_name = "submission_deadline"
+                    normalized_value = _normalize_deadline(raw_value)
+                else:
+                    field_name = "team_size"
+                    normalized_value = _normalize_team_size(raw_value)
                 if normalized_value is not None:
                     self._append_candidate(
                         document=document,
                         extraction_path=extraction_path,
                         block=block,
-                        field_name="submission_deadline",
+                        field_name=field_name,
                         raw_value=raw_value,
                         normalized_value=normalized_value,
                         extractor_fingerprint=extractor_fingerprint,
                         fields=fields,
                         evidence=evidence,
                     )
-                    seen_fields.add("submission_deadline")
-
-            team_match = _TEAM_SIZE_LABEL_RE.search(block.text)
-            if team_match is not None and "team_size" not in seen_fields:
-                raw_value = team_match.group("value").strip()
-                normalized_value = _normalize_team_size(raw_value)
-                if normalized_value is not None:
-                    self._append_candidate(
-                        document=document,
-                        extraction_path=extraction_path,
-                        block=block,
-                        field_name="team_size",
-                        raw_value=raw_value,
-                        normalized_value=normalized_value,
-                        extractor_fingerprint=extractor_fingerprint,
-                        fields=fields,
-                        evidence=evidence,
-                    )
-                    seen_fields.add("team_size")
 
         return CandidateExtractionReport(
             source_id=document.source_record.source_id,
@@ -287,6 +269,23 @@ class RuleBasedCandidateNormalizer:
         fields: list[CandidateField],
         evidence: list[EvidenceSpan],
     ) -> None:
+        for previous in fields:
+            if previous.field_name != field_name:
+                continue
+            agrees = previous.normalized_value == normalized_value
+            if field_name == "submission_deadline":
+                agrees = datetime.fromisoformat(previous.normalized_value) == datetime.fromisoformat(
+                    normalized_value
+                )
+            if agrees:
+                return
+            # The wire contract permits one field per source/path. Ambiguity
+            # cannot be represented by silently selecting either observation.
+            raise CandidateNormalizationError(
+                "source contains conflicting labeled facts",
+                source_ref=document.source_record.url_or_document_id,
+            )
+
         evidence_id = build_evidence_id(
             source_id=document.source_record.source_id,
             content_hash=document.source_record.content_hash,

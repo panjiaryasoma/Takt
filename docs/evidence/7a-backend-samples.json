@@ -1,0 +1,297 @@
+{
+  "evidence_kind": "synthetic fixture executions, not a live deployment benchmark",
+  "candidate_normalizer_version": "rule-based-v2",
+  "fixed_evaluation_clock": "2026-09-27T13:20:17+00:00",
+  "source_conflict": {
+    "method": "real native PDF parser; injected contradictory OCR text provider",
+    "field": {
+      "field_name": "submission_deadline",
+      "state": "CONFLICT",
+      "value": null,
+      "normalized_value": null,
+      "candidates": [
+        {
+          "field_name": "submission_deadline",
+          "raw_value": "September 30 2026 at 23:59 WIB",
+          "normalized_value": "2026-09-30T23:59:00+07:00",
+          "evidence_ids": [
+            "ev-submission_deadline-08a68d27ce982252734f2782a5a11945c4f047f306e1a36fd33d9bad30c74fdc"
+          ],
+          "extraction_path": "native",
+          "confidence": null,
+          "scope": {
+            "category": "all"
+          }
+        },
+        {
+          "field_name": "submission_deadline",
+          "raw_value": "October 1 2026 at 23:59 WIB",
+          "normalized_value": "2026-10-01T23:59:00+07:00",
+          "evidence_ids": [
+            "ev-submission_deadline-e400dcede9c486503350300ac410aa95f1a449c9881a6316adafd9b0b0c268f8"
+          ],
+          "extraction_path": "ocr",
+          "confidence": 0.99,
+          "scope": {
+            "category": "all"
+          }
+        }
+      ],
+      "evidence_ids": [
+        "ev-submission_deadline-08a68d27ce982252734f2782a5a11945c4f047f306e1a36fd33d9bad30c74fdc",
+        "ev-submission_deadline-e400dcede9c486503350300ac410aa95f1a449c9881a6316adafd9b0b0c268f8"
+      ]
+    },
+    "provenance": [
+      {
+        "evidence_id": "ev-submission_deadline-08a68d27ce982252734f2782a5a11945c4f047f306e1a36fd33d9bad30c74fdc",
+        "source_id": "src-api",
+        "page_or_locator": "page:1:block:0",
+        "raw_text_or_visual_reference": "Submission deadline: September 30 2026 at 23:59 WIB",
+        "field_name": "submission_deadline",
+        "extraction_path": "native",
+        "extractor_version": "native-pdf-v1|candidate-normalizer:rule-based-v2|xfp:fdf72e1257db0ad0af19e3fd0deefa15b4d0750c05be9143f5385ccdc9aba633"
+      },
+      {
+        "evidence_id": "ev-submission_deadline-e400dcede9c486503350300ac410aa95f1a449c9881a6316adafd9b0b0c268f8",
+        "source_id": "src-api",
+        "page_or_locator": "page:1:api-fixture:1",
+        "raw_text_or_visual_reference": "Submission deadline: October 1 2026 at 23:59 WIB",
+        "field_name": "submission_deadline",
+        "extraction_path": "ocr",
+        "extractor_version": "api-fixture-ocr:1|ocr-observation:ocr-xfp-bc204177f699bc90b43816e3253fa67375970ceb61ba6d023a15d74b2915bea5|candidate-normalizer:rule-based-v2|xfp:b8a3a266ddd2589d096e7214c71833291a0fb5ce24cebfd5ad50bffed346451c"
+      }
+    ]
+  },
+  "feasible_planning": {
+    "input_method": "existing validated report/workload/availability fixture; real CP-SAT",
+    "response": {
+      "evaluation_id": "00000000-0000-4000-8000-000000000001",
+      "evaluated_at": "2026-09-27T13:20:17Z",
+      "basis": {
+        "version": "evaluation-basis-v1",
+        "domain_schema_version": "3.0.0",
+        "fingerprint": "54df0960b5b6238eccf8d3b1a256cd8794af84e6e411616d176ed9d56dd552cd",
+        "report": {
+          "competition_id": "cmp-ready",
+          "report_version": 4,
+          "reconciliation_policy_version": "reconciliation-v1",
+          "assembly_policy_version": "canonical-v1",
+          "assembly_material_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+        },
+        "readiness": {
+          "basis_version": "readiness-basis-v1",
+          "basis_fingerprint": "f28b5344c3d9819cb023d0b014aa7d025be3ca8ad8be03c766d2db75649bc858",
+          "projection_version": "readiness-projection-v1",
+          "rule_version": "1.0"
+        },
+        "planning": {
+          "basis_version": "planning-basis-v1",
+          "basis_fingerprint": "58aa278c321f46116de8398e705314254b2ca2df442a53dd19815edc23d4140e",
+          "policy_version": "planning-policy-v1",
+          "solver_backend": "ortools-cp-sat",
+          "solver_backend_version": "9.15.6755"
+        }
+      },
+      "readiness": {
+        "status": "READY_TO_EVALUATE",
+        "blocking_reasons": [],
+        "review_items": [],
+        "passed_checks": [
+          "deadline_valid",
+          "mandatory_information_complete"
+        ],
+        "rule_version": "1.0"
+      },
+      "planning": {
+        "feasibility": "FEASIBLE",
+        "candidates": [
+          {
+            "ref": {
+              "evaluation_id": "00000000-0000-4000-8000-000000000001",
+              "candidate_id": "candidate-001"
+            },
+            "work_blocks": [
+              {
+                "task_id": "task-1",
+                "start": "2026-09-27T13:21:00Z",
+                "end": "2026-09-27T14:21:00Z",
+                "allocated_minutes": 60,
+                "availability_source": "derived:work_window:0"
+              }
+            ],
+            "buffer_minutes": 39,
+            "assumptions": [
+              "solver effort basis: LIKELY",
+              "task-1: single-person estimate"
+            ]
+          },
+          {
+            "ref": {
+              "evaluation_id": "00000000-0000-4000-8000-000000000001",
+              "candidate_id": "candidate-002"
+            },
+            "work_blocks": [
+              {
+                "task_id": "task-1",
+                "start": "2026-09-27T13:51:00Z",
+                "end": "2026-09-27T14:51:00Z",
+                "allocated_minutes": 60,
+                "availability_source": "derived:work_window:0"
+              }
+            ],
+            "buffer_minutes": 39,
+            "assumptions": [
+              "solver effort basis: LIKELY",
+              "task-1: single-person estimate"
+            ]
+          }
+        ],
+        "allowed_actions": [
+          "ACCEPT",
+          "CHOOSE_ALTERNATIVE",
+          "EDIT_CONSTRAINTS",
+          "IGNORE"
+        ],
+        "reason_codes": [
+          "ALL_REQUIRED_SCENARIOS_FEASIBLE",
+          "FULL_SCOPE_LIKELY_FEASIBLE"
+        ],
+        "tradeoff_codes": [],
+        "sensitivity_codes": [
+          "MINIMUM_EFFORT_SCENARIO_FEASIBLE",
+          "MAX_EFFORT_SCENARIO_FEASIBLE"
+        ],
+        "recommendation": {
+          "primary_candidate": {
+            "evaluation_id": "00000000-0000-4000-8000-000000000001",
+            "candidate_id": "candidate-001"
+          },
+          "alternative_candidates": [
+            {
+              "evaluation_id": "00000000-0000-4000-8000-000000000001",
+              "candidate_id": "candidate-002"
+            }
+          ],
+          "recommendation": {
+            "recommended_candidate_id": "candidate-001",
+            "recommended_next_work": {
+              "task_id": "task-1",
+              "task_name": "Build demo",
+              "start": "2026-09-27T13:21:00Z",
+              "end": "2026-09-27T14:21:00Z",
+              "allocated_minutes": 60,
+              "availability_source": "derived:work_window:0"
+            },
+            "suggested_windows": [
+              {
+                "task_id": "task-1",
+                "start": "2026-09-27T13:21:00Z",
+                "end": "2026-09-27T14:21:00Z",
+                "allocated_minutes": 60,
+                "availability_source": "derived:work_window:0"
+              }
+            ],
+            "alternatives": [
+              {
+                "candidate_id": "candidate-002",
+                "buffer_minutes": 39,
+                "recommended_next_work": {
+                  "task_id": "task-1",
+                  "task_name": "Build demo",
+                  "start": "2026-09-27T13:51:00Z",
+                  "end": "2026-09-27T14:51:00Z",
+                  "allocated_minutes": 60,
+                  "availability_source": "derived:work_window:0"
+                },
+                "suggested_windows": [
+                  {
+                    "task_id": "task-1",
+                    "start": "2026-09-27T13:51:00Z",
+                    "end": "2026-09-27T14:51:00Z",
+                    "allocated_minutes": 60,
+                    "availability_source": "derived:work_window:0"
+                  }
+                ],
+                "tradeoffs": [
+                  "Completes 30 minutes later than the primary candidate."
+                ]
+              }
+            ],
+            "rationale": [
+              "Required work fits across the modeled minimum, likely, and maximum effort scenarios.",
+              "The full scope fits at the likely effort estimate.",
+              "Required work fits at the minimum effort estimate.",
+              "Required work still fits at the maximum effort estimate.",
+              "Primary candidate ranks first among valid candidates because ranking prioritizes fewer work blocks, then earlier completion, with a deterministic schedule signature as the final tie-breaker. It uses 1 work blocks and completes at 2026-09-27T14:21:00+00:00."
+            ],
+            "tradeoffs": [],
+            "assumptions": [
+              {
+                "task_id": "task-1",
+                "description": "single-person estimate"
+              }
+            ]
+          },
+          "trace": {
+            "competition_id": "cmp-ready",
+            "report_version": 4,
+            "assembly_material_fingerprint": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+            "evaluation_basis_fingerprint": "54df0960b5b6238eccf8d3b1a256cd8794af84e6e411616d176ed9d56dd552cd",
+            "planning_basis_fingerprint": "58aa278c321f46116de8398e705314254b2ca2df442a53dd19815edc23d4140e",
+            "planning_policy_version": "planning-policy-v1"
+          }
+        }
+      }
+    },
+    "independent_hard_violations": {
+      "candidate-001": [],
+      "candidate-002": []
+    }
+  },
+  "blocked_readiness": {
+    "readiness": {
+      "status": "NEEDS_REVIEW",
+      "blocking_reasons": [],
+      "review_items": [
+        "unresolved_critical_field:deliverables"
+      ],
+      "passed_checks": [],
+      "rule_version": "1.0"
+    },
+    "planning": null,
+    "basis_planning": null
+  },
+  "infeasible": {
+    "readiness": "READY_TO_EVALUATE",
+    "planning": {
+      "feasibility": "NOT_FEASIBLE_UNDER_CURRENT_CONSTRAINTS",
+      "candidates": [],
+      "allowed_actions": [
+        "EDIT_CONSTRAINTS",
+        "IGNORE"
+      ],
+      "reason_codes": [
+        "REQUIRED_LIKELY_INFEASIBLE",
+        "REQUIRED_MAX_INFEASIBLE",
+        "FULL_SCOPE_LIKELY_INFEASIBLE"
+      ],
+      "tradeoff_codes": [],
+      "sensitivity_codes": [
+        "LIKELY_EFFORT_SCENARIO_INFEASIBLE"
+      ],
+      "recommendation": null
+    }
+  },
+  "superseded": {
+    "kind": "SUPERSEDED",
+    "prior_evaluation_id": "00000000-0000-4000-8000-000000000001",
+    "prior_basis_fingerprint": "54df0960b5b6238eccf8d3b1a256cd8794af84e6e411616d176ed9d56dd552cd",
+    "current_basis_fingerprint": "633e5c66dd3772f5f71f13bb5c5754fd74f1a8427c3525159b1b080493a290bb",
+    "prior_evaluation_freshness": "STALE",
+    "change_reasons": [
+      "PLANNING_BASIS_CHANGED"
+    ]
+  },
+  "public_recovery_cases": 76
+}
