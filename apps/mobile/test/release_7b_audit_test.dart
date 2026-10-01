@@ -118,8 +118,8 @@ void _resetViewport(WidgetTester tester) {
   tester.platformDispatcher.clearTextScaleFactorTestValue();
 }
 
-@Tags(['release-7b'])
 void main() {
+  group('7B release audit', () {
   testWidgets('7B synthetic screenshot evidence covers critical product states',
       (tester) async {
     _phoneViewport(tester);
@@ -345,6 +345,7 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
     await _pumpBounded(tester, frames: 2);
   });
+  }, tags: 'release-7b');
 }
 
 final class _StaticSavedPlanRepository implements SavedPlanRepository {
