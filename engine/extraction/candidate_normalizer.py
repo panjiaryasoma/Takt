@@ -31,8 +31,8 @@ _MONTH_PATTERN = (
     r"November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec"
 )
 _FACT_LABEL_RE = re.compile(
-    r"\b(?P<label>submission\s+deadline|registration\s+deadline|deadline|"
-    r"team\s+size)\b\s*[:\-]?\s*",
+    r"\b(?P<label>submission\s+deadline|registration\s+deadline|"
+    r"deadline(?=\s*[:\-])|team\s+size)\b\s*[:\-]?\s*",
     re.IGNORECASE,
 )
 _DEADLINE_VALUE_RE = re.compile(
