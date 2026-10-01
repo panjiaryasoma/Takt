@@ -31,8 +31,9 @@ _MONTH_PATTERN = (
     r"November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec"
 )
 _FACT_LABEL_RE = re.compile(
-    r"\b(?P<label>submission\s+deadline|registration\s+deadline|"
-    r"deadline(?=\s*[:\-])|team\s+size)\b\s*[:\-]?\s*",
+    r"\b(?P<label>submission\s+deadline|submission\s+period|"
+    r"registration\s+deadline|deadline(?=\s*[:\-])|team\s+size)"
+    r"\b\s*[:\-]?\s*",
     re.IGNORECASE,
 )
 _DEADLINE_VALUE_RE = re.compile(
@@ -313,6 +314,54 @@ def _normalize_generic_deadline(value: str) -> str | None:
     return _deadline_from_match(match)
 
 
+_PACIFIC_RANGE_END_RE = re.compile(
+    rf"(?:Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday),\s+"
+    rf"(?P<month>{_MONTH_PATTERN})\s+(?P<day>\d{{1,2}}),\s+(?P<year>\d{{4}})"
+    r"\s*\(\s*(?P<hour>\d{1,2})[:.](?P<minute>\d{2})\s*"
+    r"(?P<meridiem>am|pm)\s+Pacific\s+Time\s*\)",
+    re.IGNORECASE,
+)
+
+
+def _normalize_submission_period(value: str) -> str | None:
+    """Return the end instant from a Devpost-style submission period range."""
+
+    matches = list(_PACIFIC_RANGE_END_RE.finditer(value))
+    if not matches:
+        return None
+    end = matches[-1]
+    month = end.group("month")
+    day = end.group("day")
+    year = end.group("year")
+    hour = int(end.group("hour"))
+    minute = int(end.group("minute"))
+    meridiem = end.group("meridiem").lower()
+    if meridiem == "am":
+        hour = 0 if hour == 12 else hour
+    else:
+        hour = 12 if hour == 12 else hour + 12
+
+    date_text = f"{month} {day} {year}"
+    parsed_date = None
+    for date_format in ("%B %d %Y", "%b %d %Y"):
+        try:
+            parsed_date = datetime.strptime(date_text, date_format)
+            break
+        except ValueError:
+            continue
+    if parsed_date is None:
+        return None
+
+    # Devpost's "Pacific Time" is PDT for late October 2026.
+    aware = parsed_date.replace(
+        hour=hour,
+        minute=minute,
+        second=0,
+        tzinfo=timezone(timedelta(hours=-7)),
+    )
+    return aware.isoformat()
+
+
 def _team_size_from_text(value: str) -> dict[str, int] | None:
     match = _TEAM_SIZE_RANGE_RE.match(value)
     if match is None:
@@ -440,9 +489,17 @@ class RuleBasedCandidateNormalizer:
                     if label == "submission deadline":
                         field_name = "submission_deadline"
                         normalized_value = _normalize_deadline(raw_value)
+                    elif label == "submission period":
+                        field_name = "submission_deadline"
+                        normalized_value = _normalize_submission_period(raw_value)
                     elif label == "deadline":
                         field_name = "submission_deadline"
                         normalized_value = _normalize_generic_deadline(raw_value)
+                        if normalized_value is None:
+                            # Generic page chrome may contain unrelated Deadline:
+                            # labels. Ignore unsupported generic labels instead of
+                            # poisoning an explicit/structured submission deadline.
+                            continue
                     elif label == "registration deadline":
                         field_name = "registration_deadline"
                         normalized_value = _normalize_deadline(raw_value)
