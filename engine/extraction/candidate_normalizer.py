@@ -24,14 +24,14 @@ from packages.contracts import (
     ExtractionPath,
 )
 
-CANDIDATE_NORMALIZER_VERSION = "rule-based-v1"
+CANDIDATE_NORMALIZER_VERSION = "rule-based-v2"
 
 _MONTH_PATTERN = (
     r"January|February|March|April|May|June|July|August|September|October|"
     r"November|December"
 )
-_DEADLINE_LABEL_RE = re.compile(
-    r"\bsubmission\s+deadline\b\s*[:\-]?\s*(?P<value>.+)$",
+_FACT_LABEL_RE = re.compile(
+    r"\b(?P<label>submission\s+deadline|team\s+size)\b\s*[:\-]?\s*",
     re.IGNORECASE,
 )
 _DEADLINE_VALUE_RE = re.compile(
@@ -39,11 +39,7 @@ _DEADLINE_VALUE_RE = re.compile(
     r"(?P<day>\d{1,2})(?:,)?\s+"
     r"(?P<year>\d{4})"
     r"(?:\s+(?:at\s+)?(?P<hour>\d{1,2})[:.\s](?P<minute>\d{2})"
-    r"(?:\s*(?P<timezone>WIB|WITA|WIT|UTC|GMT))?)?",
-    re.IGNORECASE,
-)
-_TEAM_SIZE_LABEL_RE = re.compile(
-    r"\bteam\s+size\b\s*[:\-]?\s*(?P<value>.+)$",
+    r"(?:\s*(?P<timezone>WIB|WITA|WIT|UTC|GMT)(?!\w|\s*[+-]))?)?",
     re.IGNORECASE,
 )
 _TEAM_SIZE_RANGE_RE = re.compile(
@@ -142,11 +138,14 @@ def _candidate_confidence(document: ExtractionDocument, block: Any) -> float | N
     return None
 
 
-def _normalize_deadline(value: str) -> str | None:
-    match = _DEADLINE_VALUE_RE.search(value)
-    if match is None:
-        return None
+class _AmbiguousLabeledValue(ValueError):
+    """One explicit label contains alternatives the V1 candidate shape cannot represent."""
 
+
+_ALTERNATIVE_VALUE_RE = re.compile(r"\s+(?:or)\s+|\s*/\s*", re.IGNORECASE)
+
+
+def _deadline_from_match(match: re.Match[str]) -> str | None:
     try:
         parsed_date = datetime.strptime(
             f"{match.group('month')} {match.group('day')} {match.group('year')}",
@@ -179,8 +178,65 @@ def _normalize_deadline(value: str) -> str | None:
     return aware.isoformat()
 
 
-def _normalize_team_size(value: str) -> dict[str, int] | None:
-    match = _TEAM_SIZE_RANGE_RE.search(value)
+def _deadline_key(value: str) -> tuple[str, object]:
+    if "T" not in value:
+        return ("date", value)
+    return ("instant", datetime.fromisoformat(value).astimezone(UTC))
+
+
+def _normalize_deadline(value: str) -> str | None:
+    cleaned = value.strip()
+    alternatives = tuple(
+        item.strip()
+        for item in _ALTERNATIVE_VALUE_RE.split(cleaned)
+        if item.strip()
+    )
+    if not alternatives:
+        return None
+
+    normalized: list[str | None] = []
+    first_matches: list[re.Match[str] | None] = []
+    for alternative in alternatives:
+        match = _DEADLINE_VALUE_RE.match(alternative)
+        first_matches.append(match)
+        normalized.append(_deadline_from_match(match) if match is not None else None)
+
+    supported = [item for item in normalized if item is not None]
+    if not supported:
+        return None
+    if len(supported) != len(normalized):
+        raise _AmbiguousLabeledValue(
+            "deadline alternatives mix supported and unsupported values"
+        )
+
+    # Do not let a valid prefix hide another direct supported deadline later in
+    # the same labeled value. The V1 candidate shape cannot represent both.
+    observed = list(supported)
+    for alternative, first in zip(alternatives, first_matches, strict=True):
+        if first is None:
+            continue
+        tail = alternative[first.end():]
+        # An explicit but unsupported time suffix must not downgrade to a
+        # date-only fact merely because the time grammar failed.
+        if first.group("hour") is None and re.match(r"^\s+at\b", tail, re.IGNORECASE):
+            raise _AmbiguousLabeledValue(
+                "deadline contains an unsupported explicit time"
+            )
+        for extra in _DEADLINE_VALUE_RE.finditer(tail):
+            parsed = _deadline_from_match(extra)
+            if parsed is None:
+                raise _AmbiguousLabeledValue(
+                    "deadline alternatives mix supported and unsupported values"
+                )
+            observed.append(parsed)
+
+    if len({_deadline_key(item) for item in observed}) != 1:
+        raise _AmbiguousLabeledValue("deadline alternatives disagree")
+    return supported[0]
+
+
+def _team_size_from_text(value: str) -> dict[str, int] | None:
+    match = _TEAM_SIZE_RANGE_RE.match(value)
     if match is None:
         return None
     minimum = int(match.group("minimum"))
@@ -188,6 +244,44 @@ def _normalize_team_size(value: str) -> dict[str, int] | None:
     if minimum <= 0 or maximum < minimum:
         return None
     return {"min": minimum, "max": maximum}
+
+
+def _normalize_team_size(value: str) -> dict[str, int] | None:
+    alternatives = tuple(
+        item.strip()
+        for item in _ALTERNATIVE_VALUE_RE.split(value.strip())
+        if item.strip()
+    )
+    if not alternatives:
+        return None
+
+    normalized = [_team_size_from_text(item) for item in alternatives]
+    supported = [item for item in normalized if item is not None]
+    if not supported:
+        return None
+    if len(supported) != len(normalized):
+        raise _AmbiguousLabeledValue(
+            "team-size alternatives mix supported and unsupported values"
+        )
+
+    observed = list(supported)
+    for alternative in alternatives:
+        first = _TEAM_SIZE_RANGE_RE.match(alternative)
+        if first is None:
+            continue
+        for extra in _TEAM_SIZE_RANGE_RE.finditer(alternative, first.end()):
+            minimum = int(extra.group("minimum"))
+            maximum = int(extra.group("maximum"))
+            if minimum <= 0 or maximum < minimum:
+                raise _AmbiguousLabeledValue(
+                    "team-size alternatives mix supported and unsupported values"
+                )
+            observed.append({"min": minimum, "max": maximum})
+
+    keys = {(item["min"], item["max"]) for item in observed}
+    if len(keys) != 1:
+        raise _AmbiguousLabeledValue("team-size alternatives disagree")
+    return supported[0]
 
 
 class RuleBasedCandidateNormalizer:
@@ -219,7 +313,7 @@ class RuleBasedCandidateNormalizer:
 
         fields: list[CandidateField] = []
         evidence: list[EvidenceSpan] = []
-        seen_fields: set[str] = set()
+        parsed_by_field: dict[str, bool] = {}
         extractor_fingerprint = extractor_fingerprint_for_document(document)
 
         for block in document.blocks:
@@ -231,41 +325,41 @@ class RuleBasedCandidateNormalizer:
             if not isinstance(block.text, str) or not block.text.strip():
                 continue
 
-            deadline_match = _DEADLINE_LABEL_RE.search(block.text)
-            if deadline_match is not None and "submission_deadline" not in seen_fields:
-                raw_value = deadline_match.group("value").strip()
-                normalized_value = _normalize_deadline(raw_value)
+            matches = list(_FACT_LABEL_RE.finditer(block.text))
+            for index, match in enumerate(matches):
+                end = matches[index + 1].start() if index + 1 < len(matches) else len(block.text)
+                raw_value = block.text[match.end():end].strip()
+                try:
+                    if match.group("label").lower().startswith("submission"):
+                        field_name = "submission_deadline"
+                        normalized_value = _normalize_deadline(raw_value)
+                    else:
+                        field_name = "team_size"
+                        normalized_value = _normalize_team_size(raw_value)
+                except _AmbiguousLabeledValue as exc:
+                    raise CandidateNormalizationError(
+                        "source contains conflicting labeled facts",
+                        source_ref=document.source_record.url_or_document_id,
+                    ) from exc
+                parsed = normalized_value is not None
+                if field_name in parsed_by_field and parsed_by_field[field_name] != parsed:
+                    raise CandidateNormalizationError(
+                        "source contains conflicting supported and unsupported labeled facts",
+                        source_ref=document.source_record.url_or_document_id,
+                    )
+                parsed_by_field[field_name] = parsed
                 if normalized_value is not None:
                     self._append_candidate(
                         document=document,
                         extraction_path=extraction_path,
                         block=block,
-                        field_name="submission_deadline",
+                        field_name=field_name,
                         raw_value=raw_value,
                         normalized_value=normalized_value,
                         extractor_fingerprint=extractor_fingerprint,
                         fields=fields,
                         evidence=evidence,
                     )
-                    seen_fields.add("submission_deadline")
-
-            team_match = _TEAM_SIZE_LABEL_RE.search(block.text)
-            if team_match is not None and "team_size" not in seen_fields:
-                raw_value = team_match.group("value").strip()
-                normalized_value = _normalize_team_size(raw_value)
-                if normalized_value is not None:
-                    self._append_candidate(
-                        document=document,
-                        extraction_path=extraction_path,
-                        block=block,
-                        field_name="team_size",
-                        raw_value=raw_value,
-                        normalized_value=normalized_value,
-                        extractor_fingerprint=extractor_fingerprint,
-                        fields=fields,
-                        evidence=evidence,
-                    )
-                    seen_fields.add("team_size")
 
         return CandidateExtractionReport(
             source_id=document.source_record.source_id,
@@ -287,6 +381,23 @@ class RuleBasedCandidateNormalizer:
         fields: list[CandidateField],
         evidence: list[EvidenceSpan],
     ) -> None:
+        for previous in fields:
+            if previous.field_name != field_name:
+                continue
+            agrees = previous.normalized_value == normalized_value
+            if field_name == "submission_deadline":
+                agrees = datetime.fromisoformat(previous.normalized_value) == datetime.fromisoformat(
+                    normalized_value
+                )
+            if agrees:
+                return
+            # The wire contract permits one field per source/path. Ambiguity
+            # cannot be represented by silently selecting either observation.
+            raise CandidateNormalizationError(
+                "source contains conflicting labeled facts",
+                source_ref=document.source_record.url_or_document_id,
+            )
+
         evidence_id = build_evidence_id(
             source_id=document.source_record.source_id,
             content_hash=document.source_record.content_hash,

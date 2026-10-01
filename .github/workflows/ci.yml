@@ -8,9 +8,14 @@ on:
 jobs:
   python:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        shell: bash
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - uses: actions/setup-python@v5
         with:
@@ -29,11 +34,54 @@ jobs:
       - name: Sync dependencies
         run: uv sync --locked --dev
 
+      - name: Record backend audit context
+        run: |
+          mkdir -p tmp/backend-audit
+          uv run --locked python - <<'PY'
+          import hashlib
+          import json
+          import os
+          import platform
+          import subprocess
+          from pathlib import Path
+
+          def git(*args):
+              return subprocess.check_output(["git", *args], text=True).strip()
+
+          paths = ["apps/api", "engine", "packages/contracts", "tests", "scripts",
+                   "pyproject.toml", "uv.lock"]
+          authorities = ["tests/support/public_error_matrix.py",
+                         "tests/fixtures/reliability/recovery_policy_v1.json"]
+          context = {
+              "audited_commit": git("rev-parse", "HEAD"),
+              "audited_tree": git("rev-parse", "HEAD^{tree}"),
+              "event_commit": os.environ["GITHUB_SHA"],
+              "run_url": f"{os.environ['GITHUB_SERVER_URL']}/{os.environ['GITHUB_REPOSITORY']}/actions/runs/{os.environ['GITHUB_RUN_ID']}",
+              "python": platform.python_version(),
+              "tracked_objects": {p: git("rev-parse", f"HEAD:{p}") for p in paths},
+              "authority_sha256": {p: hashlib.sha256(Path(p).read_bytes()).hexdigest() for p in authorities},
+          }
+          Path("tmp/backend-audit/context.json").write_text(json.dumps(context, indent=2) + "\n")
+          PY
+          uv pip freeze > tmp/backend-audit/dependencies.txt
+          tesseract --version > tmp/backend-audit/tesseract.txt
+          tesseract --list-langs >> tmp/backend-audit/tesseract.txt
+          uv run --locked python scripts/validate_repo.py | tee tmp/backend-audit/repository.log
+
       - name: Lint
-        run: uv run ruff check apps engine packages tests scripts
+        run: uv run --locked ruff check apps engine packages tests scripts | tee tmp/backend-audit/ruff.log
 
       - name: Test
-        run: uv run pytest -q
+        run: uv run --locked pytest -q --junitxml=tmp/backend-audit/pytest.xml | tee tmp/backend-audit/pytest.log
+
+      - name: Upload backend audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backend-audit-${{ github.event.pull_request.head.sha || github.sha }}
+          path: tmp/backend-audit/
+          if-no-files-found: error
+          retention-days: 90
 
   flutter:
     runs-on: ubuntu-latest
