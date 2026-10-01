@@ -24,7 +24,7 @@ from packages.contracts import (
     ExtractionPath,
 )
 
-CANDIDATE_NORMALIZER_VERSION = "rule-based-v3"
+CANDIDATE_NORMALIZER_VERSION = "rule-based-v4"
 
 _MONTH_PATTERN = (
     r"January|February|March|April|May|June|July|August|September|October|"
@@ -59,6 +59,20 @@ _TEAM_SIZE_RANGE_RE = re.compile(
     r"(?P<minimum>\d+)\s*(?:to|[-–—])\s*(?P<maximum>\d+)",
     re.IGNORECASE,
 )
+_ELIGIBILITY_OPEN_RE = re.compile(
+    r"The\s+Hackathon\s+IS\s+open\s+to\s*:",
+    re.IGNORECASE,
+)
+_AGE_OF_MAJORITY_RE = re.compile(r"age\s+of\s+majority", re.IGNORECASE)
+_SUBMISSION_REQUIREMENTS_RE = re.compile(
+    r"Submission\s+Requirements",
+    re.IGNORECASE,
+)
+_PROJECT_REQUIREMENTS_RE = re.compile(
+    r"Project\s+Requirements",
+    re.IGNORECASE,
+)
+
 _TIMEZONE_OFFSETS = {
     "WIB": 7,
     "WITA": 8,
@@ -364,6 +378,58 @@ def _normalize_submission_period(value: str) -> str | None:
     return aware.isoformat()
 
 
+def _eligibility_from_text(value: str) -> dict[str, object] | None:
+    if _ELIGIBILITY_OPEN_RE.search(value) is None:
+        return None
+    if _AGE_OF_MAJORITY_RE.search(value) is None:
+        return None
+
+    # V1 eligibility can only represent a numeric minimum age, not a
+    # jurisdiction-dependent "age of majority" rule. Use 21 as a conservative
+    # projection so the system avoids false-positive eligibility for minors.
+    # Region exclusions remain visible in raw evidence but are not representable
+    # by the frozen positive-list contract.
+    return {
+        "minimum_age": 21,
+        "requires_student": False,
+        "allowed_regions": [],
+    }
+
+
+def _deliverables_from_text(value: str) -> list[str] | None:
+    if _SUBMISSION_REQUIREMENTS_RE.search(value) is None:
+        return None
+
+    deliverables: list[str] = []
+    probes = (
+        ("working demo", r"URL\s+to\s+a\s+working\s+demo|hosted\s+application|test\s+build"),
+        ("text description", r"text\s+description"),
+        ("public code repository", r"public\s+code\s+repository"),
+        ("README with setup instructions", r"README\s+with\s+setup\s+instructions"),
+        ("demonstration video", r"demonstration\s+video"),
+        ("track selection", r"Identify\s+which\s+track"),
+        ("tool feedback", r"Provide\s+feedback\s+on\s+Nebius"),
+    )
+    for label, pattern in probes:
+        if re.search(pattern, value, re.IGNORECASE):
+            deliverables.append(label)
+    return deliverables or None
+
+
+def _required_technologies_from_text(value: str) -> list[str] | None:
+    if _PROJECT_REQUIREMENTS_RE.search(value) is None:
+        return None
+    if "Nebius" not in value or "NVIDIA" not in value:
+        return None
+
+    technologies: list[str] = []
+    if re.search(r"Nebius\s+Token\s+Factory", value, re.IGNORECASE):
+        technologies.append("Nebius Token Factory or Nebius AI Cloud")
+    if re.search(r"NVIDIA\s+open\s+source\s+model", value, re.IGNORECASE):
+        technologies.append("at least one NVIDIA open source model")
+    return technologies or None
+
+
 def _team_size_from_text(value: str) -> dict[str, int] | None:
     match = _TEAM_SIZE_RANGE_RE.match(value)
     if match is None:
@@ -477,6 +543,48 @@ class RuleBasedCandidateNormalizer:
                     field_name="organizer",
                     raw_value=organizer,
                     normalized_value=organizer,
+                    extractor_fingerprint=extractor_fingerprint,
+                    fields=fields,
+                    evidence=evidence,
+                )
+
+            eligibility = _eligibility_from_text(block.text)
+            if eligibility is not None:
+                self._append_candidate(
+                    document=document,
+                    extraction_path=extraction_path,
+                    block=block,
+                    field_name="eligibility",
+                    raw_value=block.text,
+                    normalized_value=eligibility,
+                    extractor_fingerprint=extractor_fingerprint,
+                    fields=fields,
+                    evidence=evidence,
+                )
+
+            deliverables = _deliverables_from_text(block.text)
+            if deliverables is not None:
+                self._append_candidate(
+                    document=document,
+                    extraction_path=extraction_path,
+                    block=block,
+                    field_name="deliverables",
+                    raw_value=deliverables,
+                    normalized_value=deliverables,
+                    extractor_fingerprint=extractor_fingerprint,
+                    fields=fields,
+                    evidence=evidence,
+                )
+
+            required_technologies = _required_technologies_from_text(block.text)
+            if required_technologies is not None:
+                self._append_candidate(
+                    document=document,
+                    extraction_path=extraction_path,
+                    block=block,
+                    field_name="required_technologies",
+                    raw_value=required_technologies,
+                    normalized_value=required_technologies,
                     extractor_fingerprint=extractor_fingerprint,
                     fields=fields,
                     evidence=evidence,
