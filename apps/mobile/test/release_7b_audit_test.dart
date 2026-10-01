@@ -70,7 +70,7 @@ Widget _frame(Widget child, {double textScale = 1}) {
           body: SafeArea(
             child: RepaintBoundary(
               key: _frameKey,
-              child: child,
+              child: SizedBox.expand(child: child),
             ),
           ),
         ),
