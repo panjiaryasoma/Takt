@@ -88,9 +88,12 @@ jobs:
     defaults:
       run:
         working-directory: apps/mobile
+        shell: bash
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -104,15 +107,119 @@ jobs:
       - name: Verify Flutter lockfile is committed
         run: git diff --exit-code -- pubspec.lock
 
+      - name: Record mobile audit context
+        run: |
+          set -o pipefail
+          mkdir -p build/7b-audit/screenshots
+          audited_commit="$(git rev-parse HEAD)"
+          audited_tree="$(git rev-parse 'HEAD^{tree}')"
+          mobile_tree="$(git rev-parse HEAD:apps/mobile)"
+          recovery_sha="$(sha256sum ../../tests/fixtures/reliability/recovery_policy_v1.json | awk '{print $1}')"
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          printf '{\n  "format": "7b-mobile-audit-context-v1",\n  "audited_commit": "%s",\n  "audited_tree": "%s",\n  "mobile_tree": "%s",\n  "event_commit": "%s",\n  "recovery_policy_sha256": "%s",\n  "run_url": "%s"\n}\n' \
+            "$audited_commit" "$audited_tree" "$mobile_tree" "$GITHUB_SHA" "$recovery_sha" "$run_url" \
+            > build/7b-audit/context.json
+          flutter --version > build/7b-audit/flutter-version.txt
+
       - name: Flutter analyze
-        run: flutter analyze
+        run: |
+          set -o pipefail
+          flutter analyze 2>&1 | tee build/7b-audit/flutter-analyze.log
 
       - name: Flutter test
         timeout-minutes: 5
-        run: flutter test --reporter expanded
+        env:
+          TAKT_7B_AUDIT_DIR: build/7b-audit
+        run: |
+          set -o pipefail
+          flutter test --exclude-tags release-7b --reporter expanded 2>&1 | tee build/7b-audit/flutter-test.log
+
+      - name: Run 7B compact QA
+        timeout-minutes: 2
+        env:
+          TAKT_7B_AUDIT_DIR: build/7b-audit
+        run: |
+          set -o pipefail
+          flutter test test/release_7b_audit_test.dart \
+            --plain-name "7B critical root surfaces remain usable at 320px and 2x text" \
+            --reporter expanded 2>&1 | tee build/7b-audit/compact-qa.log
+
+      - name: Render 7B screenshot evidence
+        timeout-minutes: 3
+        env:
+          TAKT_7B_CAPTURE_GOLDENS: "1"
+          TAKT_7B_AUDIT_DIR: build/7b-audit
+        run: |
+          set -o pipefail
+          rm -rf test/release_7b_goldens
+          flutter test test/release_7b_audit_test.dart \
+            --update-goldens \
+            --plain-name "7B synthetic screenshot evidence covers critical product states" \
+            --reporter expanded 2>&1 | tee build/7b-audit/screenshot-evidence.log
+          mkdir -p build/7b-audit/screenshots
+          cp test/release_7b_goldens/*.png build/7b-audit/screenshots/
+          test "$(find build/7b-audit/screenshots -maxdepth 1 -name '*.png' | wc -l)" -eq 9
+          python3 - <<'PY'
+          import pathlib
+          import struct
+
+          expected = (390, 844)
+          files = sorted(pathlib.Path("build/7b-audit/screenshots").glob("*.png"))
+          if len(files) != 9:
+              raise SystemExit(f"expected 9 screenshots, found {len(files)}")
+          for path in files:
+              data = path.read_bytes()
+              if data[:8] != b"\x89PNG\r\n\x1a\n":
+                  raise SystemExit(f"{path.name}: not a PNG")
+              width, height = struct.unpack(">II", data[16:24])
+              if (width, height) != expected:
+                  raise SystemExit(
+                      f"{path.name}: expected {expected[0]}x{expected[1]}, "
+                      f"got {width}x{height}"
+                  )
+          PY
+          cat > build/7b-audit/manifest.json <<'JSON'
+          {
+            "format": "7b-mobile-evidence-v1",
+            "synthetic_data_only": true,
+            "capture_mode": "flutter_golden_update",
+            "viewport": {
+              "width": 390,
+              "height": 844,
+              "device_pixel_ratio": 1,
+              "text_scale": 1
+            },
+            "fixture_domains": ["example.test"],
+            "screenshots": [
+              "01-hero-overview.png",
+              "02-my-schedule.png",
+              "03-analyze-competition.png",
+              "04-conflict-provenance.png",
+              "05-decision-report.png",
+              "06-alternative-candidate.png",
+              "07-saved-plan-accepted.png",
+              "08-stale-reevaluate.png",
+              "09-accepted-commitment.png"
+            ]
+          }
+          JSON
 
       - name: Flutter Android debug build
-        run: flutter build apk --debug
+        run: |
+          set -o pipefail
+          flutter build apk --debug 2>&1 | tee build/7b-audit/android-build.log
+
+      - name: Upload mobile release audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-audit-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            apps/mobile/build/7b-audit/
+            apps/mobile/test/release_7b_goldens/
+            apps/mobile/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 90
 
   ios:
     runs-on: macos-latest
@@ -122,6 +229,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
