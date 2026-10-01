@@ -88,9 +88,12 @@ jobs:
     defaults:
       run:
         working-directory: apps/mobile
+        shell: bash
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
@@ -104,15 +107,48 @@ jobs:
       - name: Verify Flutter lockfile is committed
         run: git diff --exit-code -- pubspec.lock
 
+      - name: Record mobile audit context
+        run: |
+          set -o pipefail
+          mkdir -p build/7b-audit/screenshots
+          audited_commit="$(git rev-parse HEAD)"
+          audited_tree="$(git rev-parse 'HEAD^{tree}')"
+          mobile_tree="$(git rev-parse HEAD:apps/mobile)"
+          recovery_sha="$(sha256sum ../../tests/fixtures/reliability/recovery_policy_v1.json | awk '{print $1}')"
+          run_url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+          printf '{\n  "format": "7b-mobile-audit-context-v1",\n  "audited_commit": "%s",\n  "audited_tree": "%s",\n  "mobile_tree": "%s",\n  "event_commit": "%s",\n  "recovery_policy_sha256": "%s",\n  "run_url": "%s"\n}\n' \
+            "$audited_commit" "$audited_tree" "$mobile_tree" "$GITHUB_SHA" "$recovery_sha" "$run_url" \
+            > build/7b-audit/context.json
+          flutter --version > build/7b-audit/flutter-version.txt
+
       - name: Flutter analyze
-        run: flutter analyze
+        run: |
+          set -o pipefail
+          flutter analyze 2>&1 | tee build/7b-audit/flutter-analyze.log
 
       - name: Flutter test
         timeout-minutes: 5
-        run: flutter test --reporter expanded
+        env:
+          TAKT_7B_EVIDENCE_DIR: build/7b-audit/screenshots
+        run: |
+          set -o pipefail
+          flutter test --reporter expanded 2>&1 | tee build/7b-audit/flutter-test.log
 
       - name: Flutter Android debug build
-        run: flutter build apk --debug
+        run: |
+          set -o pipefail
+          flutter build apk --debug 2>&1 | tee build/7b-audit/android-build.log
+
+      - name: Upload mobile release audit evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-audit-${{ github.event.pull_request.head.sha || github.sha }}
+          path: |
+            apps/mobile/build/7b-audit/
+            apps/mobile/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 90
 
   ios:
     runs-on: macos-latest
@@ -122,6 +158,8 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up Flutter
         uses: subosito/flutter-action@v2
