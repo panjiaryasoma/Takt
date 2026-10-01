@@ -155,6 +155,19 @@ def test_trailing_supported_value_cannot_hide_after_first_match(path, statement)
 
 
 @pytest.mark.parametrize("path", ["native", "ocr"])
+@pytest.mark.parametrize(
+    "statement",
+    [
+        "Submission deadline: September 30 2026 at 23:59 WIB; October 1 2026 at 25:99 WIB",
+        "Team size: 1 to 4; 6 to 2",
+    ],
+)
+def test_trailing_invalid_fact_cannot_be_ignored_after_supported_value(path, statement):
+    with pytest.raises(CandidateNormalizationError, match="conflicting"):
+        normalize_candidate_report(_document(path, "blocks", [statement]))
+
+
+@pytest.mark.parametrize("path", ["native", "ocr"])
 def test_unsupported_explicit_deadline_time_cannot_downgrade_to_date_only(path):
     with pytest.raises(CandidateNormalizationError, match="conflicting"):
         normalize_candidate_report(_document(
