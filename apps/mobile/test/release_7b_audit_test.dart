@@ -2,7 +2,6 @@
 library;
 
 import 'dart:async';
-import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
 
@@ -57,10 +56,6 @@ const _evidenceNames = <String>[
 
 bool get _shouldCaptureGoldens =>
     Platform.environment['TAKT_7B_CAPTURE_GOLDENS'] == '1';
-
-Directory get _auditDirectory => Directory(
-      Platform.environment['TAKT_7B_AUDIT_DIR'] ?? 'build/7b-audit',
-    );
 
 Widget _frame(Widget child, {double textScale = 1}) {
   return MaterialApp(
@@ -320,30 +315,6 @@ void main() {
         isTrue,
       );
     }
-
-    final manifest = {
-      'format': '7b-mobile-evidence-v1',
-      'synthetic_data_only': true,
-      'capture_mode': _shouldCaptureGoldens ? 'flutter_golden_update' : 'assertions_only',
-      'screenshots': _evidenceNames,
-      'fixture_domains': ['example.test'],
-      'states': [
-        'hero_overview',
-        'my_schedule',
-        'analyze_competition',
-        'conflict_provenance',
-        'decision_report',
-        'alternative_candidate',
-        'saved_plan_accepted',
-        'stale_reevaluate',
-        'accepted_commitment',
-      ],
-    };
-    await _auditDirectory.create(recursive: true);
-    await File('${_auditDirectory.path}/manifest.json').writeAsString(
-      const JsonEncoder.withIndent('  ').convert(manifest),
-      flush: true,
-    );
 
     // Release every mounted listener before repository/database teardown.
     _checkpoint('cleanup_before_unmount');
