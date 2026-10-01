@@ -24,7 +24,7 @@ from packages.contracts import (
     ExtractionPath,
 )
 
-CANDIDATE_NORMALIZER_VERSION = "rule-based-v6"
+CANDIDATE_NORMALIZER_VERSION = "rule-based-v7"
 
 _MONTH_PATTERN = (
     r"January|February|March|April|May|June|July|August|September|October|"
@@ -41,7 +41,7 @@ _DEADLINE_VALUE_RE = re.compile(
     r"(?P<day>\d{1,2})(?:,)?\s+"
     r"(?P<year>\d{4})"
     r"(?:\s+(?:(?:at\s+)|(?:@\s*))?(?P<hour>\d{1,2})"
-    r"[:.](?P<minute>\d{2})\s*(?P<meridiem>am|pm)?\s*"
+    r"[:.\s](?P<minute>\d{2})\s*(?P<meridiem>am|pm)?\s*"
     r"(?:(?P<timezone>WIB|WITA|WIT|UTC|GMT|PDT|PST|MDT|MST|CDT|CST|EDT|EST)"
     r"(?!\w|\s*[+-]))?)?",
     re.IGNORECASE,
