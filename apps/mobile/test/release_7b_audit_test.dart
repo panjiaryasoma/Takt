@@ -81,8 +81,17 @@ Widget _frame(Widget child, {double textScale = 1}) {
   );
 }
 
+Future<void> _pumpBounded(
+  WidgetTester tester, {
+  int frames = 12,
+}) async {
+  for (var index = 0; index < frames; index++) {
+    await tester.pump(const Duration(milliseconds: 25));
+  }
+}
+
 Future<void> _capture(WidgetTester tester, String filename) async {
-  await tester.pumpAndSettle();
+  await _pumpBounded(tester);
   expect(tester.takeException(), isNull);
   final boundary = tester.renderObject<RenderRepaintBoundary>(
     find.byKey(_frameKey),
@@ -224,9 +233,9 @@ void main() {
 
     final chooseAlternative = find.byKey(const Key('choose-later-option'));
     await tester.ensureVisible(chooseAlternative);
-    await tester.pumpAndSettle();
+    await _pumpBounded(tester);
     await tester.tap(chooseAlternative);
-    await tester.pumpAndSettle();
+    await _pumpBounded(tester);
     expect(find.text('Your selected option'), findsOneWidget);
     await _capture(tester, _evidenceNames[5]);
 
@@ -248,7 +257,7 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await _pumpBounded(tester);
     expect(find.text('ACCEPTED'), findsOneWidget);
     await _capture(tester, _evidenceNames[6]);
 
@@ -268,13 +277,13 @@ void main() {
         ),
       ),
     );
-    await tester.pumpAndSettle();
+    await _pumpBounded(tester);
     expect(find.byKey(const Key('persisted-evaluation-stale')), findsOneWidget);
     expect(find.text('Re-evaluate'), findsOneWidget);
     await _capture(tester, _evidenceNames[7]);
 
     await tester.ensureVisible(find.text('Accepted schedule'));
-    await tester.pumpAndSettle();
+    await _pumpBounded(tester);
     expect(find.textContaining('synthetic-work-window'), findsOneWidget);
     await _capture(tester, _evidenceNames[8]);
 
