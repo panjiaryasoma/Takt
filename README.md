@@ -25,6 +25,10 @@ Takt is intentionally designed so that uncertainty, conflict, infeasibility, rec
 
 **Default hosted API used by the mobile client:** https://takt-production-951d.up.railway.app
 
+**iOS TestFlight:** https://testflight.apple.com/join/PEfUw9CX
+
+**Demo video:** https://youtu.be/aa_vFMYPgjU
+
 **Repository:** https://github.com/panjiaryasoma/Takt
 
 **Competition context:** Shipaton 2026 MVP / release candidate
