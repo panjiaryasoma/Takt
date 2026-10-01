@@ -299,6 +299,20 @@ def _organizer_from_sponsor_text(value: str) -> str | None:
     return parts[0]
 
 
+def _normalize_generic_deadline(value: str) -> str | None:
+    """Parse only the timestamp immediately following a generic Deadline label.
+
+    Generic platform headers often live in a large container whose remaining
+    text includes unrelated dates. Those later dates must not be interpreted
+    as alternatives to the header deadline.
+    """
+
+    match = _DEADLINE_VALUE_RE.match(value.strip())
+    if match is None:
+        return None
+    return _deadline_from_match(match)
+
+
 def _team_size_from_text(value: str) -> dict[str, int] | None:
     match = _TEAM_SIZE_RANGE_RE.match(value)
     if match is None:
@@ -423,9 +437,12 @@ class RuleBasedCandidateNormalizer:
                 raw_value = block.text[match.end():end].strip()
                 try:
                     label = " ".join(match.group("label").lower().split())
-                    if label in {"submission deadline", "deadline"}:
+                    if label == "submission deadline":
                         field_name = "submission_deadline"
                         normalized_value = _normalize_deadline(raw_value)
+                    elif label == "deadline":
+                        field_name = "submission_deadline"
+                        normalized_value = _normalize_generic_deadline(raw_value)
                     elif label == "registration deadline":
                         field_name = "registration_deadline"
                         normalized_value = _normalize_deadline(raw_value)
