@@ -132,7 +132,17 @@ jobs:
           TAKT_7B_AUDIT_DIR: build/7b-audit
         run: |
           set -o pipefail
-          flutter test --reporter expanded 2>&1 | tee build/7b-audit/flutter-test.log
+          flutter test --exclude-tags release-7b --reporter expanded 2>&1 | tee build/7b-audit/flutter-test.log
+
+      - name: Run 7B compact QA
+        timeout-minutes: 2
+        env:
+          TAKT_7B_AUDIT_DIR: build/7b-audit
+        run: |
+          set -o pipefail
+          flutter test test/release_7b_audit_test.dart \
+            --plain-name "7B critical root surfaces remain usable at 320px and 2x text" \
+            --reporter expanded 2>&1 | tee build/7b-audit/compact-qa.log
 
       - name: Render 7B screenshot evidence
         timeout-minutes: 3
