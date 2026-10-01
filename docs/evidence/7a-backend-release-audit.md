@@ -3,11 +3,15 @@
 Date: 2026-10-01 (Asia/Jakarta). Scope: Issue #13. Branch: `H-7A`.
 Starting main: `83b15ba31614fd799f1ad9f100a69d2b6c93b3f8`.
 
-**Verdict: HOLD until exact-head CI and post-fix clean-clone verification complete.**
-The local corrected tree passes Ruff and **976 backend tests, zero skipped**.
-The two correctness findings below have executable regressions and scoped fixes.
-This is a backend repository audit, not a production deployment or whole-product release approval.
-7B and final end-to-end/visual release evidence remain separate gates.
+**Technical verdict: GO for Hari 7A backend correctness.**
+The final runtime implementation audited here is `650d17ff8dabed273ab50ef5d60581697b777367`.
+Its exact-head Python gate passes Ruff and **1010 backend tests, zero skipped**, with the
+backend evidence bundle uploaded by CI. Three P1/HIGH source-truth findings were found during
+7A and all three are fixed with executable regressions. Known P0 = 0 and known HIGH = 0.
+The documentation-final PR head must still receive its own green CI; the PR body records that
+final publication head/run without changing backend runtime semantics. This is a backend
+repository audit, not a production deployment or whole-product release approval. 7B and final
+end-to-end/visual release evidence remain separate gates.
 
 ## Findings and disposition
 
@@ -17,9 +21,10 @@ or documentation work. A known HIGH remains a HOLD even when P0 is zero.
 
 | Finding | Severity | Reproduction and correction | Status |
 | --- | --- | --- | --- |
-| Repeated conflicting facts in one source/path silently selected the first/last observation | P1 / HIGH | Two supported submission deadlines produced `SINGLE_SOURCE` with one evidence reference. The same defect affected team-size ranges. Scan every explicit label, including multiple labels in one block; reject disagreement through existing `CandidateNormalizationError`. Equal values, including equivalent timezone instants, still yield one resolvable candidate. A supported value beside an unparseable repetition also fails closed in either order. | Fixed; 14 initial reproductions plus 12 mixed supported/unsupported repetitions failed before their guards, then passed |
-| Timezone tokens were accepted by prefix | P1 / HIGH | `UTC+07:00`, `GMT+7`, `UTC +07:00`, and `WIBB` became UTC/GMT/WIB facts. Require a complete supported timezone token; unsupported values stay unextracted instead of acquiring a guessed instant. | Fixed; eight native/OCR reproductions failed before the guard |
-| CI logs did not persist a backend evidence bundle tied to the checked-out commit | P2 / evidence | Python CI now checks out the actual PR head, records commit/tree/authority hashes and dependency/OCR versions, and uploads Ruff, pytest log and JUnit XML. Bash pipefail keeps a failed command from becoming a successful `tee` result. | Implemented; exact-head CI pending |
+| Repeated conflicting facts in one source/path silently selected the first/last observation | P1 / HIGH | Two supported submission deadlines produced `SINGLE_SOURCE` with one evidence reference. The same defect affected team-size ranges. Scan every explicit label, including multiple labels in one block; reject disagreement through existing `CandidateNormalizationError`. Equal values, including equivalent timezone instants, still yield one resolvable candidate. A supported value beside an unparseable repetition also fails closed in either order. | Fixed; native/OCR regressions cover disagreement, agreement and supported/unsupported repetition |
+| Timezone tokens were accepted by prefix | P1 / HIGH | `UTC+07:00`, `GMT+7`, `UTC +07:00`, and `WIBB` became UTC/GMT/WIB facts. Require a complete supported timezone token; unsupported values stay unextracted instead of acquiring a guessed instant. | Fixed; native/OCR regressions retain the unsupported value as unextracted |
+| Multiple alternatives inside one explicit label could still authorize the first supported prefix | P1 / HIGH | A single label such as `Submission deadline: Sep 30 ... or Oct 1 ...` or `Team size: 1 to 4; 2 to 6` could publish only the first value. The bounded parser now anchors the first value, detects additional supported values in the same label, rejects disagreement and mixed supported/unsupported alternatives, rejects an unsupported explicit time instead of downgrading to date-only, and still collapses semantically equivalent instants. | Fixed; 34 additional native/OCR regressions cover `or`, slash, semicolon, `and`, invalid trailing values, equivalent instants and unsupported prefixes |
+| CI logs did not persist a backend evidence bundle tied to the checked-out commit | P2 / evidence | Python CI checks out the actual PR head, records commit/tree/authority hashes and dependency/OCR versions, and uploads Ruff, pytest log and JUnit XML. Bash pipefail keeps a failed command from becoming a successful `tee` result. | Implemented and exercised by exact-head CI |
 
 Production correction is confined to `engine/extraction/candidate_normalizer.py`.
 Its version advances from `rule-based-v1` to `rule-based-v2`, so evidence/extractor
@@ -54,10 +59,11 @@ uv run --locked pytest -q --junitxml=tmp/backend-audit/pytest.xml
 | Fresh remote clone / locked setup at starting main | PASS; new `.venv`, 41 packages installed from `uv.lock` |
 | Corrected tree / repository validator | PASS |
 | Corrected tree / full Python Ruff | PASS |
-| Corrected tree / full backend pytest | 976 passed, 0 failed, 0 skipped; 2 dependency deprecation warnings |
-| New normalizer regression cases | 52 passed: contradictory/agreeing observations, timezone tokens, actual URL/PDF route envelopes |
+| Final runtime head / full backend pytest | 1010 passed, 0 failed, 0 skipped; 4 dependency deprecation warnings |
+| Normalizer regression coverage | Repeated labels plus 34 added single-label/trailing-value cases across native and OCR; ambiguity fails closed while equivalent instants remain usable |
 | Public failure authority / recovery coverage | 76 public rows, 57 recovery scenarios; no missing/duplicate/orphan mapping |
-| Exact-head CI / post-fix clean clone | PENDING; required before GO |
+| Exact runtime-head backend CI | PASS; artifact `backend-audit-650d17ff8dabed273ab50ef5d60581697b777367` |
+| Documentation-final PR-head CI | Required final publication gate; exact head/run is recorded in PR #36 body after completion |
 
 The hosted local runner supplies a SOCKS proxy without httpx's optional `socksio`.
 The first baseline run was **921 passed / 3 failed** during HTTP-client construction,
@@ -95,9 +101,10 @@ Paths below are relative to the repository root. All listed tests run in the ful
 | RevenueCat cannot change correctness | `tests/api/test_entitlement_correctness_boundary.py`; seven absent/free/pro scenarios in `tests/reliability/test_6a_stale_determinism.py` | No entitlement authority in backend inputs/engines; not a RevenueCat purchase/restore integration test |
 | Public failures and recovery remain stable | `tests/support/public_error_matrix.py`, `tests/fixtures/reliability/recovery_policy_v1.json`; `tests/reliability/test_6a_failure_contract.py` | Existing status/code/stage/details and trusted transition semantics; raw private exceptions do not enter the response |
 
-Suite inventory in the corrected local JUnit: API 223, availability 36, contracts 46,
-extraction 185, feasibility 45, integration 52, recommendation 56, reconciliation 73,
-reliability 152, solver 53, triage 20, workload 35. Total **976**.
+The final runtime exact-head JUnit reports **1010 passed, 0 failed, 0 skipped**.
+The additional 34 cases are extraction-normalizer regressions for ambiguity inside one labeled
+fact. Existing API, availability, contracts, feasibility, integration, recommendation,
+reconciliation, reliability, solver, triage and workload suites remain part of the same full gate.
 
 ## Source and planning examples
 
@@ -163,10 +170,12 @@ The concrete authorities remain the hierarchy in `docs/07_RELEASE_AUDIT/README.m
 - Mobile persistence/recovery, purchase/restore, physical-device behavior, UI evidence and
   final end-to-end acceptance belong to 7B. No final release-candidate note is created before both audits pass.
 
-After exact-head verification, freeze this backend implementation, the schema/policy/error
-and recovery authorities, and the claims above. Any later correctness change requires a scoped
-fix, full backend regression, and a new audited commit. Major backend feature development is
-closed for this candidate; unsupported product capabilities are not silently added to its claims.
+The backend runtime at `650d17ff8dabed273ab50ef5d60581697b777367` is the audited 7A
+implementation freeze. Any later backend correctness change requires a scoped fix, full backend
+regression, and a new audited runtime commit. Major backend feature development is closed for
+this candidate; unsupported product capabilities are not silently added to its claims. A later
+documentation-only commit does not redefine runtime truth, but it still receives CI and its
+exact publication head/run is recorded in the PR metadata.
 
 ## CI evidence locator
 
