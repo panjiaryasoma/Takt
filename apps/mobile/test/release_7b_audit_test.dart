@@ -118,6 +118,7 @@ void _resetViewport(WidgetTester tester) {
   tester.platformDispatcher.clearTextScaleFactorTestValue();
 }
 
+@Tags(['release-7b'])
 void main() {
   testWidgets('7B synthetic screenshot evidence covers critical product states',
       (tester) async {
