@@ -271,7 +271,11 @@ void main() {
     expect(find.text('Re-evaluate'), findsOneWidget);
     await _capture(tester, _evidenceNames[7]);
 
-    await tester.ensureVisible(find.text('Accepted schedule'));
+    await tester.dragUntilVisible(
+      find.text('Accepted schedule'),
+      find.byType(ListView),
+      const Offset(0, -240),
+    );
     await _pumpBounded(tester);
     expect(find.textContaining('synthetic-work-window'), findsOneWidget);
     await _capture(tester, _evidenceNames[8]);
