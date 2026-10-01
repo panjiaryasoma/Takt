@@ -185,17 +185,20 @@ def _deadline_key(value: str) -> tuple[str, object]:
 
 
 def _normalize_deadline(value: str) -> str | None:
+    cleaned = value.strip()
     alternatives = tuple(
         item.strip()
-        for item in _ALTERNATIVE_VALUE_RE.split(value.strip())
+        for item in _ALTERNATIVE_VALUE_RE.split(cleaned)
         if item.strip()
     )
     if not alternatives:
         return None
 
     normalized: list[str | None] = []
+    first_matches: list[re.Match[str] | None] = []
     for alternative in alternatives:
         match = _DEADLINE_VALUE_RE.match(alternative)
+        first_matches.append(match)
         normalized.append(_deadline_from_match(match) if match is not None else None)
 
     supported = [item for item in normalized if item is not None]
@@ -205,7 +208,26 @@ def _normalize_deadline(value: str) -> str | None:
         raise _AmbiguousLabeledValue(
             "deadline alternatives mix supported and unsupported values"
         )
-    if len({_deadline_key(item) for item in supported}) != 1:
+
+    # Do not let a valid prefix hide another direct supported deadline later in
+    # the same labeled value. The V1 candidate shape cannot represent both.
+    observed = list(supported)
+    for alternative, first in zip(alternatives, first_matches, strict=True):
+        if first is None:
+            continue
+        tail = alternative[first.end():]
+        # An explicit but unsupported time suffix must not downgrade to a
+        # date-only fact merely because the time grammar failed.
+        if first.group("hour") is None and re.match(r"^\s+at\b", tail, re.IGNORECASE):
+            raise _AmbiguousLabeledValue(
+                "deadline contains an unsupported explicit time"
+            )
+        for extra in _DEADLINE_VALUE_RE.finditer(tail):
+            parsed = _deadline_from_match(extra)
+            if parsed is not None:
+                observed.append(parsed)
+
+    if len({_deadline_key(item) for item in observed}) != 1:
         raise _AmbiguousLabeledValue("deadline alternatives disagree")
     return supported[0]
 
@@ -238,7 +260,19 @@ def _normalize_team_size(value: str) -> dict[str, int] | None:
         raise _AmbiguousLabeledValue(
             "team-size alternatives mix supported and unsupported values"
         )
-    keys = {(item["min"], item["max"]) for item in supported}
+
+    observed = list(supported)
+    for alternative in alternatives:
+        first = _TEAM_SIZE_RANGE_RE.match(alternative)
+        if first is None:
+            continue
+        for extra in _TEAM_SIZE_RANGE_RE.finditer(alternative, first.end()):
+            minimum = int(extra.group("minimum"))
+            maximum = int(extra.group("maximum"))
+            if minimum > 0 and maximum >= minimum:
+                observed.append({"min": minimum, "max": maximum})
+
+    keys = {(item["min"], item["max"]) for item in observed}
     if len(keys) != 1:
         raise _AmbiguousLabeledValue("team-size alternatives disagree")
     return supported[0]
