@@ -294,17 +294,16 @@ def _resolve_eligibility_scope_validated(
         return None
 
     if "variants" not in payload:
-        if requested_scope != "unscoped":
-            return None
         rule = _as_eligibility_rule(payload)
         if rule is None:
             return None
+        selected = selected_scope.strip()
         return ResolvedEligibilityScope(
-            selected_scope="unscoped",
+            selected_scope=selected,
             effective_rule=rule,
             provenance=_eligibility_provenance(
                 field,
-                selected_scope="unscoped",
+                selected_scope=selected,
             ),
         )
 
