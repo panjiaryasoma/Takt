@@ -132,6 +132,28 @@ def test_generic_deadline_word_in_narrative_does_not_create_false_candidate():
     assert fields[0].normalized_value == "2026-10-30T10:00:00-07:00"
 
 
+def test_generic_deadline_header_ignores_unrelated_later_dates_in_same_block():
+    report = normalize_candidate_report(
+        _document(
+            "native",
+            "blocks",
+            [
+                (
+                    "Deadline: Oct 30, 2026 @ 10:00am PDT "
+                    "Submission Period: Wednesday, August 26, 2026 "
+                    "(9:00 am Pacific Time) – Friday, October 30, 2026 "
+                    "(10:00 am Pacific Time). Judging Period: "
+                    "December 1, 2026 through December 15, 2026."
+                )
+            ],
+        )
+    )
+
+    fields = [field for field in report.fields if field.field_name == "submission_deadline"]
+    assert len(fields) == 1
+    assert fields[0].normalized_value == "2026-10-30T10:00:00-07:00"
+
+
 @pytest.mark.parametrize("path", ["native", "ocr"])
 @pytest.mark.parametrize("zone", ["UTC+07:00", "GMT+7", "UTC +07:00", "WIBB"])
 def test_unsupported_timezone_must_not_be_truncated_into_a_known_zone(path, zone):
