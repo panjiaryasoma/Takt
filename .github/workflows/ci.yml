@@ -129,10 +129,26 @@ jobs:
       - name: Flutter test
         timeout-minutes: 5
         env:
-          TAKT_7B_EVIDENCE_DIR: build/7b-audit/screenshots
+          TAKT_7B_AUDIT_DIR: build/7b-audit
         run: |
           set -o pipefail
           flutter test --reporter expanded 2>&1 | tee build/7b-audit/flutter-test.log
+
+      - name: Render 7B screenshot evidence
+        timeout-minutes: 3
+        env:
+          TAKT_7B_CAPTURE_GOLDENS: "1"
+          TAKT_7B_AUDIT_DIR: build/7b-audit
+        run: |
+          set -o pipefail
+          rm -rf test/release_7b_goldens
+          flutter test test/release_7b_audit_test.dart \
+            --update-goldens \
+            --plain-name "7B synthetic screenshot evidence covers critical product states" \
+            --reporter expanded 2>&1 | tee build/7b-audit/screenshot-evidence.log
+          mkdir -p build/7b-audit/screenshots
+          cp test/release_7b_goldens/*.png build/7b-audit/screenshots/
+          test "$(find build/7b-audit/screenshots -maxdepth 1 -name '*.png' | wc -l)" -eq 9
 
       - name: Flutter Android debug build
         run: |
