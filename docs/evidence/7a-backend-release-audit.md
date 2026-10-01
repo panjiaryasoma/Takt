@@ -4,7 +4,7 @@ Date: 2026-10-01 (Asia/Jakarta). Scope: Issue #13. Branch: `H-7A`.
 Starting main: `83b15ba31614fd799f1ad9f100a69d2b6c93b3f8`.
 
 **Verdict: HOLD until exact-head CI and post-fix clean-clone verification complete.**
-The local corrected tree passes Ruff and **964 backend tests, zero skipped**.
+The local corrected tree passes Ruff and **976 backend tests, zero skipped**.
 The two correctness findings below have executable regressions and scoped fixes.
 This is a backend repository audit, not a production deployment or whole-product release approval.
 7B and final end-to-end/visual release evidence remain separate gates.
@@ -17,7 +17,7 @@ or documentation work. A known HIGH remains a HOLD even when P0 is zero.
 
 | Finding | Severity | Reproduction and correction | Status |
 | --- | --- | --- | --- |
-| Repeated conflicting facts in one source/path silently selected the first/last observation | P1 / HIGH | Two supported submission deadlines produced `SINGLE_SOURCE` with one evidence reference. The same defect affected team-size ranges. Scan every explicit label, including multiple labels in one block; reject disagreement through existing `CandidateNormalizationError`. Equal values, including equivalent timezone instants, still yield one resolvable candidate. | Fixed; 14 reproductions failed before the change, then passed |
+| Repeated conflicting facts in one source/path silently selected the first/last observation | P1 / HIGH | Two supported submission deadlines produced `SINGLE_SOURCE` with one evidence reference. The same defect affected team-size ranges. Scan every explicit label, including multiple labels in one block; reject disagreement through existing `CandidateNormalizationError`. Equal values, including equivalent timezone instants, still yield one resolvable candidate. A supported value beside an unparseable repetition also fails closed in either order. | Fixed; 14 initial reproductions plus 12 mixed supported/unsupported repetitions failed before their guards, then passed |
 | Timezone tokens were accepted by prefix | P1 / HIGH | `UTC+07:00`, `GMT+7`, `UTC +07:00`, and `WIBB` became UTC/GMT/WIB facts. Require a complete supported timezone token; unsupported values stay unextracted instead of acquiring a guessed instant. | Fixed; eight native/OCR reproductions failed before the guard |
 | CI logs did not persist a backend evidence bundle tied to the checked-out commit | P2 / evidence | Python CI now checks out the actual PR head, records commit/tree/authority hashes and dependency/OCR versions, and uploads Ruff, pytest log and JUnit XML. Bash pipefail keeps a failed command from becoming a successful `tee` result. | Implemented; exact-head CI pending |
 
@@ -54,8 +54,8 @@ uv run --locked pytest -q --junitxml=tmp/backend-audit/pytest.xml
 | Fresh remote clone / locked setup at starting main | PASS; new `.venv`, 41 packages installed from `uv.lock` |
 | Corrected tree / repository validator | PASS |
 | Corrected tree / full Python Ruff | PASS |
-| Corrected tree / full backend pytest | 964 passed, 0 failed, 0 skipped; 2 dependency deprecation warnings |
-| New normalizer regression cases | 40 passed: contradictory/agreeing observations, timezone tokens, actual URL/PDF route envelopes |
+| Corrected tree / full backend pytest | 976 passed, 0 failed, 0 skipped; 2 dependency deprecation warnings |
+| New normalizer regression cases | 52 passed: contradictory/agreeing observations, timezone tokens, actual URL/PDF route envelopes |
 | Public failure authority / recovery coverage | 76 public rows, 57 recovery scenarios; no missing/duplicate/orphan mapping |
 | Exact-head CI / post-fix clean clone | PENDING; required before GO |
 
@@ -96,8 +96,8 @@ Paths below are relative to the repository root. All listed tests run in the ful
 | Public failures and recovery remain stable | `tests/support/public_error_matrix.py`, `tests/fixtures/reliability/recovery_policy_v1.json`; `tests/reliability/test_6a_failure_contract.py` | Existing status/code/stage/details and trusted transition semantics; raw private exceptions do not enter the response |
 
 Suite inventory in the corrected local JUnit: API 223, availability 36, contracts 46,
-extraction 173, feasibility 45, integration 52, recommendation 56, reconciliation 73,
-reliability 152, solver 53, triage 20, workload 35. Total **964**.
+extraction 185, feasibility 45, integration 52, recommendation 56, reconciliation 73,
+reliability 152, solver 53, triage 20, workload 35. Total **976**.
 
 ## Source and planning examples
 

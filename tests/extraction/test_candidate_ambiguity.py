@@ -56,7 +56,12 @@ def _document(path, layout, statements):
 
 @pytest.mark.parametrize("path", ["native", "ocr"])
 @pytest.mark.parametrize("layout", ["blocks", "\n", "; "])
-@pytest.mark.parametrize("statements", [DEADLINES, TEAM_SIZES])
+@pytest.mark.parametrize("statements", [
+    DEADLINES,
+    TEAM_SIZES,
+    (DEADLINES[0], "Submission deadline: October 1 2026 at 23:59 UTC+07:00"),
+    (TEAM_SIZES[0], "Team size: TBD"),
+])
 def test_contradictory_labeled_facts_fail_closed_in_either_order(path, layout, statements):
     for ordered in (statements, statements[::-1]):
         with pytest.raises(CandidateNormalizationError, match="conflicting"):

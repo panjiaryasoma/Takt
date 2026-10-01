@@ -215,6 +215,7 @@ class RuleBasedCandidateNormalizer:
 
         fields: list[CandidateField] = []
         evidence: list[EvidenceSpan] = []
+        parsed_by_field: dict[str, bool] = {}
         extractor_fingerprint = extractor_fingerprint_for_document(document)
 
         for block in document.blocks:
@@ -236,6 +237,13 @@ class RuleBasedCandidateNormalizer:
                 else:
                     field_name = "team_size"
                     normalized_value = _normalize_team_size(raw_value)
+                parsed = normalized_value is not None
+                if field_name in parsed_by_field and parsed_by_field[field_name] != parsed:
+                    raise CandidateNormalizationError(
+                        "source contains conflicting supported and unsupported labeled facts",
+                        source_ref=document.source_record.url_or_document_id,
+                    )
+                parsed_by_field[field_name] = parsed
                 if normalized_value is not None:
                     self._append_candidate(
                         document=document,
