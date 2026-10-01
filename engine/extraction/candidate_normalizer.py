@@ -138,11 +138,14 @@ def _candidate_confidence(document: ExtractionDocument, block: Any) -> float | N
     return None
 
 
-def _normalize_deadline(value: str) -> str | None:
-    match = _DEADLINE_VALUE_RE.search(value)
-    if match is None:
-        return None
+class _AmbiguousLabeledValue(ValueError):
+    """One explicit label contains alternatives the V1 candidate shape cannot represent."""
 
+
+_ALTERNATIVE_VALUE_RE = re.compile(r"\s+(?:or)\s+|\s*/\s*", re.IGNORECASE)
+
+
+def _deadline_from_match(match: re.Match[str]) -> str | None:
     try:
         parsed_date = datetime.strptime(
             f"{match.group('month')} {match.group('day')} {match.group('year')}",
@@ -175,8 +178,40 @@ def _normalize_deadline(value: str) -> str | None:
     return aware.isoformat()
 
 
-def _normalize_team_size(value: str) -> dict[str, int] | None:
-    match = _TEAM_SIZE_RANGE_RE.search(value)
+def _deadline_key(value: str) -> tuple[str, object]:
+    if "T" not in value:
+        return ("date", value)
+    return ("instant", datetime.fromisoformat(value).astimezone(UTC))
+
+
+def _normalize_deadline(value: str) -> str | None:
+    alternatives = tuple(
+        item.strip()
+        for item in _ALTERNATIVE_VALUE_RE.split(value.strip())
+        if item.strip()
+    )
+    if not alternatives:
+        return None
+
+    normalized: list[str | None] = []
+    for alternative in alternatives:
+        match = _DEADLINE_VALUE_RE.match(alternative)
+        normalized.append(_deadline_from_match(match) if match is not None else None)
+
+    supported = [item for item in normalized if item is not None]
+    if not supported:
+        return None
+    if len(supported) != len(normalized):
+        raise _AmbiguousLabeledValue(
+            "deadline alternatives mix supported and unsupported values"
+        )
+    if len({_deadline_key(item) for item in supported}) != 1:
+        raise _AmbiguousLabeledValue("deadline alternatives disagree")
+    return supported[0]
+
+
+def _team_size_from_text(value: str) -> dict[str, int] | None:
+    match = _TEAM_SIZE_RANGE_RE.match(value)
     if match is None:
         return None
     minimum = int(match.group("minimum"))
@@ -184,6 +219,29 @@ def _normalize_team_size(value: str) -> dict[str, int] | None:
     if minimum <= 0 or maximum < minimum:
         return None
     return {"min": minimum, "max": maximum}
+
+
+def _normalize_team_size(value: str) -> dict[str, int] | None:
+    alternatives = tuple(
+        item.strip()
+        for item in _ALTERNATIVE_VALUE_RE.split(value.strip())
+        if item.strip()
+    )
+    if not alternatives:
+        return None
+
+    normalized = [_team_size_from_text(item) for item in alternatives]
+    supported = [item for item in normalized if item is not None]
+    if not supported:
+        return None
+    if len(supported) != len(normalized):
+        raise _AmbiguousLabeledValue(
+            "team-size alternatives mix supported and unsupported values"
+        )
+    keys = {(item["min"], item["max"]) for item in supported}
+    if len(keys) != 1:
+        raise _AmbiguousLabeledValue("team-size alternatives disagree")
+    return supported[0]
 
 
 class RuleBasedCandidateNormalizer:
@@ -231,12 +289,18 @@ class RuleBasedCandidateNormalizer:
             for index, match in enumerate(matches):
                 end = matches[index + 1].start() if index + 1 < len(matches) else len(block.text)
                 raw_value = block.text[match.end():end].strip()
-                if match.group("label").lower().startswith("submission"):
-                    field_name = "submission_deadline"
-                    normalized_value = _normalize_deadline(raw_value)
-                else:
-                    field_name = "team_size"
-                    normalized_value = _normalize_team_size(raw_value)
+                try:
+                    if match.group("label").lower().startswith("submission"):
+                        field_name = "submission_deadline"
+                        normalized_value = _normalize_deadline(raw_value)
+                    else:
+                        field_name = "team_size"
+                        normalized_value = _normalize_team_size(raw_value)
+                except _AmbiguousLabeledValue as exc:
+                    raise CandidateNormalizationError(
+                        "source contains conflicting labeled facts",
+                        source_ref=document.source_record.url_or_document_id,
+                    ) from exc
                 parsed = normalized_value is not None
                 if field_name in parsed_by_field and parsed_by_field[field_name] != parsed:
                     raise CandidateNormalizationError(
