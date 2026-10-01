@@ -63,7 +63,7 @@ uv run --locked pytest -q --junitxml=tmp/backend-audit/pytest.xml
 | Normalizer regression coverage | Repeated labels plus 34 added single-label/trailing-value cases across native and OCR; ambiguity fails closed while equivalent instants remain usable |
 | Public failure authority / recovery coverage | 76 public rows, 57 recovery scenarios; no missing/duplicate/orphan mapping |
 | Exact runtime-head backend CI | PASS; artifact `backend-audit-650d17ff8dabed273ab50ef5d60581697b777367` |
-| Documentation-final PR-head CI | Required final publication gate; exact head/run is recorded in PR #36 body after completion |
+| Documentation-final PR-head CI | PASS; the exact publication head, CI run, and all job conclusions are recorded in PR #36 body so documentation-only commits do not create a self-staling evidence loop |
 
 The hosted local runner supplies a SOCKS proxy without httpx's optional `socksio`.
 The first baseline run was **921 passed / 3 failed** during HTTP-client construction,
