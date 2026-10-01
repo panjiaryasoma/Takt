@@ -122,6 +122,26 @@ def test_one_source_one_value_is_single_source() -> None:
     assert result.supporting_source_ids == ("src-a",)
 
 
+def test_global_single_source_can_be_usable_with_unknown_scope_and_freshness() -> None:
+    source = make_source(
+        "src-a",
+        scope={},
+        freshness_metadata={},
+    )
+    report = make_report(
+        "src-a",
+        value="Oct 30, 2026 10:00 PDT",
+        normalized="2026-10-30T10:00:00-07:00",
+        scope={},
+    )
+
+    result = reconcile_field("submission_deadline", [report], [source])
+
+    assert result.canonical_field.state is CanonicalFieldState.SINGLE_SOURCE
+    assert result.canonical_field.normalized_value == "2026-10-30T17:00:00Z"
+    assert result.supporting_source_ids == ("src-a",)
+
+
 def test_two_independent_sources_same_value_are_verified() -> None:
     sources = [make_source("src-a"), make_source("src-b")]
     reports = [
@@ -539,26 +559,28 @@ def test_overlapping_different_values_are_conflict() -> None:
     assert result.canonical_field.state is CanonicalFieldState.CONFLICT
 
 
-def test_unknown_scope_is_unverified() -> None:
+def test_unknown_scope_is_unverified_for_scope_sensitive_field() -> None:
     source = make_source("src-a", scope={})
     report = make_report(
         "src-a",
-        value="Sep 30",
-        normalized="2026-09-30T16:59:00Z",
+        field_name="team_size",
+        value={"min": 1, "max": 4},
+        normalized={"min": 1, "max": 4},
         scope={},
     )
-    result = reconcile_field("submission_deadline", [report], [source])
+    result = reconcile_field("team_size", [report], [source])
     assert result.canonical_field.state is CanonicalFieldState.UNVERIFIED
 
 
-def test_unknown_but_well_formed_freshness_is_unverified() -> None:
+def test_unknown_but_well_formed_freshness_is_unverified_for_scope_sensitive_field() -> None:
     source = make_source("src-a", freshness_metadata={})
     report = make_report(
         "src-a",
-        value="Sep 30",
-        normalized="2026-09-30T16:59:00Z",
+        field_name="team_size",
+        value={"min": 1, "max": 4},
+        normalized={"min": 1, "max": 4},
     )
-    result = reconcile_field("submission_deadline", [report], [source])
+    result = reconcile_field("team_size", [report], [source])
     assert result.canonical_field.state is CanonicalFieldState.UNVERIFIED
     assert result.resolution_basis == ("freshness-unknown",)
 
