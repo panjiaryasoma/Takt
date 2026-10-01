@@ -24,6 +24,7 @@ import 'package:takt_mobile/models/saved_plan_revision.dart';
 import 'package:takt_mobile/monetization/revenuecat_contract.dart';
 import 'package:takt_mobile/monetization/revenuecat_gateway.dart';
 import 'package:takt_mobile/monetization/revenuecat_service.dart';
+import 'package:takt_mobile/main.dart';
 import 'package:takt_mobile/screens/analisis_kompetisi_screen.dart';
 import 'package:takt_mobile/screens/home_screen.dart';
 import 'package:takt_mobile/screens/jadwal_harian_screen.dart';
