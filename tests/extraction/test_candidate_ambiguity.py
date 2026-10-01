@@ -174,6 +174,30 @@ def test_devpost_submission_period_uses_range_end_as_submission_deadline():
     assert fields[0].normalized_value == "2026-10-30T10:00:00-07:00"
 
 
+def test_submission_period_narrative_mentions_do_not_become_fields():
+    report = normalize_candidate_report(
+        _document(
+            "native",
+            "blocks",
+            [
+                (
+                    "Submission Period: Wednesday, August 26, 2026 "
+                    "(9:00 am Pacific Time) – Friday, October 30, 2026 "
+                    "(10:00 am Pacific Time) (“Submission Period”)."
+                ),
+                (
+                    "Entries received during the Submission Period are eligible. "
+                    "After the Submission Period closes, no new entries are accepted."
+                ),
+            ],
+        )
+    )
+
+    fields = [field for field in report.fields if field.field_name == "submission_deadline"]
+    assert len(fields) == 1
+    assert fields[0].normalized_value == "2026-10-30T10:00:00-07:00"
+
+
 @pytest.mark.parametrize("path", ["native", "ocr"])
 @pytest.mark.parametrize("zone", ["UTC+07:00", "GMT+7", "UTC +07:00", "WIBB"])
 def test_unsupported_timezone_must_not_be_truncated_into_a_known_zone(path, zone):
