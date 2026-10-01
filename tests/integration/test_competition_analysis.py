@@ -321,6 +321,25 @@ def test_unscoped_eligibility_reuses_existing_scope_model() -> None:
     assert resolved.provenance
 
 
+def test_global_eligibility_remains_unscoped_for_named_track() -> None:
+    report = _canonical_report()
+    resolved = resolve_eligibility_scope(
+        canonical_report=report,
+        selected_scope="BEST APP AGENTIC AI",
+    )
+    request, result = _triage(
+        report,
+        selected_scope="BEST APP AGENTIC AI",
+    )
+
+    assert resolved is not None
+    assert resolved.selected_scope == "unscoped"
+    assert resolved.canonical_dimension is None
+    assert resolved.canonical_value is None
+    assert request.unresolved_critical_fields == []
+    assert result.status is ReadinessStatus.READY_TO_EVALUATE
+
+
 def test_scoped_eligibility_requires_explicit_matching_scope() -> None:
     variants = {
         "variants": [
