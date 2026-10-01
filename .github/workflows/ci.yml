@@ -159,6 +159,25 @@ jobs:
           mkdir -p build/7b-audit/screenshots
           cp test/release_7b_goldens/*.png build/7b-audit/screenshots/
           test "$(find build/7b-audit/screenshots -maxdepth 1 -name '*.png' | wc -l)" -eq 9
+          cat > build/7b-audit/manifest.json <<'JSON'
+          {
+            "format": "7b-mobile-evidence-v1",
+            "synthetic_data_only": true,
+            "capture_mode": "flutter_golden_update",
+            "fixture_domains": ["example.test"],
+            "screenshots": [
+              "01-hero-overview.png",
+              "02-my-schedule.png",
+              "03-analyze-competition.png",
+              "04-conflict-provenance.png",
+              "05-decision-report.png",
+              "06-alternative-candidate.png",
+              "07-saved-plan-accepted.png",
+              "08-stale-reevaluate.png",
+              "09-accepted-commitment.png"
+            ]
+          }
+          JSON
 
       - name: Flutter Android debug build
         run: |
