@@ -260,6 +260,44 @@ void main() {
     host.dispose();
   });
 
+  testWidgets('Planning task save with a focused field does not crash',
+      (tester) async {
+    final host = PlanningHostViewModel(
+      apiClient: _ControlledPlanApi(),
+      scheduleRepository: schedule,
+      evaluationRepository: evaluations,
+      savedPlanRepository: savedPlans,
+    );
+    await host.startPlanning(snapshot);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: PlanningSetupScreen(host: host),
+        ),
+      ),
+    );
+
+    await tester.ensureVisible(find.text('Add task'));
+    await tester.tap(find.text('Add task'));
+    await tester.pumpAndSettle();
+
+    final dialog = find.byType(AlertDialog);
+    expect(dialog, findsOneWidget);
+    final taskNameField = find
+        .descendant(of: dialog, matching: find.byType(TextField))
+        .first;
+    await tester.tap(taskNameField);
+    await tester.enterText(taskNameField, 'Build prototype');
+
+    await tester.tap(find.text('Save task'));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Build prototype'), findsOneWidget);
+    host.dispose();
+  });
+
   testWidgets('Planning Setup freezes authoritative fields while request is active',
       (tester) async {
     final api = _ControlledPlanApi(delayed: true);
