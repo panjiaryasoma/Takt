@@ -7,8 +7,16 @@ on:
 jobs:
   live-e2e:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 12
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
       - name: Analyze Nebius and evaluate plan against Railway
         env:
           BASE_URL: https://takt-production-951d.up.railway.app
@@ -38,7 +46,7 @@ jobs:
                   with urllib.request.urlopen(req, timeout=timeout) as res:
                       text = res.read().decode()
                       print(f"POST {path} -> {res.status}")
-                      return res.status, json.loads(text)
+                      return res.status, text, json.loads(text)
               except urllib.error.HTTPError as exc:
                   text = exc.read().decode()
                   print(f"POST {path} -> {exc.code}")
@@ -47,7 +55,7 @@ jobs:
 
           competition_id = "cmp-emergency-live-smoke"
           source_id = "source-emergency-nebius"
-          _, analyzed = post(
+          _, _, analyzed = post(
               "/api/v1/competitions/analyze/url",
               {
                   "competition_id": competition_id,
@@ -113,7 +121,7 @@ jobs:
                       "country": "Indonesia",
                   },
                   "selected_scope": "BEST APP AGENTIC AI",
-                  "require_technology_information": False,
+                  "require_technology_information": True,
               },
               "planning": {
                   "workload": {
@@ -147,11 +155,37 @@ jobs:
               },
           }
 
-          _, result = post("/api/v1/plans/evaluate", request)
+          _, raw_result, result = post("/api/v1/plans/evaluate", request)
           print("READINESS", json.dumps(result.get("readiness"), indent=2))
-          planning = result.get("planning")
-          print("PLANNING", json.dumps(planning, indent=2)[:16000])
+          print("FEASIBILITY", (result.get("planning") or {}).get("feasibility"))
           assert result["readiness"]["status"] == "READY_TO_EVALUATE", result["readiness"]
-          assert planning is not None
-          print("LIVE_E2E_PASS")
+          assert result.get("planning") is not None
+          open("/tmp/live_plan_response.json", "w").write(raw_result)
+          print("BACKEND_LIVE_E2E_PASS")
           PY
+
+      - name: Resolve mobile dependencies
+        working-directory: apps/mobile
+        run: flutter pub get
+
+      - name: Parse live response with production mobile contract
+        working-directory: apps/mobile
+        run: |
+          mkdir -p tool
+          cat > tool/emergency_live_parse.dart <<'DART'
+          import 'dart:io';
+          import '../lib/models/plan_evaluation_wire.dart';
+
+          void main() {
+            final raw = File('/tmp/live_plan_response.json').readAsStringSync();
+            final parsed = PlanEvaluateResponseV1.parse(raw);
+            if (parsed.planning == null) {
+              throw StateError('planning unexpectedly null');
+            }
+            print('MOBILE_CONTRACT_PASS');
+            print('feasibility=${parsed.planning!.feasibility.wire}');
+            print('candidates=${parsed.planning!.candidates.length}');
+          }
+          DART
+          dart run tool/emergency_live_parse.dart
+          rm -f tool/emergency_live_parse.dart
