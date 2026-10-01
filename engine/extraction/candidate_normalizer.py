@@ -24,24 +24,34 @@ from packages.contracts import (
     ExtractionPath,
 )
 
-CANDIDATE_NORMALIZER_VERSION = "rule-based-v2"
+CANDIDATE_NORMALIZER_VERSION = "rule-based-v3"
 
 _MONTH_PATTERN = (
     r"January|February|March|April|May|June|July|August|September|October|"
-    r"November|December"
+    r"November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec"
 )
 _FACT_LABEL_RE = re.compile(
-    r"\b(?P<label>submission\s+deadline|team\s+size)\b\s*[:\-]?\s*",
+    r"\b(?P<label>submission\s+deadline|registration\s+deadline|deadline|"
+    r"team\s+size)\b\s*[:\-]?\s*",
     re.IGNORECASE,
 )
 _DEADLINE_VALUE_RE = re.compile(
     rf"(?P<month>{_MONTH_PATTERN})\s+"
     r"(?P<day>\d{1,2})(?:,)?\s+"
     r"(?P<year>\d{4})"
-    r"(?:\s+(?:at\s+)?(?P<hour>\d{1,2})[:.\s](?P<minute>\d{2})"
-    r"(?:\s*(?P<timezone>WIB|WITA|WIT|UTC|GMT)(?!\w|\s*[+-]))?)?",
+    r"(?:\s+(?:(?:at\s+)|(?:@\s*))?(?P<hour>\d{1,2})"
+    r"[:.](?P<minute>\d{2})\s*(?P<meridiem>am|pm)?\s*"
+    r"(?P<timezone>WIB|WITA|WIT|UTC|GMT|PDT|PST|MDT|MST|CDT|CST|EDT|EST)"
+    r"(?!\w|\s*[+-]))?",
     re.IGNORECASE,
 )
+_OFFICIAL_RULES_NAME_RE = re.compile(
+    r"^\s*(?P<name>.+?)\s*"
+    r"(?:\(\s*the\s+[“\"']?Hackathon[”\"']?\s*\)\s*)?"
+    r"Official\s+Rules\b",
+    re.IGNORECASE,
+)
+_SPONSOR_RE = re.compile(r"^\s*Sponsor\s*:\s*(?P<value>.+?)\s*$", re.IGNORECASE)
 _TEAM_SIZE_RANGE_RE = re.compile(
     r"(?P<minimum>\d+)\s*(?:to|[-–—])\s*(?P<maximum>\d+)",
     re.IGNORECASE,
@@ -52,6 +62,14 @@ _TIMEZONE_OFFSETS = {
     "WIT": 9,
     "UTC": 0,
     "GMT": 0,
+    "PDT": -7,
+    "PST": -8,
+    "MDT": -6,
+    "MST": -7,
+    "CDT": -5,
+    "CST": -6,
+    "EDT": -4,
+    "EST": -5,
 }
 
 ExtractionDocument = NativeDocument | OCRDocument
@@ -146,12 +164,17 @@ _ALTERNATIVE_VALUE_RE = re.compile(r"\s+(?:or)\s+|\s*/\s*", re.IGNORECASE)
 
 
 def _deadline_from_match(match: re.Match[str]) -> str | None:
-    try:
-        parsed_date = datetime.strptime(
-            f"{match.group('month')} {match.group('day')} {match.group('year')}",
-            "%B %d %Y",
-        ).replace(tzinfo=UTC)
-    except ValueError:
+    date_text = (
+        f"{match.group('month')} {match.group('day')} {match.group('year')}"
+    )
+    parsed_date = None
+    for date_format in ("%B %d %Y", "%b %d %Y"):
+        try:
+            parsed_date = datetime.strptime(date_text, date_format).replace(tzinfo=UTC)
+            break
+        except ValueError:
+            continue
+    if parsed_date is None:
         return None
 
     hour = match.group("hour")
@@ -160,15 +183,23 @@ def _deadline_from_match(match: re.Match[str]) -> str | None:
         return parsed_date.date().isoformat()
 
     timezone_name = (match.group("timezone") or "").upper()
-    if not timezone_name:
-        return None
     offset_hours = _TIMEZONE_OFFSETS.get(timezone_name)
     if offset_hours is None:
         return None
 
+    hour_value = int(hour)
+    meridiem = (match.group("meridiem") or "").lower()
+    if meridiem:
+        if not 1 <= hour_value <= 12:
+            return None
+        if meridiem == "am":
+            hour_value = 0 if hour_value == 12 else hour_value
+        else:
+            hour_value = 12 if hour_value == 12 else hour_value + 12
+
     try:
         aware = parsed_date.replace(
-            hour=int(hour),
+            hour=hour_value,
             minute=int(minute),
             second=0,
             tzinfo=timezone(timedelta(hours=offset_hours)),
@@ -218,7 +249,11 @@ def _normalize_deadline(value: str) -> str | None:
         tail = alternative[first.end():]
         # An explicit but unsupported time suffix must not downgrade to a
         # date-only fact merely because the time grammar failed.
-        if first.group("hour") is None and re.match(r"^\s+at\b", tail, re.IGNORECASE):
+        if first.group("hour") is None and re.match(
+            r"^\s*(?:at\b|@)",
+            tail,
+            re.IGNORECASE,
+        ):
             raise _AmbiguousLabeledValue(
                 "deadline contains an unsupported explicit time"
             )
@@ -233,6 +268,35 @@ def _normalize_deadline(value: str) -> str | None:
     if len({_deadline_key(item) for item in observed}) != 1:
         raise _AmbiguousLabeledValue("deadline alternatives disagree")
     return supported[0]
+
+
+def _competition_name_from_text(value: str) -> str | None:
+    match = _OFFICIAL_RULES_NAME_RE.match(value)
+    if match is None:
+        return None
+    cleaned = " ".join(match.group("name").split()).strip(" :-")
+    return cleaned or None
+
+
+def _organizer_from_sponsor_text(value: str) -> str | None:
+    match = _SPONSOR_RE.match(value)
+    if match is None:
+        return None
+
+    cleaned = " ".join(match.group("value").split())
+    parts = [part.strip() for part in cleaned.split(",") if part.strip()]
+    if not parts:
+        return None
+    if len(parts) >= 2 and parts[1].lower().rstrip(".") in {
+        "inc",
+        "llc",
+        "l.l.c",
+        "ltd",
+        "corp",
+        "corporation",
+    }:
+        return f"{parts[0]}, {parts[1]}"
+    return parts[0]
 
 
 def _team_size_from_text(value: str) -> dict[str, int] | None:
@@ -325,13 +389,45 @@ class RuleBasedCandidateNormalizer:
             if not isinstance(block.text, str) or not block.text.strip():
                 continue
 
+            competition_name = _competition_name_from_text(block.text)
+            if competition_name is not None:
+                self._append_candidate(
+                    document=document,
+                    extraction_path=extraction_path,
+                    block=block,
+                    field_name="competition_name",
+                    raw_value=competition_name,
+                    normalized_value=competition_name,
+                    extractor_fingerprint=extractor_fingerprint,
+                    fields=fields,
+                    evidence=evidence,
+                )
+
+            organizer = _organizer_from_sponsor_text(block.text)
+            if organizer is not None:
+                self._append_candidate(
+                    document=document,
+                    extraction_path=extraction_path,
+                    block=block,
+                    field_name="organizer",
+                    raw_value=organizer,
+                    normalized_value=organizer,
+                    extractor_fingerprint=extractor_fingerprint,
+                    fields=fields,
+                    evidence=evidence,
+                )
+
             matches = list(_FACT_LABEL_RE.finditer(block.text))
             for index, match in enumerate(matches):
                 end = matches[index + 1].start() if index + 1 < len(matches) else len(block.text)
                 raw_value = block.text[match.end():end].strip()
                 try:
-                    if match.group("label").lower().startswith("submission"):
+                    label = " ".join(match.group("label").lower().split())
+                    if label in {"submission deadline", "deadline"}:
                         field_name = "submission_deadline"
+                        normalized_value = _normalize_deadline(raw_value)
+                    elif label == "registration deadline":
+                        field_name = "registration_deadline"
                         normalized_value = _normalize_deadline(raw_value)
                     else:
                         field_name = "team_size"
