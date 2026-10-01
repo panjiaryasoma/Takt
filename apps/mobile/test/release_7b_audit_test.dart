@@ -2,11 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'dart:typed_data';
-import 'dart:ui' as ui;
 
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter/rendering.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:provider/provider.dart';
 import 'package:takt_mobile/config/revenuecat_config.dart';
@@ -54,9 +52,11 @@ const _evidenceNames = <String>[
   '09-accepted-commitment.png',
 ];
 
-Directory get _evidenceDirectory => Directory(
-      Platform.environment['TAKT_7B_EVIDENCE_DIR'] ??
-          'build/7b-audit/screenshots',
+bool get _shouldCaptureGoldens =>
+    Platform.environment['TAKT_7B_CAPTURE_GOLDENS'] == '1';
+
+Directory get _auditDirectory => Directory(
+      Platform.environment['TAKT_7B_AUDIT_DIR'] ?? 'build/7b-audit',
     );
 
 Widget _frame(Widget child, {double textScale = 1}) {
@@ -93,17 +93,10 @@ Future<void> _pumpBounded(
 Future<void> _capture(WidgetTester tester, String filename) async {
   await _pumpBounded(tester);
   expect(tester.takeException(), isNull);
-  final boundary = tester.renderObject<RenderRepaintBoundary>(
+  if (!_shouldCaptureGoldens) return;
+  await expectLater(
     find.byKey(_frameKey),
-  );
-  final image = await boundary.toImage(pixelRatio: 1);
-  final bytes = await image.toByteData(format: ui.ImageByteFormat.png);
-  image.dispose();
-  expect(bytes, isNotNull);
-  await _evidenceDirectory.create(recursive: true);
-  await File('${_evidenceDirectory.path}/$filename').writeAsBytes(
-    bytes!.buffer.asUint8List(),
-    flush: true,
+    matchesGoldenFile('release_7b_goldens/$filename'),
   );
 }
 
@@ -130,10 +123,6 @@ void main() {
       (tester) async {
     _phoneViewport(tester);
     addTearDown(() => _resetViewport(tester));
-    if (_evidenceDirectory.existsSync()) {
-      _evidenceDirectory.deleteSync(recursive: true);
-    }
-
     final db = AppDatabase.forTesting(NativeDatabase.memory());
     await db.initialize();
     final scheduleRepository = DriftScheduleRepository(
@@ -287,14 +276,21 @@ void main() {
     expect(find.textContaining('synthetic-work-window'), findsOneWidget);
     await _capture(tester, _evidenceNames[8]);
 
-    final files = _evidenceNames
-        .map((name) => File('${_evidenceDirectory.path}/$name'))
-        .toList(growable: false);
-    expect(files.every((file) => file.existsSync() && file.lengthSync() > 0), isTrue);
+    if (_shouldCaptureGoldens) {
+      final goldenDirectory = Directory('test/release_7b_goldens');
+      final files = _evidenceNames
+          .map((name) => File('${goldenDirectory.path}/$name'))
+          .toList(growable: false);
+      expect(
+        files.every((file) => file.existsSync() && file.lengthSync() > 0),
+        isTrue,
+      );
+    }
 
     final manifest = {
       'format': '7b-mobile-evidence-v1',
       'synthetic_data_only': true,
+      'capture_mode': _shouldCaptureGoldens ? 'flutter_golden_update' : 'assertions_only',
       'screenshots': _evidenceNames,
       'fixture_domains': ['example.test'],
       'states': [
@@ -309,7 +305,8 @@ void main() {
         'accepted_commitment',
       ],
     };
-    await File('${_evidenceDirectory.parent.path}/manifest.json').writeAsString(
+    await _auditDirectory.create(recursive: true);
+    await File('${_auditDirectory.path}/manifest.json').writeAsString(
       const JsonEncoder.withIndent('  ').convert(manifest),
       flush: true,
     );
