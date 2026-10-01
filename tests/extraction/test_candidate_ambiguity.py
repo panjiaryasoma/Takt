@@ -198,6 +198,29 @@ def test_submission_period_narrative_mentions_do_not_become_fields():
     assert fields[0].normalized_value == "2026-10-30T10:00:00-07:00"
 
 
+def test_official_rules_narrative_does_not_create_competition_name():
+    report = normalize_candidate_report(
+        _document(
+            "native",
+            "blocks",
+            [
+                (
+                    "Nebius x NVIDIA Global AI Hackathon "
+                    "(the “Hackathon”) Official Rules"
+                ),
+                (
+                    "You will be bound by and comply with these Official Rules "
+                    "and the decisions of the Sponsor."
+                ),
+            ],
+        )
+    )
+
+    fields = [field for field in report.fields if field.field_name == "competition_name"]
+    assert len(fields) == 1
+    assert fields[0].normalized_value == "Nebius x NVIDIA Global AI Hackathon"
+
+
 @pytest.mark.parametrize("path", ["native", "ocr"])
 @pytest.mark.parametrize("zone", ["UTC+07:00", "GMT+7", "UTC +07:00", "WIBB"])
 def test_unsupported_timezone_must_not_be_truncated_into_a_known_zone(path, zone):
