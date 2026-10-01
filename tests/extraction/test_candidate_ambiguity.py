@@ -143,6 +143,29 @@ def test_one_label_agreeing_alternatives_keep_one_candidate(path, statement):
 @pytest.mark.parametrize(
     "statement",
     [
+        "Submission deadline: September 30 2026 at 23:59 WIB; October 1 2026 at 23:59 WIB",
+        "Submission deadline: September 30 2026 at 23:59 WIB and October 1 2026 at 23:59 WIB",
+        "Team size: 1 to 4; 2 to 6",
+        "Team size: 1 to 4 and 2 to 6",
+    ],
+)
+def test_trailing_supported_value_cannot_hide_after_first_match(path, statement):
+    with pytest.raises(CandidateNormalizationError, match="conflicting"):
+        normalize_candidate_report(_document(path, "blocks", [statement]))
+
+
+@pytest.mark.parametrize("path", ["native", "ocr"])
+def test_unsupported_explicit_deadline_time_cannot_downgrade_to_date_only(path):
+    with pytest.raises(CandidateNormalizationError, match="conflicting"):
+        normalize_candidate_report(_document(
+            path, "blocks", ["Submission deadline: September 30 2026 at TBD"]
+        ))
+
+
+@pytest.mark.parametrize("path", ["native", "ocr"])
+@pytest.mark.parametrize(
+    "statement",
+    [
         "Submission deadline: TBD; September 30 2026 at 23:59 WIB",
         "Team size: TBD 1 to 4",
     ],
