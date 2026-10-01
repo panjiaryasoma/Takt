@@ -134,9 +134,10 @@ void main() {
       closeScheduleRepositoryOnDispose: false,
     );
     await schedule.initialize();
-    addTearDown(schedule.dispose);
-    addTearDown(scheduleRepository.close);
+    // addTearDown is LIFO: register DB first so it closes last.
     addTearDown(db.close);
+    addTearDown(scheduleRepository.close);
+    addTearDown(schedule.dispose);
 
     await tester.pumpWidget(
       ChangeNotifierProvider.value(
@@ -314,6 +315,10 @@ void main() {
       const JsonEncoder.withIndent('  ').convert(manifest),
       flush: true,
     );
+
+    // Release every mounted listener before repository/database teardown.
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _pumpBounded(tester, frames: 2);
   });
 
   testWidgets('7B critical root surfaces remain usable at 320px and 2x text',
@@ -333,6 +338,11 @@ void main() {
       }
       expect(tester.takeException(), isNull, reason: '$tab must not overflow');
     }
+
+    // TaktApp owns provider subscriptions even when the DB is injected.
+    // Unmount it before the injected database is closed by tearDown.
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _pumpBounded(tester, frames: 2);
   });
 }
 
