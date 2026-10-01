@@ -112,6 +112,26 @@ def test_devpost_rules_metadata_produces_core_candidates():
     )
 
 
+def test_generic_deadline_word_in_narrative_does_not_create_false_candidate():
+    report = normalize_candidate_report(
+        _document(
+            "native",
+            "blocks",
+            [
+                "Deadline: Oct 30, 2026 @ 10:00am PDT",
+                (
+                    "The deadline for returning the Required Forms is described "
+                    "in the section below."
+                ),
+            ],
+        )
+    )
+
+    fields = [field for field in report.fields if field.field_name == "submission_deadline"]
+    assert len(fields) == 1
+    assert fields[0].normalized_value == "2026-10-30T10:00:00-07:00"
+
+
 @pytest.mark.parametrize("path", ["native", "ocr"])
 @pytest.mark.parametrize("zone", ["UTC+07:00", "GMT+7", "UTC +07:00", "WIBB"])
 def test_unsupported_timezone_must_not_be_truncated_into_a_known_zone(path, zone):
