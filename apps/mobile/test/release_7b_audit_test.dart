@@ -93,6 +93,11 @@ Future<void> _pumpBounded(
   }
 }
 
+void _checkpoint(String value) {
+  // ignore: avoid_print
+  print('7B_EVIDENCE_CHECKPOINT=$value');
+}
+
 Future<void> _capture(WidgetTester tester, String filename) async {
   await _pumpBounded(tester);
   expect(tester.takeException(), isNull);
@@ -126,8 +131,10 @@ void main() {
       (tester) async {
     _phoneViewport(tester);
     addTearDown(() => _resetViewport(tester));
+    _checkpoint('start');
     final db = AppDatabase.forTesting(NativeDatabase.memory());
     await db.initialize();
+    _checkpoint('db_initialized');
     final scheduleRepository = DriftScheduleRepository(
       db,
       closeDatabaseOnDispose: false,
@@ -137,6 +144,7 @@ void main() {
       closeScheduleRepositoryOnDispose: false,
     );
     await schedule.initialize();
+    _checkpoint('schedule_initialized');
     // addTearDown is LIFO: register DB first so it closes last.
     addTearDown(db.close);
     addTearDown(scheduleRepository.close);
@@ -150,7 +158,9 @@ void main() {
         ),
       ),
     );
+    _checkpoint('hero_before_capture');
     await _capture(tester, _evidenceNames[0]);
+    _checkpoint('hero_after_capture');
 
     final scheduleDay = DateTime(2026, 10, 1);
     expect(
@@ -171,7 +181,9 @@ void main() {
         ),
       ),
     );
+    _checkpoint('schedule_before_capture');
     await _capture(tester, _evidenceNames[1]);
+    _checkpoint('schedule_after_capture');
 
     final analysis = AnalisisViewModel(
       apiClient: _NoopApiClient(),
@@ -186,7 +198,9 @@ void main() {
         ),
       ),
     );
+    _checkpoint('analyze_before_capture');
     await _capture(tester, _evidenceNames[2]);
+    _checkpoint('analyze_after_capture');
 
     await tester.pumpWidget(
       _frame(
@@ -197,7 +211,9 @@ void main() {
         ),
       ),
     );
+    _checkpoint('conflict_before_capture');
     await _capture(tester, _evidenceNames[3]);
+    _checkpoint('conflict_after_capture');
 
     final revenueCat = RevenueCatService(
       config: RevenueCatConfig.validate(
@@ -222,7 +238,9 @@ void main() {
         ),
       ),
     );
+    _checkpoint('decision_before_capture');
     await _capture(tester, _evidenceNames[4]);
+    _checkpoint('decision_after_capture');
 
     final chooseAlternative = find.byKey(const Key('choose-later-option'));
     await tester.ensureVisible(chooseAlternative);
@@ -230,7 +248,9 @@ void main() {
     await tester.tap(chooseAlternative);
     await _pumpBounded(tester);
     expect(find.text('Your selected option'), findsOneWidget);
+    _checkpoint('alternative_before_capture');
     await _capture(tester, _evidenceNames[5]);
+    _checkpoint('alternative_after_capture');
 
     final acceptedRepo = _StaticSavedPlanRepository(
       summaries: [releaseSavedPlanSummary(stale: false)],
@@ -252,7 +272,9 @@ void main() {
     );
     await _pumpBounded(tester);
     expect(find.text('ACCEPTED'), findsOneWidget);
+    _checkpoint('saved_before_capture');
     await _capture(tester, _evidenceNames[6]);
+    _checkpoint('saved_after_capture');
 
     final staleRepo = _StaticSavedPlanRepository(
       summaries: [releaseSavedPlanSummary(stale: true)],
@@ -273,7 +295,9 @@ void main() {
     await _pumpBounded(tester);
     expect(find.byKey(const Key('persisted-evaluation-stale')), findsOneWidget);
     expect(find.text('Re-evaluate'), findsOneWidget);
+    _checkpoint('stale_before_capture');
     await _capture(tester, _evidenceNames[7]);
+    _checkpoint('stale_after_capture');
 
     await tester.dragUntilVisible(
       find.text('Accepted schedule'),
@@ -282,7 +306,9 @@ void main() {
     );
     await _pumpBounded(tester);
     expect(find.textContaining('synthetic-work-window'), findsOneWidget);
+    _checkpoint('accepted_before_capture');
     await _capture(tester, _evidenceNames[8]);
+    _checkpoint('accepted_after_capture');
 
     if (_shouldCaptureGoldens) {
       final goldenDirectory = Directory('test/release_7b_goldens');
@@ -320,8 +346,10 @@ void main() {
     );
 
     // Release every mounted listener before repository/database teardown.
+    _checkpoint('cleanup_before_unmount');
     await tester.pumpWidget(const SizedBox.shrink());
     await _pumpBounded(tester, frames: 2);
+    _checkpoint('complete');
   });
 
   testWidgets('7B critical root surfaces remain usable at 320px and 2x text',
