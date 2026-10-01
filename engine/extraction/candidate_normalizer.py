@@ -224,8 +224,11 @@ def _normalize_deadline(value: str) -> str | None:
             )
         for extra in _DEADLINE_VALUE_RE.finditer(tail):
             parsed = _deadline_from_match(extra)
-            if parsed is not None:
-                observed.append(parsed)
+            if parsed is None:
+                raise _AmbiguousLabeledValue(
+                    "deadline alternatives mix supported and unsupported values"
+                )
+            observed.append(parsed)
 
     if len({_deadline_key(item) for item in observed}) != 1:
         raise _AmbiguousLabeledValue("deadline alternatives disagree")
@@ -269,8 +272,11 @@ def _normalize_team_size(value: str) -> dict[str, int] | None:
         for extra in _TEAM_SIZE_RANGE_RE.finditer(alternative, first.end()):
             minimum = int(extra.group("minimum"))
             maximum = int(extra.group("maximum"))
-            if minimum > 0 and maximum >= minimum:
-                observed.append({"min": minimum, "max": maximum})
+            if minimum <= 0 or maximum < minimum:
+                raise _AmbiguousLabeledValue(
+                    "team-size alternatives mix supported and unsupported values"
+                )
+            observed.append({"min": minimum, "max": maximum})
 
     keys = {(item["min"], item["max"]) for item in observed}
     if len(keys) != 1:
