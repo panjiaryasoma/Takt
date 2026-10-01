@@ -96,6 +96,63 @@ def test_unsupported_timezone_must_not_be_truncated_into_a_known_zone(path, zone
     assert report.evidence == []
 
 
+@pytest.mark.parametrize("path", ["native", "ocr"])
+@pytest.mark.parametrize(
+    "statement",
+    [
+        "Submission deadline: September 30 2026 at 23:59 WIB or October 1 2026 at 23:59 WIB",
+        "Team size: 1 to 4 or 2 to 6",
+        "Submission deadline: September 30 2026 at 23:59 WIB / October 1 2026 at 23:59 WIB",
+        "Team size: 1 to 4 / 2 to 6",
+    ],
+)
+def test_one_label_with_conflicting_alternatives_fails_closed(path, statement):
+    with pytest.raises(CandidateNormalizationError, match="conflicting"):
+        normalize_candidate_report(_document(path, "blocks", [statement]))
+
+
+@pytest.mark.parametrize("path", ["native", "ocr"])
+@pytest.mark.parametrize(
+    "statement",
+    [
+        "Submission deadline: September 30 2026 at 23:59 WIB or October 1 2026 at 23:59 UTC+07:00",
+        "Team size: 1 to 4 or TBD",
+    ],
+)
+def test_one_label_mixed_supported_and_unsupported_alternatives_fails_closed(
+    path, statement
+):
+    with pytest.raises(CandidateNormalizationError, match="conflicting"):
+        normalize_candidate_report(_document(path, "blocks", [statement]))
+
+
+@pytest.mark.parametrize("path", ["native", "ocr"])
+@pytest.mark.parametrize(
+    "statement",
+    [
+        "Submission deadline: September 30 2026 at 23:59 WIB or September 30 2026 at 16:59 UTC",
+        "Team size: 1 to 4 or 1 to 4",
+    ],
+)
+def test_one_label_agreeing_alternatives_keep_one_candidate(path, statement):
+    report = normalize_candidate_report(_document(path, "blocks", [statement]))
+    assert len(report.fields) == len(report.evidence) == 1
+
+
+@pytest.mark.parametrize("path", ["native", "ocr"])
+@pytest.mark.parametrize(
+    "statement",
+    [
+        "Submission deadline: TBD; September 30 2026 at 23:59 WIB",
+        "Team size: TBD 1 to 4",
+    ],
+)
+def test_unsupported_prefix_cannot_authorize_a_later_supported_value(path, statement):
+    report = normalize_candidate_report(_document(path, "blocks", [statement]))
+    assert report.fields == []
+    assert report.evidence == []
+
+
 @pytest.mark.parametrize("endpoint", [URL_ENDPOINT, PDF_ENDPOINT])
 def test_ambiguous_source_uses_existing_public_failure_contract(monkeypatch, endpoint):
     monkeypatch.setattr("socket.getaddrinfo", public_dns)
