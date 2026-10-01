@@ -36,6 +36,9 @@ _GLOBAL_SINGLE_SOURCE_FIELDS = frozenset({
     "organizer",
     "submission_deadline",
     "registration_deadline",
+    "eligibility",
+    "deliverables",
+    "required_technologies",
 })
 
 
@@ -408,9 +411,20 @@ def reconcile_field(
             )
 
     supporting_source_ids = {item.source_id for item in observations}
+    official_single_source = (
+        len(supporting_source_ids) == 1
+        and all(
+            item.authority.source_type.value in {
+                "official_rules",
+                "official_organizer",
+                "official_faq",
+            }
+            for item in observations
+        )
+    )
     if (
         field_name in _GLOBAL_SINGLE_SOURCE_FIELDS
-        and len(supporting_source_ids) == 1
+        and official_single_source
         and len(set(comparisons)) == 1
     ):
         return _simple_usable_result(
