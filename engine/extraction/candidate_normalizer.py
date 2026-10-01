@@ -24,7 +24,7 @@ from packages.contracts import (
     ExtractionPath,
 )
 
-CANDIDATE_NORMALIZER_VERSION = "rule-based-v4"
+CANDIDATE_NORMALIZER_VERSION = "rule-based-v5"
 
 _MONTH_PATTERN = (
     r"January|February|March|April|May|June|July|August|September|October|"
@@ -70,6 +70,30 @@ _SUBMISSION_REQUIREMENTS_RE = re.compile(
 )
 _PROJECT_REQUIREMENTS_RE = re.compile(
     r"Project\s+Requirements",
+    re.IGNORECASE,
+)
+_ELIGIBILITY_SECTION_START_RE = re.compile(
+    r"^(?:\d+\.\s*)?Eligibility\b",
+    re.IGNORECASE,
+)
+_ELIGIBILITY_SECTION_END_RE = re.compile(
+    r"^(?:\d+\.\s*)?How\s+To\s+Enter\b",
+    re.IGNORECASE,
+)
+_PROJECT_SECTION_START_RE = re.compile(
+    r"^Project\s+Requirements\b",
+    re.IGNORECASE,
+)
+_PROJECT_SECTION_END_RE = re.compile(
+    r"^Submission\s+Requirements\b",
+    re.IGNORECASE,
+)
+_SUBMISSION_SECTION_START_RE = re.compile(
+    r"^Submission\s+Requirements\b",
+    re.IGNORECASE,
+)
+_SUBMISSION_SECTION_END_RE = re.compile(
+    r"^(?:Multiple\s+Submissions|Submission\s+ownership|Submission\s+Ownership)\b",
     re.IGNORECASE,
 )
 
@@ -378,6 +402,32 @@ def _normalize_submission_period(value: str) -> str | None:
     return aware.isoformat()
 
 
+def _section_blocks(
+    blocks: tuple[Any, ...],
+    *,
+    start: re.Pattern[str],
+    end: re.Pattern[str],
+) -> tuple[Any, ...]:
+    active = False
+    collected: list[Any] = []
+    for block in blocks:
+        text = block.text.strip()
+        if not active:
+            if start.search(text) is None:
+                continue
+            active = True
+            collected.append(block)
+            continue
+        if end.search(text) is not None:
+            break
+        collected.append(block)
+    return tuple(collected)
+
+
+def _joined_block_text(blocks: tuple[Any, ...]) -> str:
+    return "\n".join(block.text.strip() for block in blocks if block.text.strip())
+
+
 def _eligibility_from_text(value: str) -> dict[str, object] | None:
     if _ELIGIBILITY_OPEN_RE.search(value) is None:
         return None
@@ -548,48 +598,6 @@ class RuleBasedCandidateNormalizer:
                     evidence=evidence,
                 )
 
-            eligibility = _eligibility_from_text(block.text)
-            if eligibility is not None:
-                self._append_candidate(
-                    document=document,
-                    extraction_path=extraction_path,
-                    block=block,
-                    field_name="eligibility",
-                    raw_value=block.text,
-                    normalized_value=eligibility,
-                    extractor_fingerprint=extractor_fingerprint,
-                    fields=fields,
-                    evidence=evidence,
-                )
-
-            deliverables = _deliverables_from_text(block.text)
-            if deliverables is not None:
-                self._append_candidate(
-                    document=document,
-                    extraction_path=extraction_path,
-                    block=block,
-                    field_name="deliverables",
-                    raw_value=deliverables,
-                    normalized_value=deliverables,
-                    extractor_fingerprint=extractor_fingerprint,
-                    fields=fields,
-                    evidence=evidence,
-                )
-
-            required_technologies = _required_technologies_from_text(block.text)
-            if required_technologies is not None:
-                self._append_candidate(
-                    document=document,
-                    extraction_path=extraction_path,
-                    block=block,
-                    field_name="required_technologies",
-                    raw_value=required_technologies,
-                    normalized_value=required_technologies,
-                    extractor_fingerprint=extractor_fingerprint,
-                    fields=fields,
-                    evidence=evidence,
-                )
-
             matches = list(_FACT_LABEL_RE.finditer(block.text))
             for index, match in enumerate(matches):
                 end = matches[index + 1].start() if index + 1 < len(matches) else len(block.text)
@@ -641,11 +649,137 @@ class RuleBasedCandidateNormalizer:
                         evidence=evidence,
                     )
 
+        eligibility_blocks = _section_blocks(
+            document.blocks,
+            start=_ELIGIBILITY_SECTION_START_RE,
+            end=_ELIGIBILITY_SECTION_END_RE,
+        )
+        eligibility_text = _joined_block_text(eligibility_blocks)
+        eligibility = _eligibility_from_text(eligibility_text)
+        if eligibility is not None:
+            self._append_candidate_from_blocks(
+                document=document,
+                extraction_path=extraction_path,
+                blocks=eligibility_blocks,
+                field_name="eligibility",
+                raw_value=eligibility_text,
+                normalized_value=eligibility,
+                extractor_fingerprint=extractor_fingerprint,
+                fields=fields,
+                evidence=evidence,
+            )
+
+        project_blocks = _section_blocks(
+            document.blocks,
+            start=_PROJECT_SECTION_START_RE,
+            end=_PROJECT_SECTION_END_RE,
+        )
+        project_text = _joined_block_text(project_blocks)
+        required_technologies = _required_technologies_from_text(project_text)
+        if required_technologies is not None:
+            self._append_candidate_from_blocks(
+                document=document,
+                extraction_path=extraction_path,
+                blocks=project_blocks,
+                field_name="required_technologies",
+                raw_value=project_text,
+                normalized_value=required_technologies,
+                extractor_fingerprint=extractor_fingerprint,
+                fields=fields,
+                evidence=evidence,
+            )
+
+        submission_blocks = _section_blocks(
+            document.blocks,
+            start=_SUBMISSION_SECTION_START_RE,
+            end=_SUBMISSION_SECTION_END_RE,
+        )
+        submission_text = _joined_block_text(submission_blocks)
+        deliverables = _deliverables_from_text(submission_text)
+        if deliverables is not None:
+            self._append_candidate_from_blocks(
+                document=document,
+                extraction_path=extraction_path,
+                blocks=submission_blocks,
+                field_name="deliverables",
+                raw_value=submission_text,
+                normalized_value=deliverables,
+                extractor_fingerprint=extractor_fingerprint,
+                fields=fields,
+                evidence=evidence,
+            )
+
         return CandidateExtractionReport(
             source_id=document.source_record.source_id,
             extraction_path=extraction_path,
             fields=fields,
             evidence=evidence,
+        )
+
+    @staticmethod
+    def _append_candidate_from_blocks(
+        *,
+        document: ExtractionDocument,
+        extraction_path: ExtractionPath,
+        blocks: tuple[Any, ...],
+        field_name: str,
+        raw_value: Any,
+        normalized_value: Any,
+        extractor_fingerprint: str,
+        fields: list[CandidateField],
+        evidence: list[EvidenceSpan],
+    ) -> None:
+        if not blocks:
+            return
+
+        for previous in fields:
+            if previous.field_name != field_name:
+                continue
+            if previous.normalized_value == normalized_value:
+                return
+            raise CandidateNormalizationError(
+                "source contains conflicting labeled facts",
+                source_ref=document.source_record.url_or_document_id,
+            )
+
+        evidence_ids: list[str] = []
+        confidences: list[float] = []
+        for block in blocks:
+            evidence_id = build_evidence_id(
+                source_id=document.source_record.source_id,
+                content_hash=document.source_record.content_hash,
+                extraction_path=extraction_path,
+                field_name=field_name,
+                locator=block.locator,
+                extractor_fingerprint=extractor_fingerprint,
+                raw_evidence=block.text,
+            )
+            evidence_ids.append(evidence_id)
+            evidence.append(
+                EvidenceSpan(
+                    evidence_id=evidence_id,
+                    source_id=document.source_record.source_id,
+                    page_or_locator=block.locator,
+                    raw_text_or_visual_reference=block.text,
+                    field_name=field_name,
+                    extraction_path=extraction_path,
+                    extractor_version=extractor_fingerprint,
+                )
+            )
+            confidence = _candidate_confidence(document, block)
+            if confidence is not None:
+                confidences.append(confidence)
+
+        fields.append(
+            CandidateField(
+                field_name=field_name,
+                raw_value=raw_value,
+                normalized_value=normalized_value,
+                evidence_ids=evidence_ids,
+                extraction_path=extraction_path,
+                confidence=min(confidences) if confidences else None,
+                scope=document.source_record.scope,
+            )
         )
 
     @staticmethod
