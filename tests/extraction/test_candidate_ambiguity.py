@@ -86,6 +86,32 @@ def test_repeated_agreeing_facts_keep_one_resolvable_candidate(path, layout, sta
     assert report.evidence[0].page_or_locator in {block.locator for block in document.blocks}
 
 
+def test_devpost_rules_metadata_produces_core_candidates():
+    report = normalize_candidate_report(
+        _document(
+            "native",
+            "blocks",
+            [
+                "Nebius x NVIDIA Global AI Hackathon (the “Hackathon”) Official Rules",
+                "Deadline: Oct 30, 2026 @ 10:00am PDT",
+                (
+                    "Sponsor: Nebius B.V., Schiphol Boulevard 165, "
+                    "1118 BG Schiphol, the Netherlands"
+                ),
+            ],
+        )
+    )
+
+    fields = {field.field_name: field for field in report.fields}
+    assert fields["competition_name"].normalized_value == (
+        "Nebius x NVIDIA Global AI Hackathon"
+    )
+    assert fields["organizer"].normalized_value == "Nebius B.V."
+    assert fields["submission_deadline"].normalized_value == (
+        "2026-10-30T10:00:00-07:00"
+    )
+
+
 @pytest.mark.parametrize("path", ["native", "ocr"])
 @pytest.mark.parametrize("zone", ["UTC+07:00", "GMT+7", "UTC +07:00", "WIBB"])
 def test_unsupported_timezone_must_not_be_truncated_into_a_known_zone(path, zone):
