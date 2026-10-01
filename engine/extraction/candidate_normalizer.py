@@ -51,7 +51,7 @@ _DEADLINE_VALUE_RE = re.compile(
 _OFFICIAL_RULES_NAME_RE = re.compile(
     r"^\s*(?P<name>.+?)\s*"
     r"(?:\(\s*the\s+[“\"']?Hackathon[”\"']?\s*\)\s*)?"
-    r"Official\s+Rules\b",
+    r"Official\s+Rules\s*$",
     re.IGNORECASE,
 )
 _SPONSOR_RE = re.compile(r"^\s*Sponsor\s*:\s*(?P<value>.+?)\s*$", re.IGNORECASE)
