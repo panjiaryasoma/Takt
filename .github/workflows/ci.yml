@@ -172,6 +172,7 @@ jobs:
           name: mobile-audit-${{ github.event.pull_request.head.sha || github.sha }}
           path: |
             apps/mobile/build/7b-audit/
+            apps/mobile/test/release_7b_goldens/
             apps/mobile/build/app/outputs/flutter-apk/app-debug.apk
           if-no-files-found: error
           retention-days: 90
