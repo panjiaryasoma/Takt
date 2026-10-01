@@ -24,18 +24,16 @@ from packages.contracts import (
     ExtractionPath,
 )
 
-CANDIDATE_NORMALIZER_VERSION = "rule-based-v5"
+CANDIDATE_NORMALIZER_VERSION = "rule-based-v6"
 
 _MONTH_PATTERN = (
     r"January|February|March|April|May|June|July|August|September|October|"
     r"November|December|Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Sept|Oct|Nov|Dec"
 )
 _FACT_LABEL_RE = re.compile(
-    r"\b(?P<label>submission\s+deadline(?=\s*[:\-])|"
-    r"submission\s+period(?=\s*[:\-])|"
-    r"registration\s+deadline(?=\s*[:\-])|"
-    r"deadline(?=\s*[:\-])|team\s+size(?=\s*[:\-]))"
-    r"\b\s*[:\-]\s*",
+    r"\b(?P<label>submission\s+deadline|registration\s+deadline|team\s+size|"
+    r"submission\s+period(?=\s*[:\-])|deadline(?=\s*[:\-]))"
+    r"\b\s*[:\-]?\s*",
     re.IGNORECASE,
 )
 _DEADLINE_VALUE_RE = re.compile(
@@ -44,8 +42,8 @@ _DEADLINE_VALUE_RE = re.compile(
     r"(?P<year>\d{4})"
     r"(?:\s+(?:(?:at\s+)|(?:@\s*))?(?P<hour>\d{1,2})"
     r"[:.](?P<minute>\d{2})\s*(?P<meridiem>am|pm)?\s*"
-    r"(?P<timezone>WIB|WITA|WIT|UTC|GMT|PDT|PST|MDT|MST|CDT|CST|EDT|EST)"
-    r"(?!\w|\s*[+-]))?",
+    r"(?:(?P<timezone>WIB|WITA|WIT|UTC|GMT|PDT|PST|MDT|MST|CDT|CST|EDT|EST)"
+    r"(?!\w|\s*[+-]))?)?",
     re.IGNORECASE,
 )
 _OFFICIAL_RULES_NAME_RE = re.compile(
