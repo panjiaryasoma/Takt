@@ -1,0 +1,157 @@
+name: Emergency Live Smoke
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  live-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Analyze Nebius and evaluate plan against Railway
+        env:
+          BASE_URL: https://takt-production-951d.up.railway.app
+        run: |
+          python - <<'PY'
+          import json
+          import os
+          import urllib.error
+          import urllib.request
+          from datetime import datetime, timedelta
+          from zoneinfo import ZoneInfo
+
+          base = os.environ["BASE_URL"].rstrip("/")
+
+          def post(path, payload, timeout=180):
+              body = json.dumps(payload, separators=(",", ":")).encode()
+              req = urllib.request.Request(
+                  base + path,
+                  data=body,
+                  method="POST",
+                  headers={
+                      "accept": "application/json",
+                      "content-type": "application/json; charset=utf-8",
+                  },
+              )
+              try:
+                  with urllib.request.urlopen(req, timeout=timeout) as res:
+                      text = res.read().decode()
+                      print(f"POST {path} -> {res.status}")
+                      return res.status, json.loads(text)
+              except urllib.error.HTTPError as exc:
+                  text = exc.read().decode()
+                  print(f"POST {path} -> {exc.code}")
+                  print(text[:12000])
+                  raise
+
+          competition_id = "cmp-emergency-live-smoke"
+          source_id = "source-emergency-nebius"
+          _, analyzed = post(
+              "/api/v1/competitions/analyze/url",
+              {
+                  "competition_id": competition_id,
+                  "url": "https://nebiusglobalaihackathon.devpost.com/rules",
+                  "source": {
+                      "source_id": source_id,
+                      "source_type": "official_rules",
+                      "authority_rank": {"basis": "official_rules"},
+                      "scope": {},
+                      "freshness_metadata": {},
+                  },
+                  "previous_report_bundle": None,
+                  "prior_source_artifacts": [],
+              },
+          )
+
+          bundle = analyzed["report_bundle"]
+          fields = bundle["report"]["canonical_fields"]
+          summary = {
+              name: {
+                  "state": value.get("state"),
+                  "normalized_value": value.get("normalized_value"),
+              }
+              for name, value in fields.items()
+              if name in {
+                  "competition_name",
+                  "submission_deadline",
+                  "eligibility",
+                  "deliverables",
+                  "required_technologies",
+              }
+          }
+          print("CANONICAL", json.dumps(summary, indent=2, default=str))
+
+          deadline_text = fields["submission_deadline"]["normalized_value"]
+          deadline = datetime.fromisoformat(deadline_text.replace("Z", "+00:00"))
+          zone = ZoneInfo("Asia/Jakarta")
+          now = datetime.now(zone)
+          start_day = now.replace(hour=0, minute=0, second=0, microsecond=0)
+          local_deadline = deadline.astimezone(zone)
+          cursor = start_day
+          windows = []
+          while cursor.date() <= local_deadline.date():
+              start = cursor.replace(hour=8, minute=0)
+              end = cursor.replace(hour=11, minute=0)
+              if start < now:
+                  start = now.replace(second=0, microsecond=0)
+              if end > local_deadline:
+                  end = local_deadline
+              if start < end:
+                  windows.append({
+                      "start": start.isoformat(timespec="seconds"),
+                      "end": end.isoformat(timespec="seconds"),
+                  })
+              cursor += timedelta(days=1)
+
+          request = {
+              "report_bundle": bundle,
+              "readiness_context": {
+                  "user": {
+                      "age": 21,
+                      "student_status": True,
+                      "country": "Indonesia",
+                  },
+                  "selected_scope": "BEST APP AGENTIC AI",
+                  "require_technology_information": False,
+              },
+              "planning": {
+                  "workload": {
+                      "tasks": [{
+                          "task_id": "task-emergency-prototype",
+                          "name": "Prototype",
+                          "mandatory": True,
+                          "dependencies": [],
+                          "effort_min_minutes": 60,
+                          "effort_likely_minutes": 120,
+                          "effort_max_minutes": 180,
+                          "assumptions": [],
+                      }],
+                      "assumptions": [],
+                  },
+                  "availability": {
+                      "horizon": {
+                          "start": start_day.isoformat(timespec="seconds"),
+                          "end": local_deadline.isoformat(timespec="seconds"),
+                      },
+                      "work_windows": windows,
+                      "commitments": [],
+                      "accepted_commitments": [],
+                      "preferences": {
+                          "timezone": "Asia/Jakarta",
+                          "max_project_minutes_per_day": 240,
+                          "preferred_focus_minutes": 90,
+                          "buffer_target_minutes": 30,
+                      },
+                  },
+              },
+          }
+
+          _, result = post("/api/v1/plans/evaluate", request)
+          print("READINESS", json.dumps(result.get("readiness"), indent=2))
+          planning = result.get("planning")
+          print("PLANNING", json.dumps(planning, indent=2)[:16000])
+          assert result["readiness"]["status"] == "READY_TO_EVALUATE", result["readiness"]
+          assert planning is not None
+          print("LIVE_E2E_PASS")
+          PY
