@@ -31,6 +31,14 @@ from packages.contracts import (
     SourceRecord,
 )
 
+_GLOBAL_SINGLE_SOURCE_FIELDS = frozenset({
+    "competition_name",
+    "organizer",
+    "submission_deadline",
+    "registration_deadline",
+})
+
+
 
 def _stable_json(value: object) -> str:
     return json.dumps(
@@ -382,18 +390,6 @@ def reconcile_field(
                 observations,
                 basis=("authority-unknown",),
             )
-        if not observation.freshness.known:
-            return _unverified(
-                field_name,
-                observations,
-                basis=("freshness-unknown",),
-            )
-        if not observation.effective_scope.known:
-            return _unverified(
-                field_name,
-                observations,
-                basis=("scope-unknown",),
-            )
         if observation.field.raw_value is None:
             return _unverified(
                 field_name,
@@ -409,6 +405,33 @@ def reconcile_field(
                 field_name,
                 observations,
                 basis=("normalized-value-unusable",),
+            )
+
+    supporting_source_ids = {item.source_id for item in observations}
+    if (
+        field_name in _GLOBAL_SINGLE_SOURCE_FIELDS
+        and len(supporting_source_ids) == 1
+        and len(set(comparisons)) == 1
+    ):
+        return _simple_usable_result(
+            field_name,
+            active=observations,
+            all_observations=observations,
+            superseded_source_ids=(),
+        )
+
+    for observation in observations:
+        if not observation.freshness.known:
+            return _unverified(
+                field_name,
+                observations,
+                basis=("freshness-unknown",),
+            )
+        if not observation.effective_scope.known:
+            return _unverified(
+                field_name,
+                observations,
+                basis=("scope-unknown",),
             )
 
     superseded_indexes: set[int] = set()
