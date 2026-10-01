@@ -244,6 +244,7 @@ def ocr_pdf(
                 deadline=deadline,
                 per_page_timeout=timeout_seconds,
             )
+            page_deadline = min(deadline, monotonic() + page_timeout)
             try:
                 page_blocks = active_provider.extract_page(
                     image_bytes,
@@ -257,6 +258,11 @@ def ocr_pdf(
                     f"OCR provider failed on page {page_number}",
                     source_ref=source_record.url_or_document_id,
                 ) from exc
+            if monotonic() >= page_deadline:
+                raise OCRTimeoutError(
+                    f"OCR page {page_number} exceeded timeout budget",
+                    source_ref=source_record.url_or_document_id,
+                )
             if not isinstance(page_blocks, tuple):
                 raise OCRExtractionError(
                     "OCR provider must return tuple[OCRTextBlock, ...]",
@@ -313,6 +319,7 @@ def ocr_pdf(
                 seen_locators.add(block.locator)
                 blocks.append(block)
 
+        _remaining_timeout(deadline=deadline, per_page_timeout=timeout_seconds)
         return OCRDocument(
             source_record=source_record,
             provider_id=provider_id,

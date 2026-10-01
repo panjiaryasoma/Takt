@@ -19,20 +19,45 @@ import 'package:takt_mobile/theme/app_theme.dart';
 
 import 'support/decision_fixture.dart';
 
-Widget report(EvaluationSession? session, {int revision = 3,
-    AcceptCandidateHandler? onAccept, ValueChanged<EditConstraintsIntent>? onEdit,
-    ValueChanged<IgnoreRecommendationIntent>? onIgnore,
-    RevenueCatService? revenueCatService, VoidCallback? onOpenPro,
-    double scale = 1}) => MaterialApp(
-  theme: AppTheme.dark,
-  home: Builder(builder: (context) => MediaQuery(
-    data: MediaQuery.of(context).copyWith(textScaler: TextScaler.linear(scale)),
-    child: Scaffold(body: RekomendasiJadwalScreen(session: session,
-        currentInputRevision: revision, revenueCatService: revenueCatService,
-        onOpenPro: onOpenPro, onAccept: onAccept,
-        onEditConstraints: onEdit, onIgnore: onIgnore)),
-  )),
-);
+Widget report(
+  EvaluationSession? session, {
+  int revision = 3,
+  AcceptCandidateHandler? onAccept,
+  ValueChanged<EditConstraintsIntent>? onEdit,
+  ValueChanged<IgnoreRecommendationIntent>? onIgnore,
+  RevenueCatService? revenueCatService,
+  VoidCallback? onOpenPro,
+  double scale = 1,
+  bool acceptancePersistencePending = false,
+  String? acceptancePersistenceMessage,
+  Future<void> Function()? onRetryAcceptanceSave,
+  VoidCallback? onCancelPendingAcceptance,
+}) =>
+    MaterialApp(
+      theme: AppTheme.dark,
+      home: Builder(
+        builder: (context) => MediaQuery(
+          data: MediaQuery.of(context).copyWith(
+            textScaler: TextScaler.linear(scale),
+          ),
+          child: Scaffold(
+            body: RekomendasiJadwalScreen(
+              session: session,
+              currentInputRevision: revision,
+              revenueCatService: revenueCatService,
+              onOpenPro: onOpenPro,
+              onAccept: onAccept,
+              onEditConstraints: onEdit,
+              onIgnore: onIgnore,
+              acceptancePersistencePending: acceptancePersistencePending,
+              acceptancePersistenceMessage: acceptancePersistenceMessage,
+              onRetryAcceptanceSave: onRetryAcceptanceSave,
+              onCancelPendingAcceptance: onCancelPendingAcceptance,
+            ),
+          ),
+        ),
+      ),
+    );
 
 Future<void> tapKey(WidgetTester tester, String key) async {
   final finder = find.byKey(Key(key));
@@ -131,6 +156,48 @@ void main() {
     expect(find.byKey(const Key('handoff-complete')), findsOneWidget);
     expect(find.text('Saved'), findsNothing);
     expect(find.text('Added to calendar'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+
+  testWidgets(
+      'pending acceptance shows retry/cancel persistence without a second decision',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+    var retries = 0;
+    var cancels = 0;
+    await tester.pumpWidget(
+      report(
+        testSession(alternatives: false),
+        onAccept: (_, _) async {},
+        onEdit: (_) {},
+        onIgnore: (_) {},
+        scale: 2,
+        acceptancePersistencePending: true,
+        acceptancePersistenceMessage:
+            'The confirmed choice could not be committed locally.',
+        onRetryAcceptanceSave: () async => retries++,
+        onCancelPendingAcceptance: () => cancels++,
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Acceptance is confirmed but not saved'), findsOneWidget);
+    expect(find.text('Retry acceptance save'), findsOneWidget);
+    expect(find.text('Cancel pending acceptance'), findsOneWidget);
+    expect(
+      tester.widget<FilledButton>(find.byKey(const Key('accept-candidate'))).onPressed,
+      isNull,
+    );
+
+    final retrySave = find.text('Retry acceptance save');
+    await tester.ensureVisible(retrySave);
+    await tester.tap(retrySave);
+    await tester.pump();
+    expect(retries, 1);
+    expect(cancels, 0);
     expect(tester.takeException(), isNull);
   });
 

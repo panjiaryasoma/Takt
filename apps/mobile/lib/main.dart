@@ -17,8 +17,11 @@ import 'data/repositories/evaluation_repository.dart';
 import 'data/repositories/saved_plan_repository.dart';
 import 'data/repositories/schedule_repository.dart';
 import 'models/commitment.dart';
+import 'models/analysis_step.dart';
 import 'models/decision_intent.dart';
 import 'models/evaluation_session.dart';
+import 'models/recovery_policy.dart';
+import 'widgets/recovery_panel.dart';
 import 'monetization/revenuecat_bootstrap.dart';
 import 'monetization/revenuecat_service.dart';
 import 'screens/analisis_kompetisi_screen.dart';
@@ -268,6 +271,18 @@ class _RootShellState extends State<RootShell> {
     }
   }
 
+  void _backFromPlanningSetup() {
+    final host = context.read<PlanningHostViewModel>();
+    if (host.navigationLockedByPersistence || host.canRetryPersistence ||
+        host.canRetryPublication) {
+      return;
+    }
+    if (host.phase == PlanningHostPhase.requesting) {
+      host.abandonRequest();
+    }
+    setState(() => _analisisStep = 2);
+  }
+
   void _closeDecision() {
     if (widget.decisionSession == null) {
       context.read<PlanningHostViewModel>().leaveDecision();
@@ -289,12 +304,17 @@ class _RootShellState extends State<RootShell> {
   }
 
   bool _hasSemanticBackTarget() {
+    final analysis = context.watch<AnalisisViewModel>();
+    final host = context.watch<PlanningHostViewModel>();
+    if (analysis.canRetryPersistence || analysis.phase == AnalysisPhase.persisting ||
+        host.canRetryPersistence || host.canRetryPublication ||
+        host.hasPendingAcceptance || host.navigationLockedByPersistence) {
+      return true;
+    }
     if (_navIndex == 1 && _showTambahJadwal) return true;
     if (_navIndex == 3 && _selectedSavedPlanId != null) return true;
     if (_navIndex != 2) return false;
 
-    final host = context.read<PlanningHostViewModel>();
-    final analysis = context.read<AnalisisViewModel>();
     final step = _effectiveAnalysisStepFor(host);
     if (step == 4 || step == 3 || step == 1) return true;
     if (step == 2) return analysis.response != null;
@@ -302,6 +322,18 @@ class _RootShellState extends State<RootShell> {
   }
 
   void _handleSemanticBack() {
+    final pendingAnalysis = context.read<AnalisisViewModel>();
+    if (pendingAnalysis.canRetryPersistence ||
+        pendingAnalysis.phase == AnalysisPhase.persisting) {
+      setState(() { _navIndex = 2; _analisisStep = 1; });
+      return;
+    }
+    final pendingHost = context.read<PlanningHostViewModel>();
+    if (pendingHost.canRetryPersistence || pendingHost.canRetryPublication ||
+        pendingHost.hasPendingAcceptance || pendingHost.navigationLockedByPersistence) {
+      setState(() { _navIndex = 2; _analisisStep = pendingHost.hasPendingAcceptance ? 3 : 4; });
+      return;
+    }
     if (_navIndex == 1 && _showTambahJadwal) {
       setState(() {
         _showTambahJadwal = false;
@@ -319,7 +351,7 @@ class _RootShellState extends State<RootShell> {
     final analysis = context.read<AnalisisViewModel>();
     switch (_effectiveAnalysisStepFor(host)) {
       case 4:
-        setState(() => _analisisStep = 2);
+        _backFromPlanningSetup();
         return;
       case 3:
         _closeDecision();
@@ -328,6 +360,8 @@ class _RootShellState extends State<RootShell> {
         if (analysis.response != null) setState(() => _analisisStep = 1);
         return;
       case 1:
+        if (!analysis.canLeaveProgress) return;
+        analysis.beginSourceEdit();
         setState(() => _analisisStep = 0);
         return;
       case 0:
@@ -354,7 +388,7 @@ class _RootShellState extends State<RootShell> {
     final schedule = context.read<JadwalViewModel>();
     var failed = false;
     try {
-      await savedPlans.refresh();
+      await savedPlans.refreshForHandoff();
     } on Object {
       failed = true;
     }
@@ -373,6 +407,27 @@ class _RootShellState extends State<RootShell> {
     );
   }
 
+  Future<void> _retryAcceptanceSave() async {
+    final host = context.read<PlanningHostViewModel>();
+    try {
+      await host.retryAcceptancePersistence();
+    } on AcceptancePersistenceExceptionProxy {
+      return;
+    }
+    if (!mounted || host.phase != PlanningHostPhase.accepted) return;
+    await _refreshAcceptedProjections();
+    if (!mounted) return;
+    setState(() {
+      _selectedSavedPlanId = host.savedPlan?.id;
+      _navIndex = 3;
+      _analisisStep = 2;
+    });
+  }
+
+  void _cancelPendingAcceptance() {
+    context.read<PlanningHostViewModel>().cancelPendingAcceptance();
+  }
+
   Future<void> _openPlanningFromCurrentAnalysis() async {
     final analysis = context.read<AnalisisViewModel>();
     final snapshot = analysis.activeSnapshot;
@@ -380,16 +435,6 @@ class _RootShellState extends State<RootShell> {
     final host = context.read<PlanningHostViewModel>();
     await host.startPlanning(snapshot);
     if (!mounted) return;
-    if (host.phase != PlanningHostPhase.setup) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            host.failure?.message ?? 'Planning context could not be prepared.',
-          ),
-        ),
-      );
-      return;
-    }
     setState(() {
       _navIndex = 2;
       _analisisStep = 4;
@@ -404,27 +449,15 @@ class _RootShellState extends State<RootShell> {
     );
     if (!mounted) return;
     if (snapshot == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'The latest persisted analysis for this competition is unavailable.',
-          ),
-        ),
-      );
-      return;
+      throw StateError('The latest persisted analysis is unavailable.');
     }
-    await analysis.loadSnapshot(snapshot);
+    if (!await analysis.loadSnapshot(snapshot)) {
+      throw StateError('The persisted analysis context cannot be opened.');
+    }
     await host.startPlanning(snapshot);
     if (!mounted) return;
     if (host.phase != PlanningHostPhase.setup) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            host.failure?.message ?? 'Planning context could not be prepared.',
-          ),
-        ),
-      );
-      return;
+      throw StateError('The planning context could not be loaded.');
     }
     setState(() {
       _selectedSavedPlanId = null;
@@ -456,15 +489,31 @@ class _RootShellState extends State<RootShell> {
       case 4:
         final draft = host.draft;
         if (draft == null) {
-          return ReviewBriefScreen(
-            response: vm.response!,
-            onBack: () => setState(() => _analisisStep = 2),
-            onPlan: _openPlanningFromCurrentAnalysis,
+          return SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              children: [
+                AppHeader(title: 'Planning Setup', onBack: _backFromPlanningSetup),
+                if (host.busy) const LinearProgressIndicator(),
+                if (host.failure != null)
+                  RecoveryPanel(
+                    descriptor: RecoveryDescriptor(
+                      title: 'Planning context is unavailable',
+                      message: host.failure!.message,
+                      recoveryClass: host.failure!.recoveryClass,
+                      technicalCode: host.failure!.code,
+                      stage: host.failure!.stage,
+                    ),
+                    primaryLabel: host.canReloadContext ? 'Reload context' : null,
+                    onPrimary: host.canReloadContext ? host.reloadContext : null,
+                  ),
+              ],
+            ),
           );
         }
         return PlanningSetupScreen(
           host: host,
-          onBack: () => setState(() => _analisisStep = 2),
+          onBack: _backFromPlanningSetup,
           onDecisionReady: () => setState(() => _analisisStep = 3),
         );
       case 3:
@@ -502,13 +551,26 @@ class _RootShellState extends State<RootShell> {
             }
             _closeDecision();
           },
+          acceptancePersistencePending: host.hasPendingAcceptance,
+          acceptancePersistenceMessage: host.hasPendingAcceptance
+              ? host.failure?.message
+              : null,
+          onRetryAcceptanceSave:
+              host.hasPendingAcceptance ? _retryAcceptanceSave : null,
+          onCancelPendingAcceptance:
+              host.hasPendingAcceptance ? _cancelPendingAcceptance : null,
           onBack: _closeDecision,
         );
       case 1:
         return ProgresAnalisisScreen(
           onReadResult: () => setState(() => _analisisStep = 2),
-          onBackToInput: () => setState(() => _analisisStep = 0),
+          onBackToInput: () {
+            if (!vm.canLeaveProgress) return;
+            vm.beginSourceEdit();
+            setState(() => _analisisStep = 0);
+          },
           onStartNewAnalysis: () {
+            if (!vm.canLeaveProgress) return;
             vm.resetForNewCompetition();
             setState(() {
               _addingSource = false;
@@ -527,11 +589,15 @@ class _RootShellState extends State<RootShell> {
         return ReviewBriefScreen(
           response: response,
           onBack: () => setState(() => _analisisStep = 1),
-          onAddSource: () => setState(() {
-            _addingSource = true;
-            _analisisStep = 0;
-          }),
+          onAddSource: () {
+            vm.ensureSourceDraft(continuation: true);
+            setState(() {
+              _addingSource = true;
+              _analisisStep = 0;
+            });
+          },
           onNewAnalysis: () {
+            if (!vm.canLeaveProgress) return;
             vm.resetForNewCompetition();
             setState(() {
               _addingSource = false;

@@ -485,7 +485,8 @@ WHERE saved_plan_task_id = ?
         savedPlanTaskId,
       ],
     );
-    await refresh();
+    // Completion means the write is durable. The host refreshes projections
+    // separately so a read failure cannot be reported as a failed save.
   }
 
   @override

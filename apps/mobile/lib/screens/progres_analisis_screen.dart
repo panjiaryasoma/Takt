@@ -1,10 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
+import '../models/analysis_failure.dart';
 import '../models/analysis_step.dart';
+import '../models/recovery_policy.dart';
 import '../theme/app_theme.dart';
 import '../viewmodels/analisis_view_model.dart';
 import '../widgets/common.dart';
+import '../widgets/recovery_panel.dart';
 
 class ProgresAnalisisScreen extends StatelessWidget {
   const ProgresAnalisisScreen({
@@ -17,6 +20,64 @@ class ProgresAnalisisScreen extends StatelessWidget {
   final VoidCallback? onReadResult;
   final VoidCallback? onBackToInput;
   final VoidCallback? onStartNewAnalysis;
+
+  RecoveryDescriptor _descriptor(AnalysisFailure failure) {
+    final recovery = failure.recoveryClass;
+    return RecoveryDescriptor(
+      title: switch (recovery) {
+        RecoveryClass.retrySameInput => 'Temporary analysis failure',
+        RecoveryClass.fixInput => 'Source needs attention',
+        RecoveryClass.reuploadSource => 'Source needs replacement',
+        RecoveryClass.reloadContext => 'Analysis context is unavailable',
+        _ => 'Analysis could not complete safely',
+      },
+      message: failure.userMessage,
+      recoveryClass: recovery,
+      technicalCode: failure.code,
+      stage: failure.stage,
+      primaryAction: switch (recovery) {
+        RecoveryClass.retrySameInput => RecoveryAction.retryRequest,
+        RecoveryClass.fixInput => RecoveryAction.editSource,
+        RecoveryClass.reuploadSource => RecoveryAction.replaceSource,
+        RecoveryClass.reloadContext => RecoveryAction.startNewAnalysis,
+        _ => RecoveryAction.back,
+      },
+      secondaryAction: recovery == RecoveryClass.retrySameInput
+          ? RecoveryAction.editSource
+          : null,
+    );
+  }
+
+  Future<void> _discardUnsaved(
+    BuildContext context,
+    AnalisisViewModel vm,
+  ) async {
+    final confirmed = await showDialog<bool>(
+          context: context,
+          builder: (dialogContext) => AlertDialog(
+            backgroundColor: C.card,
+            title: const Text('Discard unsaved result?'),
+            content: const Text(
+              'This result was not saved. Discarding it returns to the previous '
+              'durable analysis state and does not delete previously saved data.',
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(dialogContext, false),
+                child: const Text('Keep result'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(dialogContext, true),
+                child: const Text('Discard unsaved result'),
+              ),
+            ],
+          ),
+        ) ??
+        false;
+    if (!confirmed) return;
+    vm.discardUnsavedResult();
+    onBackToInput?.call();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -95,79 +156,51 @@ class ProgresAnalisisScreen extends StatelessWidget {
           ),
           if (failure != null) ...[
             const SizedBox(height: 16),
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: C.card,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: C.padat),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Row(
-                    children: [
-                      Icon(
-                        Icons.error_outline,
-                        color: C.padat,
-                        size: 20,
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: vm.canRetryPersistence
+                  ? RecoveryPanel(
+                      descriptor: RecoveryDescriptor(
+                        title: 'Analysis result is not saved yet',
+                        message: failure.userMessage,
+                        recoveryClass: RecoveryClass.noAutomaticRecovery,
+                        technicalCode: failure.code,
+                        stage: failure.stage,
+                        primaryAction: RecoveryAction.retryLocalSave,
+                        secondaryAction: RecoveryAction.discardUnsavedResult,
                       ),
-                      SizedBox(width: 8),
-                      Text(
-                        'Analysis is not complete',
-                        style: TextStyle(
-                          color: C.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    failure.userMessage,
-                    style: const TextStyle(
-                      color: C.detailMuted,
-                      fontSize: 12,
-                      height: 1.4,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    '${failure.code} · ${failure.stage}',
-                    style: const TextStyle(
-                      color: C.navInactive,
-                      fontSize: 10,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  if (vm.canRetryRequest)
-                    _ActionButton(
-                      label: 'Retry request',
-                      onTap: () {
-                        vm.retryRequest();
-                      },
-                    )
-                  else if (vm.canRetryPersistence)
-                    _ActionButton(
-                      label: 'Retry save',
-                      onTap: () {
+                      primaryLabel: 'Retry local save',
+                      onPrimary: () {
                         vm.retryPersistence();
                       },
+                      secondaryLabel: vm.canDiscardUnsavedResult
+                          ? 'Discard unsaved result'
+                          : null,
+                      onSecondary: vm.canDiscardUnsavedResult
+                          ? () => _discardUnsaved(context, vm)
+                          : null,
                     )
-                  else if (vm.requiresFreshAnalysis)
-                    _ActionButton(
-                      label: 'Start a new analysis',
-                      onTap: onStartNewAnalysis,
-                    )
-                  else
-                    _ActionButton(
-                      label: 'Back to input',
-                      onTap: onBackToInput,
+                  : RecoveryPanel(
+                      descriptor: _descriptor(failure),
+                      primaryLabel: vm.canRetryRequest
+                          ? 'Retry request'
+                          : failure.recoveryClass == RecoveryClass.reuploadSource
+                              ? 'Replace source'
+                              : failure.recoveryClass == RecoveryClass.fixInput
+                                  ? 'Edit source'
+                                  : vm.requiresFreshAnalysis
+                                      ? 'Start a new analysis'
+                                      : 'Back to input',
+                      onPrimary: vm.canRetryRequest
+                          ? () {
+                              vm.retryRequest();
+                            }
+                          : vm.requiresFreshAnalysis
+                              ? onStartNewAnalysis
+                              : onBackToInput,
+                      secondaryLabel: vm.canRetryRequest ? 'Edit source' : null,
+                      onSecondary: vm.canRetryRequest ? onBackToInput : null,
                     ),
-                ],
-              ),
             ),
           ],
           const SizedBox(height: 16),
@@ -259,39 +292,18 @@ class _StepRow extends StatelessWidget {
                     ),
                   ),
                 ],
+                const SizedBox(height: 4),
+                Text(
+                  badge,
+                  style: TextStyle(
+                    color: color,
+                    fontSize: 11,
+                  ),
+                ),
               ],
             ),
           ),
-          const SizedBox(width: 8),
-          Text(
-            badge,
-            style: TextStyle(
-              color: color,
-              fontSize: 11,
-            ),
-          ),
         ],
-      ),
-    );
-  }
-}
-
-class _ActionButton extends StatelessWidget {
-  const _ActionButton({
-    required this.label,
-    required this.onTap,
-  });
-
-  final String label;
-  final VoidCallback? onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      child: FilledButton(
-        onPressed: onTap,
-        child: Text(label),
       ),
     );
   }

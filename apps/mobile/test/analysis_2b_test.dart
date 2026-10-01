@@ -6,6 +6,9 @@ import 'dart:typed_data';
 import 'package:drift/drift.dart' show Variable;
 import 'package:drift/native.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
+import 'package:takt_mobile/main.dart';
 import 'package:http/http.dart' as http;
 import 'package:takt_mobile/data/database/app_database.dart';
 import 'package:takt_mobile/data/remote/competition_api_client.dart';
@@ -13,8 +16,10 @@ import 'package:takt_mobile/data/repositories/analysis_repository.dart';
 import 'package:takt_mobile/data/repositories/drift_analysis_repository.dart';
 import 'package:takt_mobile/models/analysis_failure.dart';
 import 'package:takt_mobile/models/analysis_snapshot.dart';
+import 'package:takt_mobile/models/analysis_source_draft.dart';
 import 'package:takt_mobile/models/analysis_step.dart';
 import 'package:takt_mobile/models/competition_analysis_wire.dart';
+import 'package:takt_mobile/models/recovery_policy.dart';
 import 'package:takt_mobile/utils/source_identity.dart';
 import 'package:takt_mobile/viewmodels/analisis_view_model.dart';
 
@@ -734,7 +739,7 @@ void main() {
               .having(
                 (error) => error.code,
                 'code',
-                'NETWORK_ERROR',
+                'CLIENT_CONNECTION_FAILED',
               )
               .having(
                 (error) => error.retryable,
@@ -774,7 +779,7 @@ void main() {
               .having(
                 (error) => error.code,
                 'code',
-                'NETWORK_ERROR',
+                'CLIENT_TIMEOUT',
               )
               .having(
                 (error) => error.retryable,
@@ -783,6 +788,50 @@ void main() {
               ),
         ),
       );
+    });
+
+    test('syntactically valid localhost is left to backend ingestion policy',
+        () async {
+      final recorder = _RecordingHttpClient(
+        jsonEncode({
+          'error': {
+            'code': 'INVALID_SOURCE',
+            'stage': 'ingestion',
+            'message': 'Source reference is invalid or not allowed.',
+            'details': <Object?>[],
+          },
+        }),
+        statusCode: 400,
+      );
+      final client = HttpCompetitionApiClient(
+        baseUrl: 'https://example.test',
+        client: recorder,
+      );
+      addTearDown(client.close);
+
+      const source = AnalysisSourceMetadata(
+        sourceId: 'src-localhost',
+        sourceType: SourceTypeWire.officialRules,
+      );
+
+      await expectLater(
+        client.analyzeUrl(
+          competitionId: 'cmp-localhost',
+          url: 'http://localhost/rules',
+          source: source,
+        ),
+        throwsA(
+          isA<AnalysisFailure>()
+              .having((error) => error.code, 'code', 'INVALID_SOURCE')
+              .having(
+                (error) => error.recoveryClass,
+                'recoveryClass',
+                RecoveryClass.fixInput,
+              ),
+        ),
+      );
+
+      expect(recorder.calls, 1);
     });
 
     test('unknown backend envelope fails safely without invented retry',
@@ -968,6 +1017,114 @@ void main() {
     });
 
 
+
+    test('pending analysis cannot be abandoned by context/edit/reset shortcuts', () async {
+      final api = _FakeApiClient();
+      final repository = _MemoryAnalysisRepository(failNextPersist: true);
+      final vm = AnalisisViewModel(apiClient: api, repository: repository);
+      await vm.analyzeUrl(url: 'https://example.com/rules',
+          sourceType: SourceTypeWire.officialRules, continuation: false);
+      final identity = vm.operationIdentity;
+      vm.beginSourceEdit();
+      vm.resetForNewCompetition();
+      await vm.analyzeUrl(url: 'https://example.com/other',
+          sourceType: SourceTypeWire.officialRules, continuation: false);
+      expect(vm.operationIdentity, same(identity));
+      expect(vm.canRetryPersistence, isTrue);
+      expect(vm.canLeaveProgress, isFalse);
+      expect(api.calls, 1);
+      await vm.retryPersistence();
+      expect(vm.phase, AnalysisPhase.ready);
+      expect(api.calls, 1);
+    });
+
+    test('continuation DB read failure remains LOCAL and sanitized', () async {
+      final api = _FakeApiClient();
+      final repository = _MemoryAnalysisRepository();
+      final vm = AnalisisViewModel(apiClient: api, repository: repository);
+      await vm.analyzeUrl(url: 'https://example.com/rules',
+          sourceType: SourceTypeWire.officialRules, continuation: false);
+      repository.failReads = true;
+      await vm.analyzeUrl(url: 'https://example.com/faq',
+          sourceType: SourceTypeWire.officialFaq, continuation: true);
+      expect(vm.failure?.code, 'LOCAL_CONTEXT_READ_FAILED');
+      expect(vm.failure?.userMessage, isNot(contains('private sqlite')));
+      expect(vm.failure?.recoveryClass, RecoveryClass.reloadContext);
+      expect(api.calls, 1);
+    });
+
+    for (final discard in [false, true]) {
+      testWidgets('Analysis system Back preserves pending save; ${discard ? "discard" : "retry"} is explicit at 320px/2x', (tester) async {
+        tester.view.physicalSize = const Size(320, 720);
+        tester.view.devicePixelRatio = 1;
+        tester.platformDispatcher.textScaleFactorTestValue = 2;
+        addTearDown(tester.view.resetPhysicalSize);
+        addTearDown(tester.view.resetDevicePixelRatio);
+        addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+        final db = AppDatabase.forTesting(NativeDatabase.memory());
+        final api = _FakeApiClient();
+        final repository = _MemoryAnalysisRepository(failNextPersist: true);
+        await tester.pumpWidget(TaktApp(database: db, analysisRepository: repository, apiClient: api));
+        await _pumpRecoveryUi(tester);
+        await tester.tap(find.text('Analysis'));
+        await _pumpRecoveryUi(tester);
+        await _showAnalysisControl(tester, find.text('Enter Link'));
+        await tester.tap(find.text('Enter Link'));
+        await tester.pump();
+        await _showAnalysisControl(tester, find.byType(DropdownButton<SourceTypeWire>));
+        await tester.tap(find.byType(DropdownButton<SourceTypeWire>));
+        await tester.pumpAndSettle();
+        await tester.tap(find.text('Official rules').last);
+        await tester.pumpAndSettle();
+        await tester.enterText(find.byType(TextField), 'https://example.com/rules');
+        await _showAnalysisControl(tester, find.byKey(const Key('submit-analysis')));
+        await tester.tap(find.byKey(const Key('submit-analysis')));
+        await _pumpRecoveryUi(tester);
+        final vm = Provider.of<AnalisisViewModel>(tester.element(find.byType(RootShell)), listen: false);
+        expect(vm.canRetryPersistence, isTrue);
+        final identity = vm.operationIdentity;
+        await tester.binding.handlePopRoute();
+        await _pumpRecoveryUi(tester);
+        expect(vm.operationIdentity, same(identity));
+        await tester.tap(find.text('Home'));
+        await _pumpRecoveryUi(tester);
+        await tester.binding.handlePopRoute();
+        await _pumpRecoveryUi(tester);
+        expect(vm.operationIdentity, same(identity));
+        expect(find.text('Analysis result is not saved yet'), findsOneWidget);
+        if (discard) {
+          await _showAnalysisControl(tester, find.text('Discard unsaved result'));
+          await tester.tap(find.text('Discard unsaved result'));
+          await tester.pumpAndSettle();
+          await tester.tap(find.text('Keep result'));
+          await tester.pumpAndSettle();
+          expect(vm.canRetryPersistence, isTrue);
+          await tester.tap(find.text('Discard unsaved result'));
+          await tester.pumpAndSettle();
+          await tester.tap(find.widgetWithText(FilledButton, 'Discard unsaved result').last);
+          await tester.pumpAndSettle();
+          expect(vm.phase, AnalysisPhase.idle);
+        } else {
+          repository.persistGate = Completer<void>();
+          await _showAnalysisControl(tester, find.text('Retry local save'));
+          await tester.tap(find.text('Retry local save'));
+          await _pumpRecoveryUi(tester);
+          expect(vm.phase, AnalysisPhase.persisting);
+          await tester.binding.handlePopRoute();
+          await _pumpRecoveryUi(tester);
+          expect(vm.operationIdentity, same(identity));
+          repository.persistGate!.complete();
+          await _pumpRecoveryUi(tester);
+          expect(vm.phase, AnalysisPhase.ready);
+        }
+        expect(api.calls, 1);
+        expect(tester.takeException(), isNull);
+        await tester.pumpWidget(const SizedBox.shrink());
+        await _pumpRecoveryUi(tester);
+        await db.close();
+      });
+    }
+
     test('broken continuation context requires explicit fresh analysis',
         () async {
       final api = _ContextFailureApiClient();
@@ -1075,6 +1232,110 @@ void main() {
 
       expect(vm.phase, AnalysisPhase.ready);
       expect(repository.persistCalls, 1);
+    });
+
+    test('discarding unsaved analysis result never repeats backend request',
+        () async {
+      final api = _FakeApiClient();
+      final repository = _MemoryAnalysisRepository(failNextPersist: true);
+      final vm = AnalisisViewModel(apiClient: api, repository: repository);
+      vm.updateSourceDraft(
+        const AnalysisSourceDraft(
+          mode: AnalysisSourceMode.url,
+          continuation: false,
+          url: 'https://example.com/rules',
+          sourceType: SourceTypeWire.officialRules,
+        ),
+      );
+
+      await vm.analyzeUrl(
+        url: 'https://example.com/rules',
+        sourceType: SourceTypeWire.officialRules,
+        continuation: false,
+      );
+
+      expect(vm.phase, AnalysisPhase.persistenceError);
+      expect(vm.canDiscardUnsavedResult, isTrue);
+      expect(api.calls, 1);
+
+      vm.discardUnsavedResult();
+
+      expect(vm.phase, AnalysisPhase.idle);
+      expect(vm.operationIdentity, isNull);
+      expect(vm.canRetryPersistence, isFalse);
+      expect(vm.sourceDraft?.url, 'https://example.com/rules');
+      expect(api.calls, 1);
+    });
+
+    test('late response cannot revive an explicitly abandoned operation',
+        () async {
+      final api = _BlockingApiClient();
+      final repository = _MemoryAnalysisRepository();
+      final vm = AnalisisViewModel(apiClient: api, repository: repository);
+
+      final pending = vm.analyzeUrl(
+        url: 'https://example.com/rules',
+        sourceType: SourceTypeWire.officialRules,
+        continuation: false,
+      );
+      await Future<void>.delayed(Duration.zero);
+      expect(vm.phase, AnalysisPhase.submitting);
+
+      vm.resetForNewCompetition();
+      expect(vm.phase, AnalysisPhase.idle);
+
+      api.complete();
+      await pending;
+
+      expect(vm.phase, AnalysisPhase.idle);
+      expect(vm.response, isNull);
+      expect(repository.persistCalls, 0);
+    });
+
+    test('recoverable source edit preserves the draft and invalidates old retry',
+        () async {
+      final api = _FakeApiClient(failFirstRequest: true);
+      final repository = _MemoryAnalysisRepository();
+      final vm = AnalisisViewModel(apiClient: api, repository: repository);
+      vm.updateSourceDraft(
+        const AnalysisSourceDraft(
+          mode: AnalysisSourceMode.url,
+          continuation: false,
+          url: 'https://example.com/rules',
+          sourceType: SourceTypeWire.officialRules,
+        ),
+      );
+
+      await vm.analyzeUrl(
+        url: 'https://example.com/rules',
+        sourceType: SourceTypeWire.officialRules,
+        continuation: false,
+      );
+      expect(vm.canRetryRequest, isTrue);
+
+      vm.beginSourceEdit();
+
+      expect(vm.phase, AnalysisPhase.idle);
+      expect(vm.sourceDraft?.url, 'https://example.com/rules');
+      expect(vm.canRetryRequest, isFalse);
+      expect(vm.operationIdentity, isNull);
+    });
+
+    test('unknown backend failure is fail-closed by recovery policy', () {
+      const failure = AnalysisFailure(
+        code: 'SOME_NEW_BACKEND_CODE',
+        stage: 'internal',
+        message: 'future failure',
+        userMessage: 'safe fallback',
+        retryable: true,
+      );
+
+      expect(failure.recoveryClass, RecoveryClass.noAutomaticRecovery);
+      expect(
+        failure.retryable,
+        isFalse,
+        reason: 'legacy retryable input must not override RecoveryClass',
+      );
     });
 
     test('add-source continuation reuses competition and exact cache context',
@@ -1515,6 +1776,8 @@ class _MemoryAnalysisRepository implements AnalysisRepository {
 
   bool failNextPersist;
   bool corruptLatestOnRead = false;
+  bool failReads = false;
+  Completer<void>? persistGate;
   int persistCalls = 0;
   bool closed = false;
   String? lastPersistedBody;
@@ -1527,6 +1790,7 @@ class _MemoryAnalysisRepository implements AnalysisRepository {
   Future<AnalysisSnapshot?> latestSnapshot(
     String competitionId,
   ) async {
+    if (failReads) throw StateError('private sqlite read diagnostic');
     final matches = _snapshots
         .where((item) => item.competitionId == competitionId)
         .toList();
@@ -1564,6 +1828,7 @@ class _MemoryAnalysisRepository implements AnalysisRepository {
     required CompetitionAnalyzeResponseWire response,
   }) async {
     persistCalls += 1;
+    await persistGate?.future;
     if (failNextPersist) {
       failNextPersist = false;
       throw StateError('simulated persistence failure');
@@ -1589,4 +1854,18 @@ class _MemoryAnalysisRepository implements AnalysisRepository {
   Future<void> close() async {
     closed = true;
   }
+}
+
+
+Future<void> _pumpRecoveryUi(WidgetTester tester) async {
+  for (var i = 0; i < 20; i++) {
+    await tester.pump(const Duration(milliseconds: 25));
+  }
+}
+
+
+Future<void> _showAnalysisControl(WidgetTester tester, Finder finder) async {
+  await tester.scrollUntilVisible(finder, 220,
+      scrollable: find.byType(Scrollable).first);
+  await tester.pump();
 }

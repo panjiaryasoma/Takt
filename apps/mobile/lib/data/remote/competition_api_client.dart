@@ -5,6 +5,7 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 
 import '../../models/analysis_failure.dart';
+import '../../models/recovery_policy.dart';
 import '../../models/competition_analysis_wire.dart';
 
 const maxAnalysisSourceBytes = 20 * 1024 * 1024;
@@ -114,7 +115,7 @@ class HttpCompetitionApiClient implements CompetitionApiClient {
         stage: 'validation',
         message: 'URL must be absolute http/https.',
         userMessage: 'Enter a valid http/https URL.',
-        retryable: false,
+        origin: FailureOrigin.clientValidation,
       );
     }
 
@@ -158,7 +159,7 @@ class HttpCompetitionApiClient implements CompetitionApiClient {
         stage: 'validation',
         message: 'PDF bytes are empty or exceed 20 MiB.',
         userMessage: 'The PDF must contain data and be no larger than 20 MiB.',
-        retryable: false,
+        origin: FailureOrigin.clientValidation,
       );
     }
     if (!filename.toLowerCase().endsWith('.pdf')) {
@@ -167,7 +168,7 @@ class HttpCompetitionApiClient implements CompetitionApiClient {
         stage: 'validation',
         message: 'Only PDF upload is supported.',
         userMessage: 'Only PDF files can be uploaded.',
-        retryable: false,
+        origin: FailureOrigin.clientValidation,
       );
     }
 
@@ -233,7 +234,7 @@ class HttpCompetitionApiClient implements CompetitionApiClient {
       final originalBody = utf8.decode(responseBytes);
 
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw _backendFailure(originalBody);
+        throw _backendFailure(originalBody, response.statusCode);
       }
 
       try {
@@ -248,13 +249,13 @@ class HttpCompetitionApiClient implements CompetitionApiClient {
     } on AnalysisFailure {
       rethrow;
     } on TimeoutException catch (error) {
-      throw AnalysisFailure.network(error);
+      throw AnalysisFailure.timeout(error);
     } on http.ClientException catch (error) {
-      throw AnalysisFailure.network(error);
+      throw AnalysisFailure.connection(error);
     }
   }
 
-  AnalysisFailure _backendFailure(String body) {
+  AnalysisFailure _backendFailure(String body, int statusCode) {
     try {
       final decoded = jsonDecode(body);
       if (decoded is! Map || decoded['error'] is! Map) {
@@ -276,15 +277,17 @@ class HttpCompetitionApiClient implements CompetitionApiClient {
         code: code,
         stage: stage,
         message: message,
+        statusCode: statusCode,
       );
     } on FormatException {
-      return const AnalysisFailure(
+      return AnalysisFailure(
         code: 'UNKNOWN_BACKEND_ERROR',
         stage: 'unknown',
         message: 'Backend returned an unrecognized error envelope.',
         userMessage:
             'The server returned an error this app does not recognize.',
-        retryable: false,
+        statusCode: statusCode,
+        origin: FailureOrigin.backend,
       );
     }
   }

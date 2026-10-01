@@ -537,28 +537,11 @@ void main() {
     addTearDown(tester.view.resetPhysicalSize);
     addTearDown(tester.view.resetDevicePixelRatio);
 
-    final viewModel = JadwalViewModel(
-      _UnusedScheduleRepository(),
-      closeScheduleRepositoryOnDispose: false,
-    );
-    addTearDown(viewModel.dispose);
-
-    await tester.pumpWidget(
-      ChangeNotifierProvider.value(
-        value: viewModel,
-        child: MaterialApp(
-          theme: AppTheme.dark,
-          home: Builder(
-            builder: (context) => MediaQuery(
-              data: MediaQuery.of(context).copyWith(
-                textScaler: const TextScaler.linear(2),
-              ),
-              child: const RootShell(),
-            ),
-          ),
-        ),
-      ),
-    );
+    tester.platformDispatcher.textScaleFactorTestValue = 2;
+    addTearDown(tester.platformDispatcher.clearTextScaleFactorTestValue);
+    final database = AppDatabase.forTesting(NativeDatabase.memory());
+    addTearDown(database.close);
+    await tester.pumpWidget(TaktApp(database: database));
     await _pumpBounded(tester);
 
     expect(find.text('Home'), findsOneWidget);
