@@ -4,7 +4,9 @@ import 'dart:convert';
 import 'package:drift/native.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart' hide Evaluation;
+import 'package:provider/provider.dart';
 import 'package:takt_mobile/data/database/app_database.dart';
+import 'package:takt_mobile/main.dart';
 import 'package:takt_mobile/data/remote/plan_api_client.dart';
 import 'package:takt_mobile/data/repositories/drift_evaluation_repository.dart';
 import 'package:takt_mobile/data/repositories/drift_saved_plan_repository.dart';
@@ -64,6 +66,127 @@ void main() {
     expect(host.activeSession!.evaluationRequestJson, persisted!.requestJson);
     expect(host.activeSession!.evaluationResponseJson, persisted.responseJson);
     host.dispose();
+  });
+
+  test('leaveDecision clears only the active presentation session', () async {
+    final api = _ControlledPlanApi();
+    final host = PlanningHostViewModel(
+      apiClient: api,
+      scheduleRepository: schedule,
+      evaluationRepository: evaluations,
+      savedPlanRepository: savedPlans,
+    );
+
+    await host.startPlanning(snapshot);
+    host.addTask(_task());
+    await host.evaluate();
+    final evaluation = host.activeSession!.parsedResponse.evaluationId;
+
+    expect(host.phase, PlanningHostPhase.decision);
+    expect(host.activeSession, isNotNull);
+    host.leaveDecision();
+
+    expect(host.phase, PlanningHostPhase.setup);
+    expect(host.activeSession, isNull);
+    expect(host.savedPlan, isNull);
+    expect(await evaluations.evaluationById(evaluation), isNotNull);
+    host.dispose();
+  });
+
+  testWidgets('production Decision Report UI back exits host decision lifecycle',
+      (tester) async {
+    final api = _ControlledPlanApi();
+    await tester.pumpWidget(TaktApp(database: db, planApiClient: api));
+    await _pumpUi(tester);
+
+    final rootContext = tester.element(find.byType(RootShell));
+    final host = Provider.of<PlanningHostViewModel>(
+      rootContext,
+      listen: false,
+    );
+    await host.startPlanning(snapshot);
+    host.addTask(_task());
+    await host.evaluate();
+    await _pumpUi(tester);
+
+    await tester.tap(find.text('Analysis'));
+    await _pumpUi(tester);
+    expect(find.text('Decision Report'), findsOneWidget);
+
+    await tester.tap(find.byTooltip('Back'));
+    await _pumpUi(tester);
+
+    expect(find.text('Decision Report'), findsNothing);
+    expect(host.phase, PlanningHostPhase.setup);
+    expect(host.activeSession, isNull);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _pumpUi(tester);
+  });
+
+  testWidgets('production Decision Report system back exits to analysis parent',
+      (tester) async {
+    final api = _ControlledPlanApi();
+    await tester.pumpWidget(TaktApp(database: db, planApiClient: api));
+    await _pumpUi(tester);
+
+    final rootContext = tester.element(find.byType(RootShell));
+    final host = Provider.of<PlanningHostViewModel>(
+      rootContext,
+      listen: false,
+    );
+    await host.startPlanning(snapshot);
+    host.addTask(_task());
+    await host.evaluate();
+    await _pumpUi(tester);
+
+    await tester.tap(find.text('Analysis'));
+    await _pumpUi(tester);
+    expect(find.text('Decision Report'), findsOneWidget);
+
+    await tester.binding.handlePopRoute();
+    await _pumpUi(tester);
+
+    expect(find.text('Decision Report'), findsNothing);
+    expect(host.phase, PlanningHostPhase.setup);
+    expect(host.activeSession, isNull);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _pumpUi(tester);
+  });
+
+  testWidgets('Saved Plans uses neutral accepted state and system back returns to list',
+      (tester) async {
+    await _persistAndAcceptPrior(evaluations, savedPlans, snapshot);
+    tester.view.physicalSize = const Size(320, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(TaktApp(database: db));
+    await _pumpUi(tester);
+
+    await tester.tap(find.text('Plans'));
+    await _pumpUi(tester);
+    expect(find.text('Saved Plans'), findsOneWidget);
+    expect(find.text('ACCEPTED'), findsOneWidget);
+    expect(find.text('CURRENT'), findsNothing);
+    expect(tester.takeException(), isNull);
+
+    await tester.ensureVisible(find.text('Open plan'));
+    await tester.tap(find.text('Open plan'));
+    await _pumpUi(tester);
+    expect(find.text('Saved Plan'), findsOneWidget);
+    expect(find.text('ACCEPTED'), findsOneWidget);
+    expect(tester.takeException(), isNull);
+
+    await tester.binding.handlePopRoute();
+    await _pumpUi(tester);
+    expect(find.text('Saved Plans'), findsOneWidget);
+    expect(find.text('Saved Plan'), findsNothing);
+
+    await tester.pumpWidget(const SizedBox.shrink());
+    await _pumpUi(tester);
   });
 
   test('late HTTP response is dropped after input revision changes', () async {
@@ -827,6 +950,15 @@ String _decisionResponse({
       .replaceAll(evaluationId, evaluationIdValue)
       .replaceAll(List.filled(64, 'b').join(), basisFingerprint);
   return raw;
+}
+
+Future<void> _pumpUi(
+  WidgetTester tester, {
+  int frames = 20,
+}) async {
+  for (var index = 0; index < frames; index++) {
+    await tester.pump(const Duration(milliseconds: 25));
+  }
 }
 
 Future<void> _waitFor(bool Function() condition) async {

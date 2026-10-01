@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 
 import '../models/active_accepted_block.dart';
 import '../models/commitment.dart';
+import '../models/enums.dart';
 import '../models/schedule_occurrence.dart';
 import '../theme/app_theme.dart';
 import '../viewmodels/jadwal_view_model.dart';
@@ -23,21 +24,28 @@ class JadwalTabs extends StatelessWidget {
     Widget tab(String label, int index) {
       final active = index == activeIndex;
       return Expanded(
-        child: GestureDetector(
-          onTap: () => onChanged(index),
-          child: Container(
-            padding: const EdgeInsets.symmetric(vertical: 10),
-            decoration: BoxDecoration(
+        child: Semantics(
+          button: true,
+          selected: active,
+          label: label,
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(minHeight: 48),
+            child: Material(
               color: active ? C.accent : Colors.transparent,
               borderRadius: BorderRadius.circular(10),
-            ),
-            alignment: Alignment.center,
-            child: Text(
-              label,
-              style: TextStyle(
-                color: active ? C.bg : C.navInactive,
-                fontSize: 13,
-                fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+              child: InkWell(
+                onTap: () => onChanged(index),
+                borderRadius: BorderRadius.circular(10),
+                child: Center(
+                  child: Text(
+                    label,
+                    style: TextStyle(
+                      color: active ? C.bg : C.navInactive,
+                      fontSize: 13,
+                      fontWeight: active ? FontWeight.w700 : FontWeight.w500,
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
@@ -215,6 +223,7 @@ class JadwalHarianScreen extends StatelessWidget {
     final vm = context.watch<JadwalViewModel>();
     final selected = vm.selectedDate;
     final items = vm.itemsForSelectedDate;
+    final cancelledItems = vm.cancelledItemsForSelectedDate;
     final acceptedItems = vm.acceptedItemsForSelectedDate;
     final eventDays = vm.eventDaysOfMonth(selected);
     final header =
@@ -259,26 +268,32 @@ class JadwalHarianScreen extends StatelessWidget {
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      GestureDetector(
-                        onTap: () => vm.selectDate(
+                      IconButton(
+                        tooltip: 'Previous month',
+                        onPressed: () => vm.selectDate(
                           DateTime(selected.year, selected.month - 1, 1),
                         ),
-                        child: const Icon(Icons.chevron_left, color: C.bg),
+                        icon: const Icon(Icons.chevron_left, color: C.bg),
                       ),
-                      Text(
-                        '${_monthNames[selected.month - 1]} ${selected.year}',
-                        key: const Key('calendar-month-label'),
-                        style: const TextStyle(
-                          color: C.bg,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
+                      Expanded(
+                        child: Text(
+                          '${_monthNames[selected.month - 1]} ${selected.year}',
+                          key: const Key('calendar-month-label'),
+                          textAlign: TextAlign.center,
+                          maxLines: 2,
+                          style: const TextStyle(
+                            color: C.bg,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w700,
+                          ),
                         ),
                       ),
-                      GestureDetector(
-                        onTap: () => vm.selectDate(
+                      IconButton(
+                        tooltip: 'Next month',
+                        onPressed: () => vm.selectDate(
                           DateTime(selected.year, selected.month + 1, 1),
                         ),
-                        child: const Icon(Icons.chevron_right, color: C.bg),
+                        icon: const Icon(Icons.chevron_right, color: C.bg),
                       ),
                     ],
                   ),
@@ -329,9 +344,13 @@ class JadwalHarianScreen extends StatelessWidget {
                                               inMonth: selected,
                                             ),
                                     child: Container(
-                                      height: 44,
+                                      constraints:
+                                          const BoxConstraints(minHeight: 44),
                                       margin: const EdgeInsets.symmetric(
                                         horizontal: 2,
+                                      ),
+                                      padding: const EdgeInsets.symmetric(
+                                        vertical: 6,
                                       ),
                                       decoration: BoxDecoration(
                                         color: day == selected.day
@@ -340,6 +359,7 @@ class JadwalHarianScreen extends StatelessWidget {
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       child: Column(
+                                        mainAxisSize: MainAxisSize.min,
                                         mainAxisAlignment:
                                             MainAxisAlignment.center,
                                         children: [
@@ -387,18 +407,48 @@ class JadwalHarianScreen extends StatelessWidget {
             _RetryCard(message: vm.errorMessage!, onRetry: vm.retry)
           else if (vm.isLoading)
             const Center(child: CircularProgressIndicator(color: C.accent))
-          else if (items.isEmpty && acceptedItems.isEmpty)
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 20),
-              padding: const EdgeInsets.symmetric(vertical: 28),
-              decoration: BoxDecoration(
-                color: C.card,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              alignment: Alignment.center,
-              child: const Text(
-                'No schedule for this date',
-                style: TextStyle(color: C.detailMuted, fontSize: 13),
+          else if (items.isEmpty && cancelledItems.isEmpty && acceptedItems.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: PresentationCard(
+                child: Column(
+                  key: const Key('schedule-empty-state'),
+                  children: [
+                    const Icon(
+                      Icons.event_available_outlined,
+                      color: C.accent,
+                      size: 30,
+                    ),
+                    const SizedBox(height: 10),
+                    const Text(
+                      'No schedule for this date',
+                      style: TextStyle(
+                        color: C.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      'Add a commitment or import a calendar from the Add Schedule flow.',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        color: C.detailMuted,
+                        fontSize: 12,
+                        height: 1.4,
+                      ),
+                    ),
+                    if (onAdd != null) ...[
+                      const SizedBox(height: 12),
+                      FilledButton.icon(
+                        key: const Key('empty-add-schedule'),
+                        onPressed: onAdd,
+                        icon: const Icon(Icons.add),
+                        label: const Text('Add schedule'),
+                      ),
+                    ],
+                  ],
+                ),
               ),
             )
           else ...[
@@ -406,7 +456,7 @@ class JadwalHarianScreen extends StatelessWidget {
               _ActivityCard(
                 item: item,
                 dot: _dotFor(item.commitment),
-                time: _hhmm(item.startAt),
+                time: JadwalHarianScreen._hhmm(item.startAt),
                 duration: _duration(item.durationMinutes),
                 onEdit: () => onEdit?.call(item.commitment),
                 onDelete: () => _delete(context, vm, item),
@@ -417,6 +467,10 @@ class JadwalHarianScreen extends StatelessWidget {
                     ? () => _move(context, vm, item)
                     : null,
               ),
+              const SizedBox(height: 16),
+            ],
+            for (final cancelled in cancelledItems) ...[
+              CancelledOccurrenceCard(item: cancelled),
               const SizedBox(height: 16),
             ],
             for (final block in acceptedItems) ...[
@@ -450,6 +504,75 @@ class JadwalHarianScreen extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class CancelledOccurrenceCard extends StatelessWidget {
+  const CancelledOccurrenceCard({super.key, required this.item});
+
+  final CancelledScheduleOccurrence item;
+
+  @override
+  Widget build(BuildContext context) {
+    final duration = JadwalHarianScreen._duration(item.durationMinutes);
+    return Semantics(
+      label:
+          '${item.commitment.title}, cancelled occurrence, does not block planning',
+      child: Container(
+        key: Key(
+          'cancelled-occurrence-${item.commitment.id}-${item.originalStartAtEpochMs}',
+        ),
+        margin: const EdgeInsets.symmetric(horizontal: 20),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+        decoration: BoxDecoration(
+          color: C.card,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: C.detailMuted),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.event_busy_outlined, color: C.detailMuted, size: 20),
+            const SizedBox(width: 12),
+            SizedBox(
+              width: 44,
+              child: Text(
+                JadwalHarianScreen._hhmm(item.startAt),
+                style: const TextStyle(
+                  color: C.detailMuted,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item.commitment.title,
+                    style: const TextStyle(
+                      color: C.detailMuted,
+                      fontSize: 13,
+                      decoration: TextDecoration.lineThrough,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '$duration · cancelled occurrence · does not block planning',
+                    style: const TextStyle(
+                      color: C.detailMuted,
+                      fontSize: 11,
+                      height: 1.35,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -623,8 +746,21 @@ class _ActivityCard extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  item.isRecurring ? '$duration · recurring' : duration,
-                  style: const TextStyle(color: C.detailMuted, fontSize: 11),
+                  [
+                    duration,
+                    item.commitment.type == CommitmentType.fixed
+                        ? 'fixed time'
+                        : 'flexible label · still blocks this time',
+                    if (item.isRecurring) 'recurring',
+                    if (item.startAtEpochMs != item.originalStartAtEpochMs)
+                      'moved occurrence',
+                  ].join(' · '),
+                  key: Key('occurrence-meta-${item.commitment.id}'),
+                  style: const TextStyle(
+                    color: C.detailMuted,
+                    fontSize: 11,
+                    height: 1.35,
+                  ),
                 ),
               ],
             ),
@@ -653,6 +789,7 @@ class _ActivityCard extends StatelessWidget {
               ],
             ),
           IconButton(
+            tooltip: 'Edit schedule',
             onPressed: onEdit,
             visualDensity: VisualDensity.compact,
             icon: const Icon(
@@ -662,6 +799,7 @@ class _ActivityCard extends StatelessWidget {
             ),
           ),
           IconButton(
+            tooltip: 'Delete schedule',
             onPressed: onDelete,
             visualDensity: VisualDensity.compact,
             icon: const Icon(Icons.close, color: C.detailMuted, size: 18),

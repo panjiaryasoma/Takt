@@ -36,6 +36,38 @@ void main() {
   });
 
 
+  testWidgets('Analysis input remains reachable at 320px and 2x text',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.dark,
+        home: Builder(
+          builder: (context) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              textScaler: const TextScaler.linear(2),
+            ),
+            child: const Scaffold(
+              body: AnalisisKompetisiScreen(continuation: false),
+            ),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('Upload PDF'), findsOneWidget);
+    expect(find.text('Enter Link'), findsOneWidget);
+    final submit = find.byKey(const Key('submit-analysis'));
+    await tester.ensureVisible(submit);
+    expect(submit, findsOneWidget);
+    expect(tester.takeException(), isNull);
+  });
+
   testWidgets('submit stays disabled until the selected source is valid',
       (tester) async {
     await tester.pumpWidget(
@@ -49,22 +81,15 @@ void main() {
       ),
     );
 
-    GestureDetector submitGesture() {
-      return tester.widget<GestureDetector>(
-        find
-            .ancestor(
-              of: find.text('Submit & Start Analysis'),
-              matching: find.byType(GestureDetector),
-            )
-            .first,
-      );
-    }
+    FilledButton submitButton() => tester.widget<FilledButton>(
+          find.byKey(const Key('submit-analysis')),
+        );
 
-    expect(submitGesture().onTap, isNull);
+    expect(submitButton().onPressed, isNull);
 
     await tester.tap(find.text('Enter Link'));
     await tester.pump();
-    expect(submitGesture().onTap, isNull);
+    expect(submitButton().onPressed, isNull);
 
     await tester.tap(find.byType(DropdownButton<SourceTypeWire>));
     await tester.pumpAndSettle();
@@ -76,14 +101,14 @@ void main() {
       'not-a-url',
     );
     await tester.pump();
-    expect(submitGesture().onTap, isNull);
+    expect(submitButton().onPressed, isNull);
 
     await tester.enterText(
       find.byType(TextField),
       'https://example.com/rules',
     );
     await tester.pump();
-    expect(submitGesture().onTap, isNotNull);
+    expect(submitButton().onPressed, isNotNull);
     expect(tester.takeException(), isNull);
   });
 
@@ -163,6 +188,38 @@ void main() {
 
     expect(find.textContaining('Add Schedule'), findsNothing);
     expect(find.textContaining('Save Schedule'), findsNothing);
+    expect(tester.takeException(), isNull);
+  });
+  testWidgets('Source Review remains reachable at 320px and 2x text',
+      (tester) async {
+    tester.view.physicalSize = const Size(320, 720);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.resetPhysicalSize);
+    addTearDown(tester.view.resetDevicePixelRatio);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        theme: AppTheme.dark,
+        home: Builder(
+          builder: (context) => MediaQuery(
+            data: MediaQuery.of(context).copyWith(
+              textScaler: const TextScaler.linear(2),
+            ),
+            child: Scaffold(body: ReviewBriefScreen(response: _reviewResponse())),
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+
+    expect(find.text('SOURCE REVIEW'), findsOneWidget);
+    final plan = find.text('Plan this competition');
+    await tester.scrollUntilVisible(
+      plan,
+      500,
+      scrollable: find.byType(Scrollable).first,
+    );
+    expect(plan, findsOneWidget);
     expect(tester.takeException(), isNull);
   });
 }

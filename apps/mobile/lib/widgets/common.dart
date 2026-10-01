@@ -19,19 +19,25 @@ class AppHeader extends StatelessWidget {
       child: Row(
         children: [
           if (onBack != null) ...[
-            GestureDetector(
-              onTap: onBack,
-              child: Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: C.card,
-                  shape: BoxShape.circle,
-                  border: Border.all(color: C.accent.withValues(alpha: 0.6)),
+            Material(
+              color: C.card,
+              shape: CircleBorder(
+                side: BorderSide(
+                  color: C.accent.withValues(alpha: 0.6),
                 ),
-                alignment: Alignment.center,
-                child:
-                    const Icon(Icons.chevron_left, color: C.accent, size: 22),
+              ),
+              child: IconButton(
+                tooltip: 'Back',
+                onPressed: onBack,
+                constraints: const BoxConstraints(
+                  minWidth: 48,
+                  minHeight: 48,
+                ),
+                icon: const Icon(
+                  Icons.chevron_left,
+                  color: C.accent,
+                  size: 22,
+                ),
               ),
             ),
             const SizedBox(width: 12),
@@ -62,14 +68,22 @@ class AppHeader extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 24),
-          Text(
-            title,
-            style: const TextStyle(color: C.white, fontSize: 20),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: const TextStyle(
+                color: C.white,
+                fontSize: 20,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
           if (trailing != null) ...[
-            const Spacer(),
-            trailing!,
+            const SizedBox(width: 12),
+            Flexible(child: trailing!),
           ],
         ],
       ),
@@ -85,33 +99,25 @@ class AddButton extends StatelessWidget {
   final String label;
 
   @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-        decoration: BoxDecoration(
-          color: C.accent,
-          borderRadius: BorderRadius.circular(999),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.add, color: C.bg, size: 16),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: const TextStyle(
-                color: C.bg,
-                fontSize: 13,
-                fontWeight: FontWeight.w700,
-              ),
+  Widget build(BuildContext context) => ConstrainedBox(
+        constraints: const BoxConstraints(minHeight: 44),
+        child: FilledButton.icon(
+          onPressed: onTap,
+          style: FilledButton.styleFrom(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+            visualDensity: VisualDensity.compact,
+          ),
+          icon: const Icon(Icons.add, size: 16),
+          label: Text(
+            label,
+            textAlign: TextAlign.center,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
             ),
-          ],
+          ),
         ),
-      ),
-    );
-  }
+      );
 }
 
 /// Divider putih tebal (rounded) di bawah header.
@@ -143,8 +149,10 @@ class SectionHeading extends StatelessWidget {
   Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      child: Wrap(
+        spacing: 8,
+        runSpacing: 4,
+        crossAxisAlignment: WrapCrossAlignment.center,
         children: [
           Text(
             title,
@@ -155,12 +163,11 @@ class SectionHeading extends StatelessWidget {
             ),
           ),
           if (action != null)
-            GestureDetector(
-              onTap: onAction,
+            TextButton(
+              onPressed: onAction,
               child: Text(
                 action!,
                 style: const TextStyle(
-                  color: C.accent,
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
                 ),
@@ -225,6 +232,99 @@ class _DashedBorderPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant _DashedBorderPainter oldDelegate) => false;
+}
+
+
+class StatusPill extends StatelessWidget {
+  const StatusPill({
+    super.key,
+    required this.label,
+    required this.color,
+    this.icon,
+    this.semanticLabel,
+  });
+
+  final String label;
+  final Color color;
+  final IconData? icon;
+  final String? semanticLabel;
+
+  @override
+  Widget build(BuildContext context) => Semantics(
+        label: semanticLabel ?? label,
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          decoration: BoxDecoration(
+            color: C.bg,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: color, width: 1.5),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 14, color: C.white),
+                const SizedBox(width: 5),
+              ],
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: C.white,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+}
+
+class PresentationCard extends StatelessWidget {
+  const PresentationCard({
+    super.key,
+    required this.child,
+    this.highlightColor,
+    this.padding = const EdgeInsets.all(16),
+  });
+
+  final Widget child;
+  final Color? highlightColor;
+  final EdgeInsetsGeometry padding;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        width: double.infinity,
+        padding: padding,
+        decoration: BoxDecoration(
+          color: C.card,
+          borderRadius: BorderRadius.circular(14),
+          border: highlightColor == null
+              ? null
+              : Border.all(color: highlightColor!),
+        ),
+        child: child,
+      );
+}
+
+class PresentationSectionTitle extends StatelessWidget {
+  const PresentationSectionTitle(this.text, {super.key});
+
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Text(
+        text,
+        style: const TextStyle(
+          color: C.white,
+          fontSize: 17,
+          fontWeight: FontWeight.w700,
+        ),
+      );
 }
 
 class HorizontalSwipeSurface extends StatefulWidget {

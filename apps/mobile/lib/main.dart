@@ -268,10 +268,78 @@ class _RootShellState extends State<RootShell> {
     }
   }
 
-  void _closeDecision() => setState(() {
-        _analisisStep =
-            context.read<AnalisisViewModel>().response == null ? 0 : 2;
+  void _closeDecision() {
+    if (widget.decisionSession == null) {
+      context.read<PlanningHostViewModel>().leaveDecision();
+    }
+    setState(() {
+      _analisisStep =
+          context.read<AnalisisViewModel>().response == null ? 0 : 2;
+    });
+  }
+
+  int _effectiveAnalysisStepFor(PlanningHostViewModel host) {
+    final injected = widget.decisionSession != null;
+    if (!injected &&
+        host.phase == PlanningHostPhase.decision &&
+        host.activeSession != null) {
+      return 3;
+    }
+    return _analisisStep;
+  }
+
+  bool _hasSemanticBackTarget() {
+    if (_navIndex == 1 && _showTambahJadwal) return true;
+    if (_navIndex == 3 && _selectedSavedPlanId != null) return true;
+    if (_navIndex != 2) return false;
+
+    final host = context.read<PlanningHostViewModel>();
+    final analysis = context.read<AnalisisViewModel>();
+    final step = _effectiveAnalysisStepFor(host);
+    if (step == 4 || step == 3 || step == 1) return true;
+    if (step == 2) return analysis.response != null;
+    return step == 0 && _addingSource && analysis.response != null;
+  }
+
+  void _handleSemanticBack() {
+    if (_navIndex == 1 && _showTambahJadwal) {
+      setState(() {
+        _showTambahJadwal = false;
+        _editingCommitment = null;
       });
+      return;
+    }
+    if (_navIndex == 3 && _selectedSavedPlanId != null) {
+      setState(() => _selectedSavedPlanId = null);
+      return;
+    }
+    if (_navIndex != 2) return;
+
+    final host = context.read<PlanningHostViewModel>();
+    final analysis = context.read<AnalisisViewModel>();
+    switch (_effectiveAnalysisStepFor(host)) {
+      case 4:
+        setState(() => _analisisStep = 2);
+        return;
+      case 3:
+        _closeDecision();
+        return;
+      case 2:
+        if (analysis.response != null) setState(() => _analisisStep = 1);
+        return;
+      case 1:
+        setState(() => _analisisStep = 0);
+        return;
+      case 0:
+        if (_addingSource && analysis.response != null) {
+          setState(() {
+            _addingSource = false;
+            _analisisStep = 2;
+          });
+        }
+        return;
+    }
+  }
 
   Future<void> _openPremiumAccess() {
     return Navigator.of(context).push(
@@ -382,11 +450,7 @@ class _RootShellState extends State<RootShell> {
     final vm = context.watch<AnalisisViewModel>();
     final host = context.watch<PlanningHostViewModel>();
     final injected = widget.decisionSession != null;
-    final effectiveStep = !injected &&
-            host.phase == PlanningHostPhase.decision &&
-            host.activeSession != null
-        ? 3
-        : _analisisStep;
+    final effectiveStep = _effectiveAnalysisStepFor(host);
 
     switch (effectiveStep) {
       case 4:
@@ -458,7 +522,6 @@ class _RootShellState extends State<RootShell> {
           return AnalisisKompetisiScreen(
             continuation: false,
             onSubmitted: () => setState(() => _analisisStep = 1),
-            onBack: () => setState(() => _navIndex = 0),
           );
         }
         return ReviewBriefScreen(
@@ -484,16 +547,14 @@ class _RootShellState extends State<RootShell> {
         return AnalisisKompetisiScreen(
           continuation: _addingSource,
           onSubmitted: () => setState(() => _analisisStep = 1),
-          onBack: () {
-            if (_addingSource && vm.response != null) {
-              setState(() {
-                _addingSource = false;
-                _analisisStep = 2;
-              });
-            } else {
-              setState(() => _navIndex = 0);
-            }
-          },
+          onBack: _addingSource && vm.response != null
+              ? () {
+                  setState(() {
+                    _addingSource = false;
+                    _analisisStep = 2;
+                  });
+                }
+              : null,
         );
     }
   }
@@ -567,7 +628,6 @@ class _RootShellState extends State<RootShell> {
                   _selectedSavedPlanId = savedPlanId;
                   _navIndex = 3;
                 }),
-                onBack: () => setState(() => _navIndex = 0),
               )
             : JadwalRingkasanScreen(
                 onSwitchTab: (index) =>
@@ -593,8 +653,14 @@ class _RootShellState extends State<RootShell> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: C.bg,
+    final hasSemanticBackTarget = _hasSemanticBackTarget();
+    return PopScope<void>(
+      canPop: !hasSemanticBackTarget,
+      onPopInvokedWithResult: (didPop, result) {
+        if (!didPop) _handleSemanticBack();
+      },
+      child: Scaffold(
+        backgroundColor: C.bg,
       body: SafeArea(
         bottom: false,
         child: HorizontalSwipeSurface(
@@ -604,9 +670,10 @@ class _RootShellState extends State<RootShell> {
           child: _body(),
         ),
       ),
-      bottomNavigationBar: _BottomNav(
-        activeIndex: _navIndex,
-        onTap: _selectRootTab,
+        bottomNavigationBar: _BottomNav(
+          activeIndex: _navIndex,
+          onTap: _selectRootTab,
+        ),
       ),
     );
   }
@@ -653,12 +720,19 @@ class _BottomNav extends StatelessWidget {
           children: List.generate(_items.length, (index) {
             final active = index == activeIndex;
             return Expanded(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => onTap(index),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
+              child: Semantics(
+                button: true,
+                selected: active,
+                label: _items[index].$2,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(minHeight: 48),
+                  child: InkWell(
+                    onTap: () => onTap(index),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
                     Icon(
                       _items[index].$1,
                       size: 20,
@@ -673,7 +747,9 @@ class _BottomNav extends StatelessWidget {
                         color: active ? C.accent : C.navInactive,
                       ),
                     ),
-                  ],
+                      ],
+                    ),
+                  ),
                 ),
               ),
             );
