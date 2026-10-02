@@ -477,6 +477,19 @@ final class PlanningHostViewModel extends ChangeNotifier {
     } on PlanApiFailure catch (error) {
       if (_isCurrent(generation, revision)) _setApiFailure(error);
       return;
+    } on Object {
+      if (_isCurrent(generation, revision)) {
+        _phase = PlanningHostPhase.error;
+        _failure = const PlanningHostFailure(
+          code: 'CLIENT_RUNTIME_ERROR',
+          message:
+              'The planning request failed locally before a usable response was produced. Retry the same request.',
+          recoveryClass: RecoveryClass.retrySameInput,
+          stage: 'transport',
+        );
+        notifyListeners();
+      }
+      return;
     }
     if (!_isCurrent(generation, revision)) return;
     _lastRequest = null;
@@ -513,6 +526,19 @@ final class PlanningHostViewModel extends ChangeNotifier {
         await _savePending();
       } else {
         _setApiFailure(error);
+      }
+      return;
+    } on Object {
+      if (_isCurrent(generation, revision)) {
+        _phase = PlanningHostPhase.error;
+        _failure = const PlanningHostFailure(
+          code: 'CLIENT_RUNTIME_ERROR',
+          message:
+              'The planning request failed locally before a usable response was produced. Retry the same request.',
+          recoveryClass: RecoveryClass.retrySameInput,
+          stage: 'transport',
+        );
+        notifyListeners();
       }
       return;
     }

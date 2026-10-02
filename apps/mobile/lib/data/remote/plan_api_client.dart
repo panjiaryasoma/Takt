@@ -123,6 +123,14 @@ final class HttpPlanApiClient implements PlanApiClient {
         origin: FailureOrigin.local,
         transportResponseJson: response,
       );
+    } on Object catch (error) {
+      throw PlanApiFailure(
+        code: 'RESPONSE_CONTRACT_INVALID',
+        stage: 'response',
+        message: error.toString(),
+        origin: FailureOrigin.local,
+        transportResponseJson: response,
+      );
     }
   }
 
@@ -224,6 +232,13 @@ final class HttpPlanApiClient implements PlanApiClient {
     } on http.ClientException catch (error) {
       throw PlanApiFailure(
         code: 'CLIENT_CONNECTION_FAILED',
+        stage: 'transport',
+        message: error.toString(),
+        origin: FailureOrigin.clientTransport,
+      );
+    } on Object catch (error) {
+      throw PlanApiFailure(
+        code: 'CLIENT_NETWORK_ERROR',
         stage: 'transport',
         message: error.toString(),
         origin: FailureOrigin.clientTransport,

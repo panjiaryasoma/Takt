@@ -129,3 +129,9 @@ docs/evidence/release-candidate-final.md
 ```
 
 Do not create that final note before both release audits are complete.
+
+7A execution record: [backend release audit](../evidence/7a-backend-release-audit.md).
+
+7B execution record: [mobile release audit](../evidence/7b-mobile-release-audit.md).
+
+Final release-candidate closure: [release-candidate final evidence](../evidence/release-candidate-final.md).

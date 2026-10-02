@@ -260,6 +260,44 @@ void main() {
     host.dispose();
   });
 
+  testWidgets('Planning task save with a focused field does not crash',
+      (tester) async {
+    final host = PlanningHostViewModel(
+      apiClient: _ControlledPlanApi(),
+      scheduleRepository: schedule,
+      evaluationRepository: evaluations,
+      savedPlanRepository: savedPlans,
+    );
+    await host.startPlanning(snapshot);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: PlanningSetupScreen(host: host),
+        ),
+      ),
+    );
+
+    await tester.ensureVisible(find.text('Add task'));
+    await tester.tap(find.text('Add task'));
+    await tester.pumpAndSettle();
+
+    final dialog = find.byType(AlertDialog);
+    expect(dialog, findsOneWidget);
+    final taskNameField = find
+        .descendant(of: dialog, matching: find.byType(TextField))
+        .first;
+    await tester.tap(taskNameField);
+    await tester.enterText(taskNameField, 'Build prototype');
+
+    await tester.tap(find.text('Save task'));
+    await tester.pumpAndSettle();
+
+    expect(tester.takeException(), isNull);
+    expect(find.text('Build prototype'), findsOneWidget);
+    host.dispose();
+  });
+
   testWidgets('Planning Setup freezes authoritative fields while request is active',
       (tester) async {
     final api = _ControlledPlanApi(delayed: true);
@@ -502,6 +540,28 @@ void main() {
     expect(host.phase, PlanningHostPhase.setup);
     expect(host.activeSession, isNull);
     expect(await evaluations.evaluationById(evaluationId), isNull);
+    host.dispose();
+  });
+
+  test('unexpected request exception unlocks setup with retry available',
+      () async {
+    final api = _RawFailurePlanApi();
+    final host = PlanningHostViewModel(
+      apiClient: api,
+      scheduleRepository: schedule,
+      evaluationRepository: evaluations,
+      savedPlanRepository: savedPlans,
+    );
+
+    await host.startPlanning(snapshot);
+    host.addTask(_task());
+    await host.evaluate();
+
+    expect(host.phase, PlanningHostPhase.error);
+    expect(host.busy, isFalse);
+    expect(host.inputsLocked, isFalse);
+    expect(host.failure?.code, 'CLIENT_RUNTIME_ERROR');
+    expect(host.canRetryRequest, isTrue);
     host.dispose();
   });
 
@@ -1344,6 +1404,27 @@ final class _ControlledPlanApi implements PlanApiClient {
     required String currentEvaluationRequestJson,
   }) {
     throw UnimplementedError();
+  }
+
+  @override
+  void close() {}
+}
+
+final class _RawFailurePlanApi implements PlanApiClient {
+  @override
+  Future<PlanEvaluateTransportResult> evaluate({
+    required String evaluationRequestJson,
+  }) {
+    throw StateError('simulated unexpected transport/runtime failure');
+  }
+
+  @override
+  Future<PlanReevaluateTransportResult> reevaluate({
+    required String priorEvaluationId,
+    required String priorEvaluationResponseJson,
+    required String currentEvaluationRequestJson,
+  }) {
+    throw StateError('simulated unexpected transport/runtime failure');
   }
 
   @override
