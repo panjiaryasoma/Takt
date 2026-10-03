@@ -274,7 +274,7 @@
 			files = (
 			);
 			inputPaths = (
-				"$(SRCROOT)/../assets/branding/logo.png",
+				"$(SRCROOT)/../assets/icon/takt_app_icon_1024.jpg",
 			);
 			name = "Generate Takt Branding";
 			outputPaths = (

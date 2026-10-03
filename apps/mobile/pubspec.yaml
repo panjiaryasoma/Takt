@@ -24,8 +24,16 @@ dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^5.0.0
-  flutter_launcher_icons:
-  # Temporary Shipaton/TestFlight icon source. This file is opaque (no alpha).
+  flutter_launcher_icons: ^0.14.4
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
+    - assets/branding/
+    - assets/icon/
+
+flutter_launcher_icons:
   ios: true
   android: false
-  image_path_ios: "assets/icon/taktlogo_opaque.png"
+  image_path_ios: "assets/icon/takt_app_icon_1024.jpg"

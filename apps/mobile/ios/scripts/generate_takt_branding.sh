@@ -1,53 +1,30 @@
 #!/bin/sh
 set -eu
 
-SOURCE="$SRCROOT/../assets/branding/logo.png"
+SOURCE="$SRCROOT/../assets/icon/takt_app_icon_1024.jpg"
 APPICON_DIR="$SRCROOT/Runner/Assets.xcassets/AppIcon.appiconset"
+OUTPUT="$APPICON_DIR/takt_app_icon_1024.png"
 
 if [ ! -f "$SOURCE" ]; then
-  echo "error: Takt branding source not found at $SOURCE" >&2
+  echo "error: Takt iOS app icon source not found at $SOURCE" >&2
   exit 1
 fi
-
-mkdir -p "$APPICON_DIR"
-WORK_DIR="$(mktemp -d)"
-trap 'rm -rf "$WORK_DIR"' EXIT
 
 WIDTH="$(/usr/bin/sips -g pixelWidth "$SOURCE" | /usr/bin/awk '/pixelWidth/ {print $2}')"
 HEIGHT="$(/usr/bin/sips -g pixelHeight "$SOURCE" | /usr/bin/awk '/pixelHeight/ {print $2}')"
 
-if [ -z "$WIDTH" ] || [ -z "$HEIGHT" ]; then
-  echo "error: could not read Takt logo dimensions" >&2
+if [ "$WIDTH" != "1024" ] || [ "$HEIGHT" != "1024" ]; then
+  echo "error: Takt iOS app icon must be exactly 1024x1024, got ${WIDTH}x${HEIGHT}" >&2
   exit 1
 fi
 
-SIDE="$WIDTH"
-if [ "$HEIGHT" -lt "$WIDTH" ]; then
-  SIDE="$HEIGHT"
+mkdir -p "$APPICON_DIR"
+/usr/bin/sips -s format png "$SOURCE" --out "$OUTPUT" >/dev/null
+
+HAS_ALPHA="$(/usr/bin/sips -g hasAlpha "$OUTPUT" | /usr/bin/awk '/hasAlpha/ {print $2}')"
+if [ "$HAS_ALPHA" != "no" ]; then
+  echo "error: generated Takt iOS app icon contains an alpha channel" >&2
+  exit 1
 fi
 
-SQUARE="$WORK_DIR/takt-square.jpg"
-/usr/bin/sips --cropToHeightWidth "$SIDE" "$SIDE" "$SOURCE" --out "$SQUARE" >/dev/null
-
-make_icon() {
-  NAME="$1"
-  PIXELS="$2"
-  /usr/bin/sips -s format png -z "$PIXELS" "$PIXELS" "$SQUARE" \
-    --out "$APPICON_DIR/$NAME" >/dev/null
-}
-
-make_icon "Icon-App-20x20@1x.png" 20
-make_icon "Icon-App-20x20@2x.png" 40
-make_icon "Icon-App-20x20@3x.png" 60
-make_icon "Icon-App-29x29@1x.png" 29
-make_icon "Icon-App-29x29@2x.png" 58
-make_icon "Icon-App-29x29@3x.png" 87
-make_icon "Icon-App-40x40@1x.png" 40
-make_icon "Icon-App-40x40@2x.png" 80
-make_icon "Icon-App-40x40@3x.png" 120
-make_icon "Icon-App-60x60@2x.png" 120
-make_icon "Icon-App-60x60@3x.png" 180
-make_icon "Icon-App-76x76@1x.png" 76
-make_icon "Icon-App-76x76@2x.png" 152
-make_icon "Icon-App-83.5x83.5@2x.png" 167
-make_icon "Icon-App-1024x1024@1x.png" 1024
+echo "Generated opaque iOS AppIcon from $SOURCE"
